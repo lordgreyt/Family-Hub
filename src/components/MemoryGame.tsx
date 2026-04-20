@@ -53,7 +53,7 @@ export const MemoryGame = ({ onExit, onReplay, onSaveScore, highScore }: { onExi
   }, [isGameOver, moves, onSaveScore]);
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'var(--color-bg)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#ffffff', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
        <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
             <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-text)' }}>Versuche: {moves}</span>
@@ -114,7 +114,7 @@ export const MemoryGame = ({ onExit, onReplay, onSaveScore, highScore }: { onExi
               <p style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Benötigte Versuche: {moves}</p>
               {highScore > 0 && <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#facc15' }}>Rekord: {highScore}</p>}
               <button onClick={() => { resetGame(); onReplay(); }} className="btn btn-primary" style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1.5rem' }}>
-                  <RefreshCw size={18} /> Noch eine Runde (5 🌟)
+                  <RefreshCw size={18} /> Noch eine Runde (2 🌟)
               </button>
           </div>
       )}

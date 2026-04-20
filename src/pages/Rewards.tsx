@@ -19,6 +19,10 @@ export const Rewards = () => {
   const [exchangeAmount, setExchangeAmount] = useState<number | ''>('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeGame, setActiveGame] = useState<'SNAKE' | 'MEMORY' | 'FLAPPY' | 'WHACKAMO' | null>(null);
+  const [acknowledgedApprovals, setAcknowledgedApprovals] = useState<string[]>(() => {
+    const saved = localStorage.getItem('acknowledged_stars_approvals');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   const [adjustments, setAdjustments] = useState<Record<string, number | ''>>({});
 
@@ -244,8 +248,9 @@ export const Rewards = () => {
   };
 
   const deductPlayCost = () => {
-    if (balance < 5) return false;
-    mockDb.addRewardRequest({ childId: user.id, stars: 5, status: 'APPROVED' });
+    if (balance < 2) return false;
+    const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    mockDb.addRewardRequest({ id: gameId, childId: user.id, stars: 2, status: 'APPROVED' });
     return true;
   };
 
@@ -253,7 +258,7 @@ export const Rewards = () => {
     if (deductPlayCost()) {
       setActiveGame(gameId);
     } else {
-      alert("Nicht genug Sterne! Du brauchst 5 Sterne, um eine Runde zu spielen.");
+      alert("Nicht genug Sterne! Du brauchst 2 Sterne, um eine Runde zu spielen.");
     }
   };
 
@@ -268,6 +273,19 @@ export const Rewards = () => {
     mockDb.updateHighScore({ gameId, childId: user.id, score }, lowerIsBetter);
   };
 
+  // Newly approved requests that haven't been acknowledged (excluding games)
+  const newApprovals = myRequests.filter(r => 
+    r.status === 'APPROVED' && 
+    !acknowledgedApprovals.includes(r.id) && 
+    !r.id.startsWith('game-')
+  );
+
+  const acknowledgeApproval = (id: string) => {
+    const next = [...acknowledgedApprovals, id];
+    setAcknowledgedApprovals(next);
+    localStorage.setItem('acknowledged_stars_approvals', JSON.stringify(next));
+  };
+
   return (
     <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto' }}>
       
@@ -276,7 +294,29 @@ export const Rewards = () => {
       {activeGame === 'FLAPPY' && <FlappyGame onExit={() => setActiveGame(null)} onReplay={handleReplay} onSaveScore={(s) => handleSaveScore('FLAPPY', s)} highScore={getHighScore('FLAPPY')} />}
       {activeGame === 'WHACKAMO' && <WhackAMoleGame onExit={() => setActiveGame(null)} onReplay={handleReplay} onSaveScore={(s) => handleSaveScore('WHACKAMO', s)} highScore={getHighScore('WHACKAMO')} />}
       
-      {/* Header / Balance */}
+      {/* Approval Notifications */}
+      {newApprovals.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {newApprovals.map(req => (
+            <div key={req.id} className="glass-panel" style={{ padding: '1rem', border: '2px solid var(--color-success)', background: 'rgba(16, 185, 129, 0.1)', animation: 'slideIn 0.3s ease-out' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h4 style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <Check size={20} /> Genehmigt!
+                  </h4>
+                  <p style={{ fontSize: 'var(--font-sm)', lineHeight: 1.4 }}>
+                    Deine Anfrage über <strong>{req.stars > 0 ? req.stars : Math.abs(req.stars)} Sterne</strong> wurde {req.stars < 0 ? 'gutgeschrieben' : 'genehmigt und abgezogen'}. Viel Spaß!
+                  </p>
+                </div>
+                <button onClick={() => acknowledgeApproval(req.id)} style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(255,152,0,0.1) 100%)' }}>
         <h2 style={{ fontSize: '1.2rem', color: 'var(--color-primary-dark)', marginBottom: '0.5rem' }}>Dein Sternenkonto</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '3rem', fontWeight: 800, color: '#f59e0b', textShadow: '0 2px 10px rgba(245, 158, 11, 0.3)' }}>
@@ -297,10 +337,10 @@ export const Rewards = () => {
             <button 
                 onClick={() => handlePlayGame('SNAKE')} 
                 className="btn btn-primary" 
-                disabled={balance < 5}
+                disabled={balance < 2}
                 style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '0.25rem', justifyContent: 'center' }}
             >
-                <Play size={14} /> 5 <Star size={12} fill="currentColor" />
+                <Play size={14} /> 2 <Star size={12} fill="currentColor" />
             </button>
           </div>
           <div style={{ background: 'var(--color-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
@@ -309,10 +349,10 @@ export const Rewards = () => {
             <button 
                 onClick={() => handlePlayGame('MEMORY')} 
                 className="btn btn-primary" 
-                disabled={balance < 5}
+                disabled={balance < 2}
                 style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '0.25rem', justifyContent: 'center' }}
             >
-                <Play size={14} /> 5 <Star size={12} fill="currentColor" />
+                <Play size={14} /> 2 <Star size={12} fill="currentColor" />
             </button>
           </div>
           <div style={{ background: 'var(--color-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
@@ -321,10 +361,10 @@ export const Rewards = () => {
             <button 
                 onClick={() => handlePlayGame('FLAPPY')} 
                 className="btn btn-primary" 
-                disabled={balance < 5}
+                disabled={balance < 2}
                 style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '0.25rem', justifyContent: 'center' }}
             >
-                <Play size={14} /> 5 <Star size={12} fill="currentColor" />
+                <Play size={14} /> 2 <Star size={12} fill="currentColor" />
             </button>
           </div>
           <div style={{ background: 'var(--color-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
@@ -333,15 +373,15 @@ export const Rewards = () => {
             <button 
                 onClick={() => handlePlayGame('WHACKAMO')} 
                 className="btn btn-primary" 
-                disabled={balance < 5}
+                disabled={balance < 2}
                 style={{ width: '100%', marginTop: 'auto', display: 'flex', gap: '0.25rem', justifyContent: 'center' }}
             >
-                <Play size={14} /> 5 <Star size={12} fill="currentColor" />
+                <Play size={14} /> 2 <Star size={12} fill="currentColor" />
             </button>
           </div>
         </div>
         <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginTop: '1rem', textAlign: 'center' }}>
-          Jede gespielte Runde kostet 5 Sterne.
+          Jede gespielte Runde kostet 2 Sterne.
         </p>
       </div>
 
@@ -430,22 +470,50 @@ export const Rewards = () => {
       {/* History */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <h3 style={{ marginBottom: '1rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <History size={20} /> Erledigte Aufgaben
+          <History size={20} /> Sterne-Historie
         </h3>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {completedTasks.length === 0 ? (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>Noch keine Aufgaben erledigt.</p>
-          ) : (
-            completedTasks.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ fontSize: 'var(--font-sm)', flex: 1 }}>{t.content}</span>
-                <span style={{ fontWeight: 600, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  +{PRIO_STARS[t.priority]} <Star size={14} fill="#f59e0b" />
-                </span>
-              </div>
-            ))
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Earnings (Tasks) */}
+          <div>
+            <h4 style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Verdienst (Aufgaben)</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {completedTasks.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontStyle: 'italic' }}>Noch keine Aufgaben erledigt.</p>
+              ) : (
+                completedTasks.map(t => (
+                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                    <span style={{ fontSize: 'var(--font-sm)' }}>{t.content}</span>
+                    <span style={{ fontWeight: 600, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
+                      +{PRIO_STARS[t.priority]} <Star size={12} fill="#f59e0b" />
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Spendings (Approved Requests & Games) */}
+          <div>
+            <h4 style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Eintausch & Abzüge</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {myRequests.filter(r => r.status === 'APPROVED' && !r.id.startsWith('game-') && r.stars !== 5).length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontStyle: 'italic' }}>Noch nichts eingetauscht.</p>
+              ) : (
+                myRequests.filter(r => r.status === 'APPROVED' && !r.id.startsWith('game-') && r.stars !== 5).sort((a,b) => b.createdAt - a.createdAt).map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 'var(--font-sm)' }}>{r.stars > 0 ? (r.id.startsWith('game-') ? 'Gespielt' : 'Medienzeit') : 'Gutschrift (Eltern)'}</span>
+                      <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.createdAt).toLocaleDateString('de-DE')}</span>
+                    </div>
+                    <span style={{ fontWeight: 600, color: r.stars > 0 ? 'var(--color-danger)' : 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
+                      {r.stars > 0 ? '-' : '+'}{Math.abs(r.stars)} <Star size={12} fill="currentColor" />
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
       

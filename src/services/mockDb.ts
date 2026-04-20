@@ -300,9 +300,9 @@ export const mockDb = {
     }
     return reqs;
   },
-  addRewardRequest: (req: Omit<RewardRequest, 'id' | 'createdAt'>) => {
+  addRewardRequest: (req: Omit<RewardRequest, 'id' | 'createdAt'> & { id?: string }) => {
     const rewards = mockDb.getRewardRequests();
-    set(DB_KEYS.REWARDS, [...rewards, { ...req, id: uuidv4(), createdAt: Date.now() }]);
+    set(DB_KEYS.REWARDS, [...rewards, { id: uuidv4(), ...req, createdAt: Date.now() }]);
   },
   updateRewardRequest: (updatedReq: RewardRequest) => {
     const rewards = mockDb.getRewardRequests();
