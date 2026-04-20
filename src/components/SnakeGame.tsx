@@ -15,7 +15,7 @@ export const SnakeGame = ({ onExit, onReplay, onSaveScore, highScore }: { onExit
   const directionRef = useRef(direction);
 
   const generateFood = useCallback(() => {
-    let newFood;
+    let newFood: { x: number, y: number };
     while (true) {
       newFood = {
         x: Math.floor(Math.random() * GRID_SIZE),

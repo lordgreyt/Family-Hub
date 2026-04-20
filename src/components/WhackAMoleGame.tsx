@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Trophy, RefreshCw, X, Clock } from 'lucide-react';
 
 const GRID_SIZE = 9;

@@ -12,7 +12,7 @@ import { Meals } from './pages/Meals';
 import { Rewards } from './pages/Rewards';
 import { Setup } from './pages/Setup';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { initFirebase } from './services/mockDb';
 
 import './index.css';
