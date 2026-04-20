@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { NoteItem, TaskItem, User, RewardRequest } from '../services/mockDb';
-import { Calendar, AlertTriangle, Filter, Star, Check, X } from 'lucide-react';
+import { Calendar, AlertTriangle, Filter, Star, Check, X, Save, Trash2 } from 'lucide-react';
+import { RichTextEditor } from '../components/RichTextEditor';
+
+const LONG_PRESS_MS = 500;
 
 export const Dashboard = () => {
   const { user } = useAuth();
@@ -11,80 +14,84 @@ export const Dashboard = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [rewardRequests, setRewardRequests] = useState<RewardRequest[]>([]);
   const [taskAssigneeFilter, setTaskAssigneeFilter] = useState<string>('');
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+  const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
+
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadData = () => {
       const allNotes = mockDb.getNotes().filter(note => note.isShared);
-      setRecentNotes(allNotes.slice(0, 3)); // Get top 3
+      setRecentNotes(allNotes.slice(0, 3));
 
-      // Calculate upcoming tasks (4 weeks)
       const fourWeeksFromNow = new Date();
       fourWeeksFromNow.setDate(fourWeeksFromNow.getDate() + 28);
       fourWeeksFromNow.setHours(23, 59, 59, 999);
 
       const tasks = mockDb.getTasks().filter(t => {
-        // Show shared tasks or personal tasks
         const hasAccess = t.isShared || t.createdBy === user?.id;
         if (!hasAccess || t.isDone) return false;
-        if (!t.dueDate) return true; // Keep tasks without due date
-        
+        if (!t.dueDate) return true;
         const due = new Date(t.dueDate);
         return due <= fourWeeksFromNow;
       }).sort((a, b) => {
-        // Sort by priority first
-        if (a.priority !== b.priority) {
-          return b.priority - a.priority;
-        }
-        
-        // Inside same priority group:
+        if (a.priority !== b.priority) return b.priority - a.priority;
         if (!a.dueDate && !b.dueDate) return 0;
-        // Items without due date go to the bottom of their priority group
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
-        
-        // Both have due date, sort ascending by date
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
-      
+
       setUpcomingTasks(tasks);
       setUsers(mockDb.getUsers());
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
     };
-    
+
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
   }, []);
 
-  return (
-    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+  const startPress = (note: NoteItem) => {
+    pressTimer.current = setTimeout(() => {
+      setEditingNote({ ...note });
+      setExpandedNotes(prev => { const n = new Set(prev); n.delete(note.id); return n; });
+    }, LONG_PRESS_MS);
+  };
 
-      {/* Offene Belohnungs-Anfragen (nur für Eltern) */}
+  const cancelPress = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNote || !editingNote.content.trim()) return;
+    mockDb.updateNote(editingNote);
+    setEditingNote(null);
+  };
+
+  const handleDeleteNote = (id: string) => {
+    if (confirm('Notiz wirklich löschen?')) {
+      mockDb.deleteNote(id);
+      setEditingNote(null);
+    }
+  };
+
+  return (
+    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+      {/* Offene Belohnungs-Anfragen Info (nur für Eltern) */}
       {!user?.isChild && rewardRequests.length > 0 && (
-        <div className="glass-panel" style={{ padding: '1rem', border: '2px solid #f59e0b' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#d97706' }}>
-            <Star size={20} fill="#f59e0b" /> Offene Sternen-Anfragen
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {rewardRequests.map(req => {
-              const reqUser = users.find(u => u.id === req.childId);
-              return (
-                <div key={req.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <strong>{reqUser?.avatar} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => mockDb.updateRewardRequest({ ...req, status: 'REJECTED' })} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
-                      <X size={16} /> Abweisen
-                    </button>
-                    <button onClick={() => mockDb.updateRewardRequest({ ...req, status: 'APPROVED' })} className="btn btn-primary" style={{ padding: '0.5rem', backgroundColor: '#f59e0b', color: 'white', border: 'none' }}>
-                      <Check size={16} /> Bestätigen
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <div className="glass-panel" style={{ padding: '0.75rem 1rem', border: '1px solid #f59e0b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#d97706' }}>
+            <Star size={20} fill="#f59e0b" />
+            <strong style={{ fontSize: 'var(--font-sm)' }}>
+              {rewardRequests.length} offene {rewardRequests.length === 1 ? 'Anfrage' : 'Anfragen'}
+            </strong>
           </div>
+          <a href="/rewards" style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)', fontWeight: 600, padding: '0.25rem 0.5rem', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)' }}>
+            Ansehen
+          </a>
         </div>
       )}
 
@@ -96,7 +103,7 @@ export const Dashboard = () => {
               Aufgaben (Top 4 Wochen)
             </h3>
           </div>
-          
+
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
             <button
               onClick={() => setTaskAssigneeFilter('')}
@@ -138,12 +145,12 @@ export const Dashboard = () => {
             {upcomingTasks.filter(t => !taskAssigneeFilter || t.assignedTo === taskAssigneeFilter).map(task => {
               const overdue = task.dueDate ? new Date(task.dueDate) < new Date(new Date().setHours(0,0,0,0)) : false;
               return (
-                <div key={task.id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div key={task.id} className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ fontWeight: task.priority === 3 ? 600 : 400 }}>{task.content}</div>
                     {task.assignedTo && (
-                      <div style={{ fontSize: '1rem', opacity: 0.8 }} title={`Zugewiesen an ${task.assignedTo}`}>
-                        {users.find(u => u.id === task.assignedTo)?.avatar}
+                      <div style={{ fontSize: '0.9rem', opacity: 0.8, color: 'var(--color-text-muted)' }} title={`Zugewiesen an ${task.assignedTo}`}>
+                        ({task.assignedTo})
                       </div>
                     )}
                   </div>
@@ -183,19 +190,92 @@ export const Dashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {recentNotes.map(note => {
               const author = mockDb.getUsers().find(u => u.id === note.createdBy);
+              const isExpanded = expandedNotes.has(note.id);
+
+              // Edit mode
+              if (editingNote?.id === note.id) {
+                return (
+                  <form
+                    key={note.id}
+                    onSubmit={handleSaveEdit}
+                    className="glass-panel"
+                    style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '2px solid var(--color-primary)' }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Überschrift (optional)"
+                      className="input-field"
+                      value={editingNote.title || ''}
+                      onChange={e => setEditingNote({ ...editingNote, title: e.target.value || undefined })}
+                    />
+                    <RichTextEditor
+                      placeholder="Notiz bearbeiten..."
+                      value={editingNote.content}
+                      initialValue={editingNote.content}
+                      onChange={val => setEditingNote({ ...editingNote, content: val })}
+                    />
+                    <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 500 }}>{author?.id || note.createdBy}</span>
+                      <span>&bull;</span>
+                      <span>{new Date(note.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => setEditingNote(null)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+                        <X size={16} /> Abbrechen
+                      </button>
+                      <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                        <Save size={16} /> Speichern
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteNote(note.id)}
+                      style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)', alignSelf: 'flex-start' }}
+                    >
+                      <Trash2 size={16} /> Löschen
+                    </button>
+                  </form>
+                );
+              }
+
+              // Normal view — no footer, long-press to edit, tap to expand
               return (
-                <div key={note.id} className="glass-panel" style={{ padding: '1rem 1rem 0.5rem 1rem' }}>
-                  <div 
+                <div
+                  key={note.id}
+                  className="glass-panel"
+                  style={{ padding: '1rem 1rem 0.75rem 1rem', userSelect: 'none', cursor: 'default' }}
+                  onMouseDown={() => startPress(note)}
+                  onMouseUp={e => {
+                    cancelPress();
+                    // simple click = toggle expand
+                    setExpandedNotes(prev => {
+                      const next = new Set(prev);
+                      if (next.has(note.id)) { next.delete(note.id); } else { next.add(note.id); }
+                      return next;
+                    });
+                  }}
+                  onMouseLeave={cancelPress}
+                  onTouchStart={() => startPress(note)}
+                  onTouchEnd={e => {
+                    cancelPress();
+                  }}
+                  onTouchMove={cancelPress}
+                  onContextMenu={e => e.preventDefault()}
+                >
+                  {note.title && (
+                    <div style={{ fontWeight: 700, fontSize: 'var(--font-base)', color: 'var(--color-text)', marginBottom: '0.25rem' }}>
+                      {note.title}
+                    </div>
+                  )}
+                  <div
                     className="rich-text-content"
-                    style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', paddingBottom: '0.25rem' }}
-                    dangerouslySetInnerHTML={{ __html: note.content }} 
+                    style={{
+                      color: 'var(--color-text-muted)',
+                      fontSize: 'var(--font-sm)',
+                      ...(isExpanded ? {} : { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const })
+                    }}
+                    dangerouslySetInnerHTML={{ __html: note.content }}
                   />
-                  <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>
-                    <span style={{ fontSize: '1rem', lineHeight: 1 }}>{author?.avatar}</span>
-                    <span style={{ fontWeight: 500 }}>{author?.id || note.createdBy}</span>
-                    <span>&bull;</span>
-                    <span>{new Date(note.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                  </div>
                 </div>
               );
             })}

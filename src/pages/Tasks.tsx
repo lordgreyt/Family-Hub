@@ -112,7 +112,7 @@ export const Tasks = () => {
   };
 
   return (
-    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
+    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
       
       <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--color-surface)', padding: '0.5rem', borderRadius: 'var(--radius-lg)' }}>
         <button 
@@ -320,21 +320,12 @@ export const Tasks = () => {
                         gap: '0.25rem',
                         color: 'var(--color-text)',
                       }}>
-                        <UserIcon size={12} /> {users.find(u => u.id === task.assignedTo)?.avatar || ''} {task.assignedTo}
+                        <UserIcon size={12} /> {task.assignedTo}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {activeTab === 'SHARED' && (
-                      <>
-                        <span style={{ fontSize: '1rem', lineHeight: 1 }}>{author?.avatar}</span>
-                        <span style={{ fontWeight: 500 }}>{author?.id || task.createdBy}</span>
-                        <span>&bull;</span>
-                      </>
-                    )}
-                    <span>{new Date(task.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                  </div>
+
                 </div>
               </div>
             );

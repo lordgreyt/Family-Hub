@@ -5,16 +5,27 @@ interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  initialValue?: string;
 }
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder, initialValue }) => {
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // Set initial content on mount (needed for edit mode where content already exists)
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      if (!value) {
-        editorRef.current.innerHTML = '';
+    if (editorRef.current) {
+      const startContent = initialValue ?? value;
+      if (startContent) {
+        editorRef.current.innerHTML = startContent;
       }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clear when value is reset to empty (e.g. after saving a new note)
+  useEffect(() => {
+    if (!value && editorRef.current) {
+      editorRef.current.innerHTML = '';
     }
   }, [value]);
 

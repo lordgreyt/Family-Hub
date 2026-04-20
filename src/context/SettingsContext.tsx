@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber';
+type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
 type FontSize = 'small' | 'base' | 'large';
 
 interface AppSettings {

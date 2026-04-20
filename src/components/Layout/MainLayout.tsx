@@ -16,6 +16,11 @@ export const MainLayout = () => {
     return <Outlet />;
   }
 
+  // Children cannot access the budget page
+  if (user?.isChild && location.pathname === '/budget') {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <>
       <TopBar />

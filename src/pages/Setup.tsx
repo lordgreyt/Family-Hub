@@ -97,7 +97,7 @@ export const Setup = () => {
   };
 
   return (
-    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
@@ -113,6 +113,11 @@ export const Setup = () => {
             <option value="rose">Rose</option>
             <option value="emerald">Smaragd (Emerald)</option>
             <option value="amber">Bernstein (Amber)</option>
+            <option value="cyan">Cyan</option>
+            <option value="violet">Violett</option>
+            <option value="slate">Schiefergrau (Slate)</option>
+            <option value="teal">Petrol (Teal)</option>
+            <option value="pink">Pink</option>
           </select>
           <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
             Wähle eine Farbe, die dir gefällt.
@@ -147,20 +152,21 @@ export const Setup = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
               {dbUsers.map(u => (
-                <div key={u.id} style={{ padding: '0.75rem 1rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.25rem' }}>{u.avatar}</span> <strong>{u.id}</strong> 
+                    <span style={{ fontSize: '1.25rem' }}>{u.avatar}</span>
+                    <strong>{u.id}</strong>
                     {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
-                    {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8 }}>Kindermodus</span>}
+                    {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
                     {u.id !== user.id && u.id !== 'Falko' && !u.isAdmin && (
                       <button 
                         onClick={() => handleToggleChild(u)} 
                         className="btn" 
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer' }}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                       >
-                        {u.isChild ? 'Als Erwachsenen setzen' : 'Als Kind setzen'}
+                        {u.isChild ? 'Erwachsene' : 'Kind'}
                       </button>
                     )}
                     {u.id !== user.id && (

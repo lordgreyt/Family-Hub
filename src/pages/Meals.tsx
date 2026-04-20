@@ -145,7 +145,7 @@ export const Meals = () => {
   };
 
   return (
-    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', overflowY: 'auto' }}>
+    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto' }}>
       
       {/* Pending Requests for Adults */}
       {!isChild && pendingRequests.length > 0 && (

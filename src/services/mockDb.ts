@@ -226,6 +226,10 @@ export const mockDb = {
     const notes = mockDb.getNotes();
     set(DB_KEYS.NOTES, notes.filter(note => note.id !== id));
   },
+  updateNote: (updatedNote: NoteItem) => {
+    const notes = mockDb.getNotes();
+    set(DB_KEYS.NOTES, notes.map(n => n.id === updatedNote.id ? updatedNote : n));
+  },
 
   // Tasks (Shared & Private)
   getTasks: (): TaskItem[] => get(DB_KEYS.TASKS, []),

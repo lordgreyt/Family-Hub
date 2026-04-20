@@ -6,11 +6,11 @@ export const BottomNav = () => {
   const { user } = useAuth();
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
-    { to: '/budget', icon: Calculator, label: 'Budget' },
+    ...(!user?.isChild ? [{ to: '/budget', icon: Calculator, label: 'Budget' }] : []),
     { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
     { to: '/notes', icon: BookOpen, label: 'Notizen' },
     { to: '/meals', icon: Utensils, label: 'Mahlzeit' },
-    ...(user?.isChild ? [{ to: '/rewards', icon: Star, label: 'Sterne' }] : []),
+    { to: '/rewards', icon: Star, label: 'Sterne' },
     { to: '/setup', icon: Settings, label: 'Setup' },
   ];
 
