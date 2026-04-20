@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
-import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X } from 'lucide-react';
+import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
 import { FlappyGame } from '../components/FlappyGame';
@@ -19,6 +19,8 @@ export const Rewards = () => {
   const [exchangeAmount, setExchangeAmount] = useState<number | ''>('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeGame, setActiveGame] = useState<'SNAKE' | 'MEMORY' | 'FLAPPY' | 'WHACKAMO' | null>(null);
+  
+  const [adjustments, setAdjustments] = useState<Record<string, number | ''>>({});
 
   useEffect(() => {
     const load = () => {
@@ -97,6 +99,23 @@ export const Rewards = () => {
     const childAccounts = users.filter(u => u.isChild);
     const pendingRequests = requests.filter(r => r.status === 'PENDING');
 
+    const handleManualAdjustment = (childId: string, isAdd: boolean) => {
+      const amountStr = adjustments[childId];
+      if (!amountStr || amountStr <= 0) return;
+      const amount = Number(amountStr);
+      
+      // isAdd = true means parent adds stars. To add balance, spentOrPendingStars should DECREASE. So stars must be negative.
+      // isAdd = false means parent removes stars. To reduce balance, spentOrPendingStars should INCREASE. So stars must be positive.
+      const dbStars = isAdd ? -amount : amount;
+
+      mockDb.addRewardRequest({
+        childId: childId,
+        stars: dbStars,
+        status: 'APPROVED'
+      });
+      setAdjustments(prev => ({ ...prev, [childId]: '' }));
+    };
+
     return (
       <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto' }}>
         
@@ -116,13 +135,45 @@ export const Rewards = () => {
                 const childBalance = childEarnedStars - childSpentStars;
                 
                 return (
-                  <div key={child.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.5rem' }}>{child.avatar}</span>
-                      <strong style={{ fontSize: '1.1rem' }}>{child.id}</strong>
+                  <div key={child.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>{child.avatar}</span>
+                        <strong style={{ fontSize: '1.1rem' }}>{child.id}</strong>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '1.2rem', fontWeight: 'bold', color: '#f59e0b' }}>
+                        {childBalance} <Star size={20} fill="#f59e0b" />
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '1.2rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                      {childBalance} <Star size={20} fill="#f59e0b" />
+                    {/* Manual Adjustment Field */}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <input 
+                        type="number"
+                        className="input-field"
+                        placeholder="Menge..."
+                        value={adjustments[child.id] || ''}
+                        onChange={(e) => setAdjustments(prev => ({ ...prev, [child.id]: Number(e.target.value) || '' }))}
+                        min="1"
+                        style={{ flex: 1, padding: '0.5rem' }}
+                      />
+                      <button 
+                        onClick={() => handleManualAdjustment(child.id, true)} 
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.5rem 0.75rem', color: 'var(--color-success)', borderColor: 'var(--color-success)' }}
+                        disabled={!adjustments[child.id]}
+                        title="Sterne gutschreiben"
+                      >
+                        <Plus size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleManualAdjustment(child.id, false)} 
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.5rem 0.75rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                        disabled={!adjustments[child.id]}
+                        title="Sterne abziehen"
+                      >
+                        <Minus size={18} />
+                      </button>
                     </div>
                   </div>
                 );
