@@ -1,56 +1,96 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../services/firebase';
 import { mockDb } from '../services/mockDb';
 import type { User } from '../services/mockDb';
 
 const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄'];
 
 export const Login = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   // For first-time setup
   const [selectedAvatar, setSelectedAvatar] = useState(EMOJI_OPTIONS[0]);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [tempUser, setTempUser] = useState<User | null>(null);
 
-  const { login } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    setUsers(mockDb.getUsers());
-  }, []);
+    if (!loading && user) {
+      if (user.isSetupComplete === false) {
+        setNeedsSetup(true);
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, loading, navigate]);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoggingIn(true);
     
-    if (!selectedUser) return;
-    
-    if (selectedUser.password && selectedUser.password !== password) {
-      setError('Falsches Passwort');
-      return;
-    }
-    
-    if (selectedUser.isSetupComplete === false) {
-      setNeedsSetup(true);
-    } else {
-      login(selectedUser);
-      navigate('/');
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // The onAuthStateChanged in AuthContext will handle the user state.
+      // But we need to check if user needs setup immediately for better UX.
+      const hubUser = mockDb.getUsers().find(u => u.uid === firebaseUser.uid);
+      
+      if (hubUser && hubUser.isSetupComplete === false) {
+        setTempUser(hubUser);
+        setNeedsSetup(true);
+      }
+      // If hubUser is complete, useEffect will redirect.
+      // If hubUser doesn't exist at all, we might need to create one, 
+      // but for now we assume they are pre-linked.
+    } catch (err: any) {
+      console.error("Login error:", err);
+      switch (err.code) {
+        case 'auth/user-not-found':
+          setError('Benutzer nicht gefunden.');
+          break;
+        case 'auth/wrong-password':
+          setError('Falsches Passwort.');
+          break;
+        case 'auth/invalid-email':
+          setError('Ungültige E-Mail Adresse.');
+          break;
+        case 'auth/invalid-credential':
+          setError('E-Mail oder Passwort ist falsch.');
+          break;
+        default:
+          setError('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleSetupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUser) return;
+    if (!user && !tempUser) return;
     
-    const updatedUser = { ...selectedUser, avatar: selectedAvatar, isSetupComplete: true };
+    const targetUser = user || tempUser;
+    if (!targetUser) return;
+
+    const updatedUser = { ...targetUser, avatar: selectedAvatar, isSetupComplete: true };
     mockDb.updateUser(updatedUser);
-    login(updatedUser);
+    
+    // AuthContext will pick up the changes via the db_updated event 
+    // or we can manually navigate since we know setup is done.
     navigate('/');
   };
+
+  if (loading) return null;
 
   return (
     <div style={{
@@ -69,7 +109,7 @@ export const Login = () => {
         {needsSetup ? (
           <form onSubmit={handleSetupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <h2 style={{ fontSize: '1.25rem', color: 'var(--color-text)' }}>Erster Login - Setup</h2>
-            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Willkommen {selectedUser?.id}! Bitte wähle deinen Avatar aus.</p>
+            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Willkommen! Bitte wähle deinen Avatar aus.</p>
             
             <div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
@@ -96,33 +136,21 @@ export const Login = () => {
               Fertigstellen & Starten
             </button>
           </form>
-        ) : !selectedUser ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {users.map(user => (
-              <button
-                key={user.id}
-                onClick={() => setSelectedUser(user)}
-                className="btn btn-secondary"
-                style={{ justifyContent: 'flex-start', padding: '1rem' }}
-              >
-                <span style={{ fontSize: '1.5rem', opacity: user.isSetupComplete === false ? 0.5 : 1 }}>
-                  {user.isSetupComplete === false ? '❓' : user.avatar}
-                </span>
-                <span style={{ fontSize: '1.125rem' }}>{user.id}</span>
-              </button>
-            ))}
-            {users.length === 0 && <p>Keine Nutzer gefunden.</p>}
-          </div>
         ) : (
           <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)' }}>
-              <span style={{ fontSize: '1.5rem', opacity: selectedUser.isSetupComplete === false ? 0.5 : 1 }}>
-                {selectedUser.isSetupComplete === false ? '❓' : selectedUser.avatar}
-              </span>
-              <span style={{ fontWeight: 600 }}>{selectedUser.id}</span>
-              <button type="button" onClick={() => { setSelectedUser(null); setPassword(''); setError(''); }} style={{ marginLeft: 'auto', fontSize: '0.875rem', color: 'var(--color-primary)' }}>Ändern</button>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>E-Mail</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="input-field" 
+                placeholder="beispiel@mail.de"
+                autoFocus
+                required 
+              />
             </div>
-            
+
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Passwort</label>
               <input 
@@ -130,14 +158,20 @@ export const Login = () => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="input-field" 
-                autoFocus
+                placeholder="••••••••"
                 required 
               />
-              {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{error}</p>}
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-              Einloggen
+            {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{error}</p>}
+
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ marginTop: '1rem' }}
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn ? 'Anmeldung...' : 'Einloggen'}
             </button>
           </form>
         )}

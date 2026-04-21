@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Home, Calculator, BookOpen, Settings, CheckSquare, Utensils, Star, X } from 'lucide-react';
+import { Home, Calculator, BookOpen, Settings, CheckSquare, Utensils, Star, X, Wallet } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -12,7 +12,10 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
-    ...(!user?.isChild ? [{ to: '/budget', icon: Calculator, label: 'Budget' }] : []),
+    ...(!user?.isChild ? [
+      { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
+      { to: '/budget', icon: Calculator, label: 'Budget' }
+    ] : []),
     { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
     { to: '/notes', icon: BookOpen, label: 'Notizen' },
     { to: '/meals', icon: Utensils, label: 'Mahlzeit' },

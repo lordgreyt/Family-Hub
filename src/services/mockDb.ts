@@ -5,12 +5,13 @@ import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/d
 // Types
 export interface User {
   id: string; // The user's typed alias (e.g. "Markus")
+  uid?: string; // Firebase Authentication UID
   avatar: string; // Emoji
-  password?: string;
   isAdmin?: boolean;
   isSetupComplete?: boolean;
   isChild?: boolean;
   unlockedGames?: string[];
+  defaultPath?: string;
 }
 
 export interface BudgetItem {
@@ -73,15 +74,32 @@ export interface ScoreEntry {
   score: number;
 }
 
+export interface ExpenseItem {
+  id: string;
+  amount: number;
+  category: string;
+  date: string; // YYYY-MM-DD
+  type: 'INCOME' | 'EXPENSE';
+  description?: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface ExpenseBudget {
+  month: string; // YYYY-MM
+  amount: number;
+}
+
 // Initial Data
 const INITIAL_USERS: User[] = [
-  { id: 'Falko', avatar: '👨', password: 'admin', isAdmin: true, isSetupComplete: true },
-  { id: 'Markus', avatar: '👦', password: 'user', isSetupComplete: true },
-  { id: 'Sarah', avatar: '👩', password: 'user', isSetupComplete: true },
+  { id: 'Falko', uid: 'thOJVf4L9cd2BysM2bFOeuC14yV2', avatar: '👨', isAdmin: true, isSetupComplete: true },
+  { id: 'Anja', uid: 'zaKMNvN3UFTnFRE2VT8EmioWfGk1', avatar: '👩', isSetupComplete: true },
+  { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: '👦', isSetupComplete: true, isChild: true },
 ];
 
 export const DB_KEYS = {
   USERS: 'family_hub_users',
+  PROFILES: 'profiles',
   BUDGET: 'family_hub_budget',
   NOTES: 'family_hub_notes',
   TASKS: 'family_hub_tasks',
@@ -89,9 +107,10 @@ export const DB_KEYS = {
   MEAL_PLAN: 'family_hub_meal_plan',
   REWARDS: 'family_hub_rewards',
   LEADERBOARD: 'family_hub_leaderboard',
+  EXPENSES: 'family_hub_expenses',
+  EXPENSE_BUDGETS: 'family_hub_expense_budgets',
 };
 
-// Generic get helper: Returns data exclusively from local cache
 function get<T>(key: string, initialValue: T): T {
   const data = localStorage.getItem(key);
   if (!data) return initialValue;
@@ -133,7 +152,9 @@ export const initFirebase = async () => {
         ]),
         [DB_KEYS.MEAL_PLAN]: get(DB_KEYS.MEAL_PLAN, []),
         [DB_KEYS.REWARDS]: get(DB_KEYS.REWARDS, []),
-        [DB_KEYS.LEADERBOARD]: get(DB_KEYS.LEADERBOARD, [])
+        [DB_KEYS.LEADERBOARD]: get(DB_KEYS.LEADERBOARD, []),
+        [DB_KEYS.EXPENSES]: get(DB_KEYS.EXPENSES, []),
+        [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, [])
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -170,15 +191,55 @@ export const initFirebase = async () => {
 
 
 export const mockDb = {
+  // Profiles (profiles/[uid])
+  saveProfile: async (uid: string, profileData: Partial<User>) => {
+    // 1. Save to the specific profiles/[uid] path
+    const profileRef = ref(db, `${DB_KEYS.PROFILES}/${uid}`);
+    await firebaseSet(profileRef, profileData);
+    
+    // 2. Also ensure it's in our main users list for legacy compatibility and easy listing
+    const users = mockDb.getUsers();
+    const existing = users.find(u => u.uid === uid || u.id === profileData.id);
+    
+    if (existing) {
+      mockDb.updateUser({ ...existing, ...profileData, uid });
+    } else {
+      mockDb.addUser({ 
+        id: profileData.id || 'Unknown', 
+        avatar: profileData.avatar || '❓', 
+        ...profileData, 
+        uid 
+      } as User);
+    }
+  },
+
   // Users (Always Shared)
   getUsers: (): User[] => {
-    const data = get<User[]>(DB_KEYS.USERS, INITIAL_USERS);
-    return data.map(u => {
-      if (u.id === 'Falko') {
-        return { ...u, isAdmin: true, password: u.password || 'admin', isSetupComplete: u.isSetupComplete ?? true };
-      }
-      return { ...u, password: u.password || 'user', isSetupComplete: u.isSetupComplete ?? true };
-    });
+    const data = get<User[]>(DB_KEYS.USERS, INITIAL_USERS) || [];
+    // Migration: ensure UIDs are present if cloud/local state was already populated
+    const needsMigration = data.some(u => u && ((u.id === 'Falko' && !u.uid) || u.id === 'Markus' || u.id === 'Sarah'));
+    
+    if (needsMigration) {
+       console.log("Applying user migration to link UIDs...");
+       const migrated = data.map(u => {
+         if (!u) return null;
+         if (u.id === 'Falko') return { ...u, uid: 'thOJVf4L9cd2BysM2bFOeuC14yV2', isAdmin: true };
+         if (u.id === 'Anja' || u.id === 'Sarah') return { id: 'Anja', uid: 'zaKMNvN3UFTnFRE2VT8EmioWfGk1', avatar: u.avatar || '👩', isSetupComplete: true };
+         if (u.id === 'Lennart' || u.id === 'Markus') return { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: u.avatar || '👦', isSetupComplete: true, isChild: true };
+         return u;
+       }).filter(u => u && u.id !== 'Markus' && u.id !== 'Sarah' && u.id !== 'Anja' && u.id !== 'Lennart');
+       
+       // Re-add precisely mapped users to avoid duplicates during migration
+       const finalUsers = [
+         migrated.find(u => u && u.id === 'Falko') || INITIAL_USERS[0],
+         { id: 'Anja', uid: 'zaKMNvN3UFTnFRE2VT8EmioWfGk1', avatar: '👩', isSetupComplete: true },
+         { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: '👦', isSetupComplete: true, isChild: true },
+       ];
+       
+       return finalUsers;
+    }
+    
+    return data;
   },
   addUser: (user: User) => {
     const users = mockDb.getUsers();
@@ -321,6 +382,33 @@ export const mockDb = {
       if (isNewHigh) {
         set(DB_KEYS.LEADERBOARD, board.map(e => e.gameId === entry.gameId && e.childId === entry.childId ? entry : e));
       }
+    }
+  },
+
+  // Expenses
+  getExpenses: (): ExpenseItem[] => get(DB_KEYS.EXPENSES, []),
+  addExpense: (expense: Omit<ExpenseItem, 'id' | 'createdAt'>) => {
+    const expenses = mockDb.getExpenses();
+    const newExpense: ExpenseItem = {
+      ...expense,
+      id: uuidv4(),
+      createdAt: Date.now(),
+    };
+    set(DB_KEYS.EXPENSES, [...expenses, newExpense]);
+  },
+  deleteExpense: (id: string) => {
+    const expenses = mockDb.getExpenses();
+    set(DB_KEYS.EXPENSES, expenses.filter(e => e.id !== id));
+  },
+  getExpenseBudgets: (): ExpenseBudget[] => get(DB_KEYS.EXPENSE_BUDGETS, []),
+  setExpenseBudget: (budget: ExpenseBudget) => {
+    const budgets = mockDb.getExpenseBudgets();
+    const existingIndex = budgets.findIndex(b => b.month === budget.month);
+    if (existingIndex > -1) {
+      budgets[existingIndex] = budget;
+      set(DB_KEYS.EXPENSE_BUDGETS, [...budgets]);
+    } else {
+      set(DB_KEYS.EXPENSE_BUDGETS, [...budgets, budget]);
     }
   },
 };

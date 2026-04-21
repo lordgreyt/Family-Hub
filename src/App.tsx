@@ -11,6 +11,7 @@ import { Tasks } from './pages/Tasks';
 import { Meals } from './pages/Meals';
 import { Rewards } from './pages/Rewards';
 import { Setup } from './pages/Setup';
+import { Expenses } from './pages/Expenses';
 
 import { useEffect } from 'react';
 import { initFirebase } from './services/mockDb';
@@ -29,6 +30,7 @@ function App() {
           <Routes>
             <Route element={<MainLayout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/expenses" element={<Expenses />} />
               <Route path="/budget" element={<Budget />} />
               <Route path="/notes" element={<Notes />} />
               <Route path="/tasks" element={<Tasks />} />

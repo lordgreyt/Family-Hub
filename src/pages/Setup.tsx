@@ -3,6 +3,11 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import { LogOut, Palette, Type, Users, Trash2, Plus, Lock } from 'lucide-react';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../services/firebase';
+
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { secondaryAuth } from '../services/firebase';
 
 export const Setup = () => {
   const { settings, updateSettings } = useSettings();
@@ -10,11 +15,14 @@ export const Setup = () => {
   
   const [dbUsers, setDbUsers] = useState(mockDb.getUsers());
   const [newUserId, setNewUserId] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [newUserIsChild, setNewUserIsChild] = useState(false);
   const [lastCreatedUser, setLastCreatedUser] = useState<{ id: string, pass: string } | null>(null);
+  const [createError, setCreateError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [pwMessage, setPwMessage] = useState({ type: '', text: '' });
 
@@ -24,25 +32,61 @@ export const Setup = () => {
     return () => window.removeEventListener('db_updated', load);
   }, []);
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserId.trim()) return;
+    setCreateError('');
+    setIsCreating(true);
+
+    if (!newUserId.trim() || !newEmail.trim() || !newPassword.trim()) {
+      setCreateError('Alle Felder müssen ausgefüllt sein.');
+      setIsCreating(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setCreateError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+      setIsCreating(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      setCreateError('Bitte gib eine gültige E-Mail-Adresse ein.');
+      setIsCreating(false);
+      return;
+    }
     
-    const defaultPassword = 'Start123!';
-    const defaultAvatar = '❓';
-    
-    const newUser = { 
-      id: newUserId.trim(), 
-      avatar: defaultAvatar,
-      password: defaultPassword,
-      isSetupComplete: false,
-      isChild: newUserIsChild
-    };
-    
-    mockDb.addUser(newUser);
-    setLastCreatedUser({ id: newUser.id, pass: defaultPassword });
-    setNewUserId('');
-    setNewUserIsChild(false);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newEmail, newPassword);
+      const uid = userCredential.user.uid;
+      
+      const profileData = { 
+        id: newUserId.trim(), 
+        avatar: '❓',
+        isSetupComplete: false,
+        isChild: newUserIsChild,
+        uid
+      };
+      
+      await mockDb.saveProfile(uid, profileData);
+      
+      setLastCreatedUser({ id: profileData.id, pass: 'Erfolgreich erstellt!' });
+      setNewUserId('');
+      setNewEmail('');
+      setNewPassword('');
+      setNewUserIsChild(false);
+    } catch (err: any) {
+      console.error("User creation error:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setCreateError('Diese E-Mail-Adresse wird bereits verwendet.');
+      } else if (err.code === 'auth/weak-password') {
+        setCreateError('Das Passwort ist zu schwach.');
+      } else {
+        setCreateError('Fehler beim Erstellen des Nutzers (Firebase).');
+      }
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleToggleChild = (targetUser: any) => {
@@ -56,21 +100,12 @@ export const Setup = () => {
     }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!auth.currentUser || !user) return;
     
-    // Validate current password
-    const currentDbUser = mockDb.getUsers().find(u => u.id === user.id);
-    if (!currentDbUser) return;
-    
-    if (currentDbUser.password !== oldPassword) {
-      setPwMessage({ type: 'error', text: 'Das aktuelle Passwort ist falsch.' });
-      return;
-    }
-    
-    if (newPassword.length < 4) {
-      setPwMessage({ type: 'error', text: 'Das neue Passwort muss mindestens 4 Zeichen lang sein.' });
+    if (newPassword.length < 6) {
+      setPwMessage({ type: 'error', text: 'Das neue Passwort muss mindestens 6 Zeichen lang sein.' });
       return;
     }
     
@@ -78,14 +113,29 @@ export const Setup = () => {
       setPwMessage({ type: 'error', text: 'Die neuen Passwörter stimmen nicht überein.' });
       return;
     }
+
+    try {
+      if (auth.currentUser.email) {
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, oldPassword);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+        await updatePassword(auth.currentUser, newPassword);
+        setPwMessage({ type: 'success', text: 'Passwort erfolgreich geändert!' });
+        setOldPassword('');
+        setNewPassword('');
+        setNewPasswordConfirm('');
+      } else {
+        setPwMessage({ type: 'error', text: 'Keine E-Mail-Adresse für diesen Account hinterlegt.' });
+      }
+    } catch (err: any) {
+      console.error("Password change error:", err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        setPwMessage({ type: 'error', text: 'Das aktuelle Passwort ist falsch.' });
+      } else {
+        setPwMessage({ type: 'error', text: 'Fehler beim Ändern des Passworts. Bitte erneut anmelden.' });
+      }
+    }
     
-    mockDb.updateUser({ ...currentDbUser, password: newPassword });
-    setPwMessage({ type: 'success', text: 'Passwort erfolgreich geändert!' });
-    setOldPassword('');
-    setNewPassword('');
-    setNewPasswordConfirm('');
-    
-    setTimeout(() => setPwMessage({ type: '', text: '' }), 3000);
+    setTimeout(() => setPwMessage({ type: '', text: '' }), 5000);
   };
   
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -119,9 +169,6 @@ export const Setup = () => {
             <option value="teal">Petrol (Teal)</option>
             <option value="pink">Pink</option>
           </select>
-          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-            Wähle eine Farbe, die dir gefällt.
-          </p>
         </div>
 
         <div style={{ marginBottom: '1.25rem' }}>
@@ -133,9 +180,6 @@ export const Setup = () => {
             <option value="base">Normal</option>
             <option value="large">Groß</option>
           </select>
-          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-            Passe die Lesbarkeit nach deinen Bedürfnissen an.
-          </p>
         </div>
       </div>
 
@@ -145,10 +189,6 @@ export const Setup = () => {
             <Users size={20} /> Nutzerverwaltung
           </h3>
           
-          <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-            Registrierte Profile verwalten:
-          </p>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
             {dbUsers.map(u => (
               <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
@@ -180,33 +220,55 @@ export const Setup = () => {
 
           <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Neuen Nutzer anlegen</h4>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <input 
                 type="text" 
                 value={newUserId}
                 onChange={e => setNewUserId(e.target.value)}
                 className="input-field" 
-                placeholder="Nutzername (z.B. Anna)" 
-                style={{ flex: 1 }}
+                placeholder="Anzeigename (z.B. Anna)" 
                 required 
               />
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
-                <Plus size={20} />
-              </button>
+              <input 
+                type="email" 
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="input-field" 
+                placeholder="E-Mail Adresse" 
+                required 
+              />
+              <input 
+                type="password" 
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="input-field" 
+                placeholder="Initiales Passwort (min. 6 Zeichen)" 
+                required 
+              />
             </div>
+
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
               <input 
                 type="checkbox" 
                 checked={newUserIsChild} 
                 onChange={e => setNewUserIsChild(e.target.checked)} 
               />
-              Als Kinderaccount anlegen (eingeschränkte Sichtbarkeit)
+              Als Kinderaccount anlegen (eingeschränkte Sicht)
             </label>
+
+            {createError && (
+              <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-sm)' }}>{createError}</p>
+            )}
+
+            <button type="submit" className="btn btn-primary" disabled={isCreating} style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              {isCreating ? 'Wird erstellt...' : <><Plus size={20} /> Nutzer Account erstellen</>}
+            </button>
+
             {lastCreatedUser && (
               <div style={{ padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-success)', fontSize: 'var(--font-sm)', lineHeight: 1.5 }}>
-                Erfolgreich! Der Account <strong>{lastCreatedUser.id}</strong> wurde erstellt.<br/>
-                Initiales Passwort: <strong>{lastCreatedUser.pass}</strong><br/>
-                Der Nutzer kann sich nun einloggen und seinen Avatar wählen.
+                Profil <strong>{lastCreatedUser.id}</strong> erfolgreich angelegt!<br/>
+                Der Nutzer kann sich nun mit seiner E-Mail anmelden.
               </div>
             )}
           </form>
@@ -214,16 +276,41 @@ export const Setup = () => {
       )}
 
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
-          <Lock size={20} /> Mein Konto
-        </h3>
-        
         <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Konto-Profileinstellungen</h4>
+          
+          {!user?.isChild && (
+            <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
+                Bevorzugte Startseite beim Öffnen
+              </label>
+              <select 
+                value={user?.defaultPath || '/'} 
+                onChange={(e) => {
+                  if (user) {
+                    mockDb.updateUser({ ...user, defaultPath: e.target.value });
+                  }
+                }} 
+                className="input-field"
+              >
+                <option value="/">Dashboard (Home)</option>
+                <option value="/expenses">Ausgaben</option>
+                <option value="/tasks">Aufgaben</option>
+                <option value="/notes">Notizen</option>
+                <option value="/meals">Mahlzeit</option>
+                <option value="/rewards">Sterne</option>
+              </select>
+              <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.4rem' }}>
+                Wähle aus, auf welcher Seite du nach dem Login landen möchtest.
+              </p>
+            </div>
+          )}
+
           <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Passwort ändern</h4>
           
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-              Aktuelles Passwort
+              Aktuelles Passwort (zur Bestätigung)
             </label>
             <input 
               type="password" 
@@ -261,7 +348,7 @@ export const Setup = () => {
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
-            Passwort speichern
+            Passwort in Firebase aktualisieren
           </button>
           
           {pwMessage.text && (

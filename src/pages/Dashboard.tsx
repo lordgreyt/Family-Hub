@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { NoteItem, TaskItem, User, RewardRequest } from '../services/mockDb';
-import { Calendar, AlertTriangle, Filter, Star, Check, X, Save, Trash2 } from 'lucide-react';
+import { Calendar, AlertTriangle, Filter, Star, Check, X, Save, Trash2, Wallet, TrendingDown } from 'lucide-react';
 import { RichTextEditor } from '../components/RichTextEditor';
 
 const LONG_PRESS_MS = 500;
@@ -16,14 +16,17 @@ export const Dashboard = () => {
   const [taskAssigneeFilter, setTaskAssigneeFilter] = useState<string>('');
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
+  const [expenseStats, setExpenseStats] = useState({ total: 0, topCategory: '' });
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadData = () => {
+      // Notes
       const allNotes = mockDb.getNotes().filter(note => note.isShared);
       setRecentNotes(allNotes.slice(0, 3));
 
+      // Tasks
       const fourWeeksFromNow = new Date();
       fourWeeksFromNow.setDate(fourWeeksFromNow.getDate() + 28);
       fourWeeksFromNow.setHours(23, 59, 59, 999);
@@ -45,6 +48,29 @@ export const Dashboard = () => {
       setUpcomingTasks(tasks);
       setUsers(mockDb.getUsers());
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
+
+      // Expenses
+      try {
+        const currentMonthStr = new Date().toISOString().slice(0, 7);
+        const allExpenses = mockDb.getExpenses() || [];
+        const monthlyExpenses = allExpenses.filter(e => e && e.date && e.date.startsWith(currentMonthStr) && e.type === 'EXPENSE');
+        const total = monthlyExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        
+        const byCat = monthlyExpenses.reduce((acc, e) => {
+          if (e.category) {
+            acc[e.category] = (acc[e.category] || 0) + (Number(e.amount) || 0);
+          }
+          return acc;
+        }, {} as Record<string, number>);
+        
+        const topEntry = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+        setExpenseStats({ 
+          total, 
+          topCategory: topEntry ? `${topEntry[0]} (${topEntry[1].toFixed(0)}€)` : 'Keine Ausgaben' 
+        });
+      } catch (err) {
+        console.error("Error loading expense stats:", err);
+      }
     };
 
     loadData();
@@ -98,6 +124,23 @@ export const Dashboard = () => {
 
       {upcomingTasks.length > 0 && (
         <div>
+          {/* Tägliche Ausgaben Summary (nur Eltern) */}
+          {user && !user.isChild && (
+            <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', border: '1px solid var(--color-border-hover)' }}>
+              <div style={{ backgroundColor: 'var(--color-primary-light)', padding: '0.75rem', borderRadius: 'var(--radius-md)', color: 'var(--color-primary)' }}>
+                <Wallet size={24} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Ausgaben diesen Monat</p>
+                <h4 style={{ margin: '0.1rem 0', fontSize: '1.25rem', color: 'var(--color-text)' }}>{expenseStats.total.toFixed(2)}€</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>
+                  <TrendingDown size={12} color="var(--color-danger)" /> Top: {expenseStats.topCategory}
+                </div>
+              </div>
+              <a href="/expenses" className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: 'var(--font-xs)', background: 'var(--color-primary)', color: 'white' }}>Details</a>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
             <h3 style={{ fontSize: 'var(--font-lg)', color: 'var(--color-primary-dark)' }}>
               Aufgaben (Top 4 Wochen)
