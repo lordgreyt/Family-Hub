@@ -206,7 +206,6 @@ a {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem;
-  padding-bottom: 80px; /* Space for bottom nav */
 }
 
 /* Hide scrollbar for cleaner mobile look */

@@ -1,12 +1,14 @@
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { TopBar } from './TopBar';
-import { BottomNav } from './BottomNav';
+import { Sidebar } from './Sidebar';
 import { NotificationManager } from '../NotificationManager';
 
 export const MainLayout = () => {
   const { user } = useAuth();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (!user && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
@@ -23,11 +25,11 @@ export const MainLayout = () => {
 
   return (
     <>
-      <TopBar />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <TopBar onMenuClick={() => setIsSidebarOpen(true)} />
       <main className="app-content">
         <Outlet />
       </main>
-      <BottomNav />
       <NotificationManager />
     </>
   );

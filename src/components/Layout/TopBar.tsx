@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { mockDb } from '../../services/mockDb';
-import { X, Camera, Check } from 'lucide-react';
+import { X, Camera, Check, Menu } from 'lucide-react';
 
-const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄', '🐱', '🐶', '🦊', '🐸', '🐻', '🐼', '🦁', '🐯', '🐰', '🐵'];
+const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄', '🐱', '🐶', '🦊', '🐻', '🐼', '🦁', '🐯', '🐰', '🐵', '🐸'];
 
-export const TopBar = () => {
+export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { user, login } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState('');
@@ -66,9 +66,24 @@ export const TopBar = () => {
         top: 0,
         zIndex: 10,
       }}>
-        <h1 style={{ fontSize: 'var(--font-xl)', margin: 0, color: 'var(--color-primary)' }}>
-          Family Hub
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            onClick={onMenuClick}
+            style={{
+              padding: '0.25rem',
+              color: 'var(--color-text)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex'
+            }}
+          >
+            <Menu size={24} />
+          </button>
+          <h1 style={{ fontSize: 'var(--font-xl)', margin: 0, color: 'var(--color-primary)' }}>
+            Family Hub
+          </h1>
+        </div>
         <button 
           onClick={() => setShowProfile(true)}
           style={{
