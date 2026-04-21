@@ -139,101 +139,79 @@ export const Setup = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
-          <Users size={20} /> Nutzerverwaltung
-        </h3>
-        
-        {(user?.isAdmin || user?.id === 'Falko') ? (
-          <>
-            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-              Registrierte Profile verwalten:
-            </p>
+      {(user?.isAdmin || user?.id === 'Falko') && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
+            <Users size={20} /> Nutzerverwaltung
+          </h3>
+          
+          <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+            Registrierte Profile verwalten:
+          </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-              {dbUsers.map(u => (
-                <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.25rem' }}>{u.avatar}</span>
-                    <strong>{u.id}</strong>
-                    {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
-                    {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
-                    {u.id !== user.id && u.id !== 'Falko' && !u.isAdmin && (
-                      <button 
-                        onClick={() => handleToggleChild(u)} 
-                        className="btn" 
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        {u.isChild ? 'Erwachsene' : 'Kind'}
-                      </button>
-                    )}
-                    {u.id !== user.id && (
-                      <button onClick={() => handleDeleteUser(u.id)} style={{ color: 'var(--color-danger)', border: 'none', background: 'none', cursor: 'pointer', display: 'flex' }}>
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
+            {dbUsers.map(u => (
+              <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>{u.avatar}</span>
+                  <strong>{u.id}</strong>
+                  {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
+                  {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}
                 </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Neuen Nutzer anlegen</h4>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="text" 
-                  value={newUserId}
-                  onChange={e => setNewUserId(e.target.value)}
-                  className="input-field" 
-                  placeholder="Nutzername (z.B. Anna)" 
-                  style={{ flex: 1 }}
-                  required 
-                />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
-                  <Plus size={20} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+                  {u.id !== user!.id && u.id !== 'Falko' && !u.isAdmin && (
+                    <button 
+                      onClick={() => handleToggleChild(u)} 
+                      className="btn" 
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      {u.isChild ? 'Erwachsene' : 'Kind'}
+                    </button>
+                  )}
+                  {u.id !== user!.id && (
+                    <button onClick={() => handleDeleteUser(u.id)} style={{ color: 'var(--color-danger)', border: 'none', background: 'none', cursor: 'pointer', display: 'flex' }}>
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
-                <input 
-                  type="checkbox" 
-                  checked={newUserIsChild} 
-                  onChange={e => setNewUserIsChild(e.target.checked)} 
-                />
-                Als Kinderaccount anlegen (eingeschränkte Sichtbarkeit)
-              </label>
-              {lastCreatedUser && (
-                <div style={{ padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-success)', fontSize: 'var(--font-sm)', lineHeight: 1.5 }}>
-                  Erfolgreich! Der Account <strong>{lastCreatedUser.id}</strong> wurde erstellt.<br/>
-                  Initiales Passwort: <strong>{lastCreatedUser.pass}</strong><br/>
-                  Der Nutzer kann sich nun einloggen und seinen Avatar wählen.
-                </div>
-              )}
-            </form>
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-              Registrierte Profile auf diesem Gerät:
-            </p>
+            ))}
+          </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-              {dbUsers.map(u => (
-                <div key={u.id} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>{u.avatar}</span> <strong>{u.id}</strong> 
-                  {u.isAdmin && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
-                  {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8 }}>Kindermodus</span>}
-                </div>
-              ))}
+          <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Neuen Nutzer anlegen</h4>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input 
+                type="text" 
+                value={newUserId}
+                onChange={e => setNewUserId(e.target.value)}
+                className="input-field" 
+                placeholder="Nutzername (z.B. Anna)" 
+                style={{ flex: 1 }}
+                required 
+              />
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                <Plus size={20} />
+              </button>
             </div>
-            
-            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>
-              Bitte wende dich an einen Admin, um neue Nutzer anzulegen oder bestehende zu löschen.
-            </p>
-          </>
-        )}
-      </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
+              <input 
+                type="checkbox" 
+                checked={newUserIsChild} 
+                onChange={e => setNewUserIsChild(e.target.checked)} 
+              />
+              Als Kinderaccount anlegen (eingeschränkte Sichtbarkeit)
+            </label>
+            {lastCreatedUser && (
+              <div style={{ padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-success)', fontSize: 'var(--font-sm)', lineHeight: 1.5 }}>
+                Erfolgreich! Der Account <strong>{lastCreatedUser.id}</strong> wurde erstellt.<br/>
+                Initiales Passwort: <strong>{lastCreatedUser.pass}</strong><br/>
+                Der Nutzer kann sich nun einloggen und seinen Avatar wählen.
+              </div>
+            )}
+          </form>
+        </div>
+      )}
 
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
