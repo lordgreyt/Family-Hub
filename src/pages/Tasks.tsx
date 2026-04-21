@@ -39,7 +39,9 @@ export const Tasks = () => {
     .filter(t => {
       // KINDERMODUS
       if (isChild) {
-        if (!t.assignedTo) return false;
+        // Show unassigned tasks to children as well (communal tasks)
+        if (!t.assignedTo) return true;
+        
         const assignedUser = users.find(u => u.id === t.assignedTo);
         if (!assignedUser) return false;
         if (assignedUser.id !== user.id && !assignedUser.isChild) return false;

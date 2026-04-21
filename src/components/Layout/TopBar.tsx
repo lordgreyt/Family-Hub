@@ -6,7 +6,7 @@ import { X, Camera, Check, Menu } from 'lucide-react';
 const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄', '🐱', '🐶', '🦊', '🐻', '🐼', '🦁', '🐯', '🐰', '🐵', '🐸'];
 
 export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
-  const { user, login } = useAuth();
+  const { user, updateUser } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
@@ -45,7 +45,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     }
 
     // Update the auth session
-    login(updatedUser);
+    updateUser(updatedUser);
     setSaveMessage('Profil gespeichert!');
     setTimeout(() => {
       setShowProfile(false);

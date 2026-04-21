@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
-import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus } from 'lucide-react';
+import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
 import { FlappyGame } from '../components/FlappyGame';
@@ -19,10 +19,6 @@ export const Rewards = () => {
   const [exchangeAmount, setExchangeAmount] = useState<number | ''>('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeGame, setActiveGame] = useState<'SNAKE' | 'MEMORY' | 'FLAPPY' | 'WHACKAMO' | null>(null);
-  const [acknowledgedApprovals, setAcknowledgedApprovals] = useState<string[]>(() => {
-    const saved = localStorage.getItem('acknowledged_stars_approvals');
-    return saved ? JSON.parse(saved) : [];
-  });
   
   const [adjustments, setAdjustments] = useState<Record<string, number | ''>>({});
 
@@ -276,14 +272,12 @@ export const Rewards = () => {
   // Newly approved requests that haven't been acknowledged (excluding games)
   const newApprovals = myRequests.filter(r => 
     r.status === 'APPROVED' && 
-    !acknowledgedApprovals.includes(r.id) && 
+    !r.acknowledged && 
     !r.id.startsWith('game-')
   );
 
-  const acknowledgeApproval = (id: string) => {
-    const next = [...acknowledgedApprovals, id];
-    setAcknowledgedApprovals(next);
-    localStorage.setItem('acknowledged_stars_approvals', JSON.stringify(next));
+  const acknowledgeApproval = (req: RewardRequest) => {
+    mockDb.updateRewardRequest({ ...req, acknowledged: true });
   };
 
   return (
@@ -308,7 +302,7 @@ export const Rewards = () => {
                     Deine Anfrage über <strong>{req.stars > 0 ? req.stars : Math.abs(req.stars)} Sterne</strong> wurde {req.stars < 0 ? 'gutgeschrieben' : 'genehmigt und abgezogen'}. Viel Spaß!
                   </p>
                 </div>
-                <button onClick={() => acknowledgeApproval(req.id)} style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer' }}>
+                <button onClick={() => acknowledgeApproval(req)} style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer' }}>
                   <X size={20} />
                 </button>
               </div>
@@ -323,6 +317,106 @@ export const Rewards = () => {
           <Star size={48} fill="#f59e0b" /> {balance}
         </div>
       </div>
+
+      {/* Podium (Ranking) */}
+      {(() => {
+        const rankings = users
+          .filter(u => u.isChild)
+          .map(child => {
+            const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo === child.id);
+            const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
+            const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
+            return { ...child, balance: childEarnedStars - childSpentStars };
+          })
+          .sort((a, b) => b.balance - a.balance);
+
+        if (rankings.length < 1) return null;
+
+        return (
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: 'var(--color-text-muted)' }}>Siegertreppchen</h3>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '0.5rem', height: '140px', marginTop: '1rem', width: '100%' }}>
+              {/* 2nd Place */}
+              {rankings[1] && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
+                  <div style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>{rankings[1].avatar}</div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '50px', 
+                    background: 'linear-gradient(to bottom, #94a3b8, #64748b)', 
+                    borderRadius: '8px 8px 0 0', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    position: 'relative',
+                    color: 'white',
+                    boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+                  }}>
+                    <Medal size={16} color="#e2e8f0" fill="#e2e8f0" style={{ position: 'absolute', top: '-10px' }} />
+                    <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                      {rankings[1].balance} <Star size={10} fill="currentColor" />
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', marginTop: '0.4rem', fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[1].id}</span>
+                </div>
+              )}
+
+              {/* 1st Place */}
+              {rankings[0] && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
+                  <div style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>{rankings[0].avatar}</div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '90px', 
+                    background: 'linear-gradient(to bottom, #f59e0b, #d97706)', 
+                    borderRadius: '8px 8px 0 0', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    position: 'relative',
+                    color: 'white',
+                    boxShadow: '0 -4px 15px rgba(245, 158, 11, 0.2)'
+                  }}>
+                    <Trophy size={20} color="#fef3c7" fill="#fef3c7" style={{ position: 'absolute', top: '-14px' }} />
+                    <span style={{ fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      {rankings[0].balance} <Star size={14} fill="currentColor" />
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', marginTop: '0.4rem', fontWeight: 800, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[0].id}</span>
+                </div>
+              )}
+
+              {/* 3rd Place */}
+              {rankings[2] && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
+                  <div style={{ fontSize: '1rem', marginBottom: '0.2rem' }}>{rankings[2].avatar}</div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '35px', 
+                    background: 'linear-gradient(to bottom, #b45309, #78350f)', 
+                    borderRadius: '8px 8px 0 0', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    position: 'relative',
+                    color: 'white',
+                    boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+                  }}>
+                    <Medal size={14} color="#fde68a" fill="#b45309" style={{ position: 'absolute', top: '-8px' }} />
+                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                      {rankings[2].balance} <Star size={10} fill="currentColor" />
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', marginTop: '0.4rem', fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[2].id}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Spielecke */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>

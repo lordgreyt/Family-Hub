@@ -66,6 +66,7 @@ export interface RewardRequest {
   stars: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: number;
+  acknowledged?: boolean;
 }
 
 export interface ScoreEntry {

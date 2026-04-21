@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Home, Calculator, BookOpen, Settings, CheckSquare, Utensils, Star, X, Wallet } from 'lucide-react';
+import { Home, Calculator, BookOpen, Settings, CheckSquare, Utensils, Star, X, Wallet, LogOut } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
@@ -93,9 +93,30 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         </nav>
 
         {/* Footer Info */}
-        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>
-          <p>Angemeldet als <strong>{user?.id}</strong></p>
-          <p>Family Hub v1.0</p>
+        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div>
+            <p style={{ margin: 0 }}>Angemeldet als <strong>{user?.id}</strong></p>
+            <button 
+              onClick={() => { logout(); onClose(); }}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.4rem', 
+                background: 'none', 
+                border: 'none', 
+                color: 'var(--color-danger)', 
+                cursor: 'pointer', 
+                padding: '0.4rem 0',
+                fontSize: '0.75rem',
+                opacity: 0.8,
+                fontWeight: 500,
+                marginTop: '0.25rem'
+              }}
+            >
+              <LogOut size={14} /> Abmelden
+            </button>
+          </div>
+          <p style={{ margin: 0, opacity: 0.6 }}>Family Hub v1.0</p>
         </div>
       </aside>
 

@@ -109,6 +109,14 @@ export const MemoryGame = ({ onExit, onReplay, onSaveScore, highScore }: { onExi
 
       {isGameOver && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 10 }}>
+              <button 
+                onClick={onExit} 
+                style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0.5rem', transition: 'transform 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <X size={32} />
+              </button>
               <Trophy size={64} fill="#facc15" color="#ca8a04" style={{ marginBottom: '1rem' }} />
               <h2 style={{ marginBottom: '1rem', color: '#facc15' }}>Klasse gemacht!</h2>
               <p style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Benötigte Versuche: {moves}</p>

@@ -76,7 +76,7 @@ export const Dashboard = () => {
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
-  }, []);
+  }, [user]);
 
   const startPress = (note: NoteItem) => {
     pressTimer.current = setTimeout(() => {
