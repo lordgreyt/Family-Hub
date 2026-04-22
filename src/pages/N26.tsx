@@ -206,6 +206,7 @@ export const N26 = () => {
           style={{
             width: '64px',
             height: '64px',
+            flexShrink: 0,
             backgroundColor: 'var(--color-primary)',
             color: 'white',
             borderRadius: '50%',
