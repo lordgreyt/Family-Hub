@@ -11,7 +11,7 @@ export const Tasks = () => {
   const [content, setContent] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<1 | 2 | 3>(1);
-  const [assignedTo, setAssignedTo] = useState<string>('');
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
@@ -30,8 +30,8 @@ export const Tasks = () => {
   const assignableUsers = users.filter(u => isChild ? (u.id === user.id || u.isChild) : true);
 
   useEffect(() => {
-    if (isChild && !assignedTo) {
-      setAssignedTo(user.id);
+    if (isChild && assignedTo.length === 0) {
+      setAssignedTo([user.id]);
     }
   }, [user, isChild, assignedTo]);
 
@@ -40,11 +40,13 @@ export const Tasks = () => {
       // KINDERMODUS
       if (isChild) {
         // Show unassigned tasks to children as well (communal tasks)
-        if (!t.assignedTo) return true;
+        if (!t.assignedTo || t.assignedTo.length === 0) return true;
         
-        const assignedUser = users.find(u => u.id === t.assignedTo);
-        if (!assignedUser) return false;
-        if (assignedUser.id !== user.id && !assignedUser.isChild) return false;
+        return t.assignedTo.some(id => {
+          if (id === user.id) return true;
+          const u = users.find(usr => usr.id === id);
+          return u?.isChild;
+        });
       }
 
       if (activeTab === 'SHARED') return t.isShared;
@@ -78,7 +80,7 @@ export const Tasks = () => {
       content: content.trim(),
       dueDate: dueDate || undefined,
       priority,
-      assignedTo: assignedTo || undefined,
+      assignedTo: assignedTo.length > 0 ? assignedTo : undefined,
       isShared: activeTab === 'SHARED',
       createdBy: user.id,
     });
@@ -86,7 +88,7 @@ export const Tasks = () => {
     setContent('');
     setDueDate('');
     setPriority(1);
-    setAssignedTo('');
+    setAssignedTo([]);
   };
 
   const handleDelete = (id: string) => {
@@ -142,28 +144,68 @@ export const Tasks = () => {
           onChange={e => setContent(e.target.value)} 
         />
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <select 
-            value={priority} 
-            onChange={e => setPriority(Number(e.target.value) as 1|2|3)}
-            className="input-field"
-            style={{ flex: 1, minWidth: '100px', padding: '0.5rem' }}
-          >
-            <option value={1}>1 - Hat Zeit</option>
-            <option value={2}>2 - Normal</option>
-            <option value={3}>3 - Sofort!</option>
-          </select>
-
-          <select 
-            value={assignedTo} 
-            onChange={e => setAssignedTo(e.target.value)}
-            className="input-field"
-            style={{ flex: 1, minWidth: '120px', padding: '0.5rem' }}
-          >
-            {!isChild && <option value="">An Alle</option>}
-            {assignableUsers.map(u => (
-              <option key={u.id} value={u.id}>{u.avatar} {u.id}</option>
+          <div style={{ display: 'flex', gap: '0.4rem', width: '100%', padding: '0.25rem 0' }}>
+            {[1, 2, 3].map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPriority(p as 1|2|3)}
+                className="btn"
+                style={{ 
+                  flex: 1,
+                  padding: '0.5rem', 
+                  fontSize: '12px', 
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid',
+                  borderColor: priority === p ? (p === 3 ? 'var(--color-danger)' : p === 2 ? 'var(--color-primary)' : 'var(--color-primary-light)') : 'var(--color-border)',
+                  backgroundColor: priority === p ? (p === 3 ? 'var(--color-danger)' : p === 2 ? 'var(--color-primary)' : 'var(--color-primary-light)') : 'var(--color-surface)',
+                  color: priority === p ? 'white' : 'var(--color-text-muted)',
+                  fontWeight: 700,
+                  transition: 'all 0.2s'
+                }}
+              >
+                Prio {p}
+              </button>
             ))}
-          </select>
+          </div>
+          <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--color-border)', margin: '0.25rem 0' }}></div>
+
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', width: '100%', padding: '0.25rem 0' }}>
+            {assignableUsers.map(u => {
+              const isSelected = assignedTo.includes(u.id);
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) setAssignedTo(assignedTo.filter(id => id !== u.id));
+                    else setAssignedTo([...assignedTo, u.id]);
+                  }}
+                  className="btn"
+                  style={{ 
+                    padding: '0.3rem 0.6rem', 
+                    fontSize: '11px', 
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                    backgroundColor: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                    color: isSelected ? 'white' : 'var(--color-text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {u.avatar} {u.id}
+                </button>
+              );
+            })}
+            {assignedTo.length === 0 && !isChild && (
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: 0.7 }}>
+                (Wird an alle verteilt)
+              </span>
+            )}
+          </div>
 
           <input 
             type="date" 
@@ -202,28 +244,64 @@ export const Tasks = () => {
                     required
                   />
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <select 
-                      value={editingTask.priority} 
-                      onChange={e => setEditingTask({ ...editingTask, priority: Number(e.target.value) as 1|2|3 })}
-                      className="input-field"
-                      style={{ flex: 1, minWidth: '100px', padding: '0.5rem' }}
-                    >
-                      <option value={1}>1 - Hat Zeit</option>
-                      <option value={2}>2 - Normal</option>
-                      <option value={3}>3 - Sofort!</option>
-                    </select>
-
-                    <select 
-                      value={editingTask.assignedTo || ''} 
-                      onChange={e => setEditingTask({ ...editingTask, assignedTo: e.target.value || undefined })}
-                      className="input-field"
-                      style={{ flex: 1, minWidth: '120px', padding: '0.5rem' }}
-                    >
-                      {!isChild && <option value="">An Alle</option>}
-                      {assignableUsers.map(u => (
-                        <option key={u.id} value={u.id}>{u.avatar} {u.id}</option>
+                    <div style={{ display: 'flex', gap: '0.4rem', width: '100%', padding: '0.25rem 0' }}>
+                      {[1, 2, 3].map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setEditingTask({ ...editingTask, priority: p as 1|2|3 })}
+                          className="btn"
+                          style={{ 
+                            flex: 1,
+                            padding: '0.5rem', 
+                            fontSize: '12px', 
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid',
+                            borderColor: editingTask.priority === p ? (p === 3 ? 'var(--color-danger)' : p === 2 ? 'var(--color-primary)' : 'var(--color-primary-light)') : 'var(--color-border)',
+                            backgroundColor: editingTask.priority === p ? (p === 3 ? 'var(--color-danger)' : p === 2 ? 'var(--color-primary)' : 'var(--color-primary-light)') : 'var(--color-surface)',
+                            color: editingTask.priority === p ? 'white' : 'var(--color-text-muted)',
+                            fontWeight: 700,
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Prio {p}
+                        </button>
                       ))}
-                    </select>
+                    </div>
+                    <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--color-border)', margin: '0.25rem 0' }}></div>
+
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', width: '100%', padding: '0.25rem 0' }}>
+                      {assignableUsers.map(u => {
+                        const isSelected = editingTask.assignedTo?.includes(u.id);
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => {
+                              const current = editingTask.assignedTo || [];
+                              const next = isSelected ? current.filter(id => id !== u.id) : [...current, u.id];
+                              setEditingTask({ ...editingTask, assignedTo: next.length > 0 ? next : undefined });
+                            }}
+                            className="btn"
+                            style={{ 
+                              padding: '0.3rem 0.6rem', 
+                              fontSize: '11px', 
+                              borderRadius: '20px',
+                              border: '1px solid',
+                              borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                              backgroundColor: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                              color: isSelected ? 'white' : 'var(--color-text-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {u.avatar} {u.id}
+                          </button>
+                        );
+                      })}
+                    </div>
 
                     <input 
                       type="date" 
@@ -315,14 +393,14 @@ export const Tasks = () => {
                         <Calendar size={12} /> Bis: {new Date(task.dueDate).toLocaleDateString('de-DE')}
                       </span>
                     )}
-                    {task.assignedTo && (
+                    {task.assignedTo && task.assignedTo.length > 0 && (
                       <span style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: '0.25rem',
                         color: 'var(--color-text)',
                       }}>
-                        <UserIcon size={12} /> {task.assignedTo}
+                        <UserIcon size={12} /> {task.assignedTo.join(', ')}
                       </span>
                     )}
                   </div>

@@ -186,6 +186,34 @@ export const Setup = () => {
             <option value="large">Groß</option>
           </select>
         </div>
+
+        {(user?.isAdmin || user?.id === 'Falko') && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)', fontSize: 'var(--font-sm)', fontWeight: 600 }}>
+              Aufgaben-Punkte (Sterne)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              {[1, 2, 3].map((prio) => (
+                <div key={prio}>
+                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Prio {prio}</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    value={settings.prioPoints[prio]} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      updateSettings({ prioPoints: { ...settings.prioPoints, [prio]: val } });
+                    }}
+                    style={{ padding: '0.5rem', textAlign: 'center' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
+              Lege fest, wie viele Sterne die Kinder für jede Aufgaben-Priorität erhalten.
+            </p>
+          </div>
+        )}
       </div>
 
       {(user?.isAdmin || user?.id === 'Falko') && (

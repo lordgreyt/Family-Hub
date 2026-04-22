@@ -185,15 +185,15 @@ export const Dashboard = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {upcomingTasks.filter(t => !taskAssigneeFilter || t.assignedTo === taskAssigneeFilter).map(task => {
+            {upcomingTasks.filter(t => !taskAssigneeFilter || t.assignedTo?.includes(taskAssigneeFilter)).map(task => {
               const overdue = task.dueDate ? new Date(task.dueDate) < new Date(new Date().setHours(0,0,0,0)) : false;
               return (
                 <div key={task.id} className="glass-panel" style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ fontWeight: task.priority === 3 ? 600 : 400 }}>{task.content}</div>
-                    {task.assignedTo && (
-                      <div style={{ fontSize: '0.9rem', opacity: 0.8, color: 'var(--color-text-muted)' }} title={`Zugewiesen an ${task.assignedTo}`}>
-                        ({task.assignedTo})
+                    {task.assignedTo && task.assignedTo.length > 0 && (
+                      <div style={{ fontSize: '0.9rem', opacity: 0.8, color: 'var(--color-text-muted)' }} title={`Zugewiesen an ${task.assignedTo.join(', ')}`}>
+                        ({task.assignedTo.join(', ')})
                       </div>
                     )}
                   </div>

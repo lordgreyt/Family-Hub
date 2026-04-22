@@ -39,7 +39,7 @@ export interface TaskItem {
   isDone: boolean;
   priority: 1 | 2 | 3;
   dueDate?: string;
-  assignedTo?: string;
+  assignedTo?: string[];
   createdAt: number;
   createdBy: string; // User ID
 }
@@ -345,7 +345,16 @@ export const mockDb = {
   },
 
   // Tasks (Shared & Private)
-  getTasks: (): TaskItem[] => get(DB_KEYS.TASKS, []),
+  getTasks: (): TaskItem[] => {
+    const tasks = get<TaskItem[]>(DB_KEYS.TASKS, []);
+    // Migration: convert legacy single-string assignedTo to string[]
+    return tasks.map(t => {
+      if (t.assignedTo && typeof t.assignedTo === 'string') {
+        return { ...t, assignedTo: [t.assignedTo] };
+      }
+      return t;
+    });
+  },
   addTask: (task: Omit<TaskItem, 'id' | 'createdAt' | 'isDone'>) => {
     const tasks = mockDb.getTasks();
     const newTask: TaskItem = {

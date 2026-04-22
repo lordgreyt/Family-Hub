@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
 import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal } from 'lucide-react';
@@ -10,6 +11,7 @@ import { WhackAMoleGame } from '../components/WhackAMoleGame';
 
 export const Rewards = () => {
   const { user } = useAuth();
+  const { settings } = useSettings();
   
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [requests, setRequests] = useState<RewardRequest[]>([]);
@@ -36,7 +38,7 @@ export const Rewards = () => {
 
   if (!user) return null;
 
-  const PRIO_STARS = { 1: 5, 2: 10, 3: 15 } as Record<number, number>;
+  const PRIO_STARS = settings.prioPoints;
 
   // Leaderboard common rendering
   const getHighScore = (gameId: string, lowerIsBetter: boolean = false) => {
@@ -129,7 +131,7 @@ export const Rewards = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
               {childAccounts.map(child => {
-                const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo === child.id);
+                const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(child.id));
                 const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
                 const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
                 const childBalance = childEarnedStars - childSpentStars;
@@ -218,7 +220,7 @@ export const Rewards = () => {
   }
 
   // === CHILD VIEW ===
-  const completedTasks = tasks.filter(t => t.isDone && t.assignedTo === user.id);
+  const completedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(user.id));
   const earnedStars = completedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
   const myRequests = requests.filter(r => r.childId === user.id);
   const spentOrPendingStars = myRequests
@@ -323,7 +325,7 @@ export const Rewards = () => {
         const rankings = users
           .filter(u => u.isChild)
           .map(child => {
-            const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo === child.id);
+            const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(child.id));
             const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
             const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
             return { ...child, balance: childEarnedStars - childSpentStars };

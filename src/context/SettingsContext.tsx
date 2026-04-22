@@ -6,6 +6,7 @@ type FontSize = 'small' | 'base' | 'large';
 interface AppSettings {
   themeColor: ThemeColor;
   fontSize: FontSize;
+  prioPoints: Record<number, number>;
 }
 
 interface SettingsContextType {
@@ -16,6 +17,7 @@ interface SettingsContextType {
 const defaultSettings: AppSettings = {
   themeColor: 'indigo',
   fontSize: 'base',
+  prioPoints: { 1: 5, 2: 10, 3: 15 },
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -23,7 +25,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('family_hub_settings');
-    return saved ? JSON.parse(saved) : defaultSettings;
+    return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
   });
 
   useEffect(() => {
