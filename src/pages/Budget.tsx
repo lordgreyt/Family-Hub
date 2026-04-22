@@ -4,51 +4,21 @@ import { mockDb } from '../services/mockDb';
 import type { BudgetItem } from '../services/mockDb';
 import { Plus, Trash2 } from 'lucide-react';
 
-let cachedFixedDepotAmount: number | null = null;
-
 export const Budget = () => {
   const { user } = useAuth();
   const [items, setItems] = useState<BudgetItem[]>([]);
+  const [depots, setDepots] = useState<Depot[]>([]);
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
-  const [fixedDepotAmount, setFixedDepotAmount] = useState<number | null>(cachedFixedDepotAmount);
 
   useEffect(() => {
-    const load = () => setItems(mockDb.getBudgetItems());
+    const load = () => {
+      setItems(mockDb.getBudgetItems());
+      setDepots(mockDb.getDepots());
+    };
     load();
     window.addEventListener('db_updated', load);
-
-    if (cachedFixedDepotAmount === null) {
-      const fetchMonatlicheSumme = async () => {
-      try {
-        const response = await fetch('https://api.jsonbin.io/v3/b/69a943e4d0ea881f40f0fe2b/latest', {
-          headers: { 'X-Access-Key': '$2a$10$xgHBK5MaCPjGBZmwI8srg.C9IPVMC989QP7Lh2pZmr3IIRargWOcm' }
-        });
-        
-        if (!response.ok) throw new Error("Netzwerkfehler");
-        const data = await response.json();
-        
-        let summe = 0;
-        const zielArray = data.record?.depots;
-        
-        if (zielArray && Array.isArray(zielArray)) {
-          summe = zielArray.reduce((acc: number, curr: any) => {
-            const wert = parseFloat(String(curr.betrag).replace(',', '.'));
-            return acc + (isNaN(wert) ? 0 : wert);
-          }, 0);
-        }
-        
-        cachedFixedDepotAmount = summe;
-        setFixedDepotAmount(summe);
-      } catch (error) {
-        console.error("Fehler beim Abrufen der JSONBin Daten:", error);
-      }
-    };
-
-    fetchMonatlicheSumme();
-    }
-
     return () => window.removeEventListener('db_updated', load);
   }, []);
 
@@ -74,8 +44,10 @@ export const Budget = () => {
   const incomes = items.filter(i => i.type === 'INCOME');
   const expenses = items.filter(i => i.type === 'EXPENSE');
 
+  const fixedDepotAmount = depots.reduce((sum, d) => sum + (d.monthlyAmount || 0), 0);
+
   const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0);
-  const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0) + (fixedDepotAmount || 0);
+  const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0) + fixedDepotAmount;
   const excess = totalIncome - totalExpense;
 
   const renderList = (list: BudgetItem[], title: string, total: number, color: string, isExpense = false) => (
@@ -85,11 +57,11 @@ export const Budget = () => {
         <strong style={{ color }}>{total.toFixed(2)} €</strong>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {isExpense && fixedDepotAmount !== null && (
+        {isExpense && fixedDepotAmount > 0 && (
           <div className="glass-panel" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface-hover)' }}>
             <div>
               <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Nebenkosten <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Auto)</span>
+                N26 Sparplan <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Auto)</span>
               </div>
               <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{fixedDepotAmount.toFixed(2)} €</div>
             </div>
@@ -106,7 +78,7 @@ export const Budget = () => {
                 <div style={{ fontWeight: 500 }}>{item.title} <span title={item.createdBy} style={{ fontSize: '0.8em' }}>{author?.avatar}</span></div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{item.amount.toFixed(2)} €</div>
               </div>
-              <button onClick={() => handleDelete(item.id)} style={{ color: 'var(--color-danger)', padding: '0.5rem' }}>
+              <button onClick={() => handleDelete(item.id)} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>
                 <Trash2 size={18} />
               </button>
             </div>
@@ -140,7 +112,7 @@ export const Budget = () => {
           <button 
             type="button" 
             className={`btn ${type === 'INCOME' ? 'btn-primary' : 'btn-secondary'}`} 
-            style={{ flex: 1, backgroundColor: type === 'INCOME' ? 'var(--color-success)' : undefined }}
+            style={{ flex: 1, backgroundColor: type === 'INCOME' ? 'var(--color-success)' : undefined, border: 'none', color: type === 'INCOME' ? 'white' : 'inherit' }}
             onClick={() => setType('INCOME')}
           >
             Einnahme
@@ -148,7 +120,7 @@ export const Budget = () => {
           <button 
             type="button" 
             className={`btn ${type === 'EXPENSE' ? 'btn-primary' : 'btn-secondary'}`} 
-            style={{ flex: 1, backgroundColor: type === 'EXPENSE' ? 'var(--color-danger)' : undefined }}
+            style={{ flex: 1, backgroundColor: type === 'EXPENSE' ? 'var(--color-danger)' : undefined, border: 'none', color: type === 'EXPENSE' ? 'white' : 'inherit' }}
             onClick={() => setType('EXPENSE')}
           >
             Ausgabe
@@ -171,7 +143,7 @@ export const Budget = () => {
           onChange={e => setAmount(e.target.value)} 
           required 
         />
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" style={{ border: 'none' }}>
           <Plus size={20} /> Hinzufügen
         </button>
       </form>

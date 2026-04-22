@@ -12,6 +12,7 @@ import { Meals } from './pages/Meals';
 import { Rewards } from './pages/Rewards';
 import { Setup } from './pages/Setup';
 import { Expenses } from './pages/Expenses';
+import { N26 } from './pages/N26';
 
 import { useEffect } from 'react';
 import { initFirebase } from './services/mockDb';
@@ -37,6 +38,7 @@ function App() {
               <Route path="/meals" element={<Meals />} />
               <Route path="/rewards" element={<Rewards />} />
               <Route path="/setup" element={<Setup />} />
+              <Route path="/n26" element={<N26 />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

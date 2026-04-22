@@ -91,11 +91,57 @@ export interface ExpenseBudget {
   amount: number;
 }
 
+export interface Depot {
+  id: string;
+  name: string;
+  monthlyAmount: number;
+  startBalance: number;
+  createdAt: number;
+}
+
+export interface DepotTransaction {
+  id: string;
+  depotId: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  note?: string;
+  createdAt: number;
+  isAutomated?: boolean;
+}
+
+export interface N26Settings {
+  autoBookingEnabled: boolean;
+  bookingDay: number; // 1-28
+  lastAutoBookingMonth?: string; // YYYY-MM
+  closedYears?: number[];
+}
+
 // Initial Data
 const INITIAL_USERS: User[] = [
   { id: 'Falko', uid: 'thOJVf4L9cd2BysM2bFOeuC14yV2', avatar: '👨', isAdmin: true, isSetupComplete: true },
   { id: 'Anja', uid: 'zaKMNvN3UFTnFRE2VT8EmioWfGk1', avatar: '👩', isSetupComplete: true },
   { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: '👦', isSetupComplete: true, isChild: true },
+];
+
+const INITIAL_DEPOTS: Depot[] = [
+  { id: '1', name: 'GEZ', startBalance: 0, monthlyAmount: 11, createdAt: Date.now() },
+  { id: '2', name: 'Arag Zahn + Hund', startBalance: 308.40, monthlyAmount: 57, createdAt: Date.now() },
+  { id: '3', name: 'Diverses', startBalance: -169.67, monthlyAmount: 93.5, createdAt: Date.now() },
+  { id: '4', name: 'GEZ (Steuer)', startBalance: -4.96, monthlyAmount: 18.36, createdAt: Date.now() },
+  { id: '5', name: 'Grundsteuer + Finanzamt', startBalance: 39.85, monthlyAmount: 129, createdAt: Date.now() },
+  { id: '6', name: 'Haftpflicht', startBalance: 26.83, monthlyAmount: 6, createdAt: Date.now() },
+  { id: '7', name: 'Heizkosten', startBalance: 1429.38, monthlyAmount: 150, createdAt: Date.now() },
+  { id: '8', name: 'Instandhaltung', startBalance: 0, monthlyAmount: 60, createdAt: Date.now() },
+  { id: '9', name: 'Internet', startBalance: 10.23, monthlyAmount: 50, createdAt: Date.now() },
+  { id: '10', name: 'KFZ-Versicherungen', startBalance: 230, monthlyAmount: 75, createdAt: Date.now() },
+  { id: '11', name: 'Müll', startBalance: 2, monthlyAmount: 27, createdAt: Date.now() },
+  { id: '12', name: 'Rücklagen Auto', startBalance: 150, monthlyAmount: 150, createdAt: Date.now() },
+  { id: '13', name: 'Schornsteinfeger', startBalance: 11.22, monthlyAmount: 20, createdAt: Date.now() },
+  { id: '14', name: 'Strom', startBalance: 91.36, monthlyAmount: 120, createdAt: Date.now() },
+  { id: '15', name: 'Waki + Aufbereitung', startBalance: 28, monthlyAmount: 123, createdAt: Date.now() },
+  { id: '16', name: 'Wartung Heizung', startBalance: 66, monthlyAmount: 27, createdAt: Date.now() },
+  { id: '17', name: 'Wasser', startBalance: 3, monthlyAmount: 95, createdAt: Date.now() },
+  { id: '18', name: 'Wohngebäude/Hausrat', startBalance: 155.2, monthlyAmount: 47, createdAt: Date.now() },
 ];
 
 export const DB_KEYS = {
@@ -110,6 +156,9 @@ export const DB_KEYS = {
   LEADERBOARD: 'family_hub_leaderboard',
   EXPENSES: 'family_hub_expenses',
   EXPENSE_BUDGETS: 'family_hub_expense_budgets',
+  DEPOTS: 'family_hub_depots',
+  DEPOT_TRANSACTIONS: 'family_hub_depot_transactions',
+  N26_SETTINGS: 'family_hub_n26_settings',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -155,7 +204,9 @@ export const initFirebase = async () => {
         [DB_KEYS.REWARDS]: get(DB_KEYS.REWARDS, []),
         [DB_KEYS.LEADERBOARD]: get(DB_KEYS.LEADERBOARD, []),
         [DB_KEYS.EXPENSES]: get(DB_KEYS.EXPENSES, []),
-        [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, [])
+        [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, []),
+        [DB_KEYS.DEPOTS]: get(DB_KEYS.DEPOTS, INITIAL_DEPOTS),
+        [DB_KEYS.DEPOT_TRANSACTIONS]: get(DB_KEYS.DEPOT_TRANSACTIONS, []),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -412,4 +463,89 @@ export const mockDb = {
       set(DB_KEYS.EXPENSE_BUDGETS, [...budgets, budget]);
     }
   },
+
+  // Depots
+  getDepots: (): Depot[] => {
+    const data = get<Depot[]>(DB_KEYS.DEPOTS, INITIAL_DEPOTS) || [];
+    // Safety filtering: only return valid depot objects to prevent rendering crashes
+    return data.filter(d => d && typeof d === 'object' && d.name);
+  },
+  addDepot: (depot: Omit<Depot, 'id' | 'createdAt'>) => {
+    const depots = mockDb.getDepots();
+    const newDepot: Depot = {
+      ...depot,
+      id: uuidv4(),
+      createdAt: Date.now(),
+    };
+    set(DB_KEYS.DEPOTS, [...depots, newDepot]);
+  },
+  deleteDepot: (id: string) => {
+    const depots = mockDb.getDepots();
+    set(DB_KEYS.DEPOTS, depots.filter(d => d.id !== id));
+    // Also cleanup transactions
+    const transactions = mockDb.getDepotTransactions();
+    set(DB_KEYS.DEPOT_TRANSACTIONS, transactions.filter(t => t.depotId !== id));
+  },
+  updateDepot: (updatedDepot: Depot) => {
+    const depots = mockDb.getDepots();
+    set(DB_KEYS.DEPOTS, depots.map(d => d.id === updatedDepot.id ? updatedDepot : d));
+  },
+  getDepotTransactions: (depotId?: string): DepotTransaction[] => {
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    return depotId ? txs.filter(t => t.depotId === depotId) : txs;
+  },
+  addDepotTransaction: (tx: Omit<DepotTransaction, 'id' | 'createdAt'>) => {
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    const newTx: DepotTransaction = {
+      ...tx,
+      id: uuidv4(),
+      createdAt: Date.now(),
+    };
+    set(DB_KEYS.DEPOT_TRANSACTIONS, [newTx, ...txs]);
+  },
+  deleteDepotTransaction: (id: string) => {
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    set(DB_KEYS.DEPOT_TRANSACTIONS, txs.filter(t => t.id !== id));
+  },
+  getN26Settings: (): N26Settings => {
+    const defaults: N26Settings = { autoBookingEnabled: false, bookingDay: 1, closedYears: [] };
+    return get<N26Settings>(DB_KEYS.N26_SETTINGS, defaults) || defaults;
+  },
+  saveN26Settings: (settings: N26Settings) => {
+    set(DB_KEYS.N26_SETTINGS, settings);
+  },
+  executeMonthlyBookings: (date: string, isAutomated: boolean = false) => {
+    const depots = mockDb.getDepots();
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    
+    const newTxs: DepotTransaction[] = depots.map(depot => ({
+      id: uuidv4(),
+      depotId: depot.id,
+      amount: depot.monthlyAmount || 0,
+      date,
+      note: isAutomated ? 'Monatliche Sparrate (Auto)' : 'Monatliche Sparrate (Manuell)',
+      createdAt: Date.now(),
+      isAutomated
+    })).filter(t => t.amount !== 0);
+
+    set(DB_KEYS.DEPOT_TRANSACTIONS, [...newTxs, ...txs]);
+    
+    if (isAutomated) {
+      const settings = mockDb.getN26Settings();
+      mockDb.saveN26Settings({
+        ...settings,
+        lastAutoBookingMonth: date.substring(0, 7) // YYYY-MM
+      });
+    }
+  },
+  closeYear: (year: number) => {
+    const settings = mockDb.getN26Settings();
+    const closedYears = settings.closedYears || [];
+    if (!closedYears.includes(year)) {
+      mockDb.saveN26Settings({
+        ...settings,
+        closedYears: [...closedYears, year].sort((a, b) => b - a)
+      });
+    }
+  }
 };
