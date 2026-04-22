@@ -9,11 +9,16 @@ import { auth } from '../services/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { secondaryAuth } from '../services/firebase';
 
+import { getNavItems } from '../utils/navigation';
+
 export const Setup = () => {
   const { settings, updateSettings } = useSettings();
   const { user, logout } = useAuth();
   
+  const navItems = getNavItems(user);
+  
   const [dbUsers, setDbUsers] = useState(mockDb.getUsers());
+
   const [newUserId, setNewUserId] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -293,13 +298,13 @@ export const Setup = () => {
                 }} 
                 className="input-field"
               >
-                <option value="/">Dashboard (Home)</option>
-                <option value="/expenses">Ausgaben</option>
-                <option value="/tasks">Aufgaben</option>
-                <option value="/notes">Notizen</option>
-                <option value="/meals">Mahlzeit</option>
-                <option value="/rewards">Sterne</option>
+                {navItems.map(item => (
+                  <option key={item.to} value={item.to}>
+                    {item.label} {item.to === '/' ? '(Home)' : ''}
+                  </option>
+                ))}
               </select>
+
               <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.4rem' }}>
                 Wähle aus, auf welcher Seite du nach dem Login landen möchtest.
               </p>

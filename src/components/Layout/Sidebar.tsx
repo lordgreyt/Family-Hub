@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Home, Calculator, BookOpen, Settings, CheckSquare, Utensils, Star, X, Wallet, LogOut, CreditCard } from 'lucide-react';
+import { X, LogOut } from 'lucide-react';
+import { getNavItems } from '../../utils/navigation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,21 +11,8 @@ interface SidebarProps {
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuth();
   
-  const navItems = [
-    { to: '/', icon: Home, label: 'Home' },
-    { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
-    { to: '/notes', icon: BookOpen, label: 'Notizen' },
-    { to: '/meals', icon: Utensils, label: 'Mahlzeit' },
-    ...(user?.id === 'Falko' ? [
-      { to: '/n26', icon: CreditCard, label: 'N26' }
-    ] : []),
-    ...(!user?.isChild ? [
-      { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
-      { to: '/budget', icon: Calculator, label: 'Budget' }
-    ] : []),
-    { to: '/rewards', icon: Star, label: 'Sterne' },
-    { to: '/setup', icon: Settings, label: 'Setup' },
-  ];
+  const navItems = getNavItems(user);
+
 
   return (
     <>

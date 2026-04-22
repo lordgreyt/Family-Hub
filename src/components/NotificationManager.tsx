@@ -175,20 +175,6 @@ export const NotificationManager = () => {
     };
   }, [user]);
 
-    window.addEventListener('db_updated', handleDbUpdate);
-    
-    // Initialer Check
-    const initialTimeout = setTimeout(handleDbUpdate, 5000);
-
-    // Periodischer Check (als Fallback)
-    const intervalId = setInterval(handleDbUpdate, 5 * 60 * 1000);
-
-    return () => {
-      window.removeEventListener('db_updated', handleDbUpdate);
-      clearTimeout(initialTimeout);
-      clearInterval(intervalId);
-    };
-  }, [user]);
-
   return null;
 };
+
