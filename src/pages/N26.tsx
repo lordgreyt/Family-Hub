@@ -580,9 +580,9 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
             fontSize: '11px',
             fontWeight: 700,
             border: '1px solid',
-            borderColor: showAutomated ? 'var(--color-primary)' : 'var(--color-border)',
-            backgroundColor: showAutomated ? 'var(--color-primary-light)' : 'var(--color-surface)',
-            color: showAutomated ? 'white' : 'var(--color-text-muted)',
+            borderColor: !showAutomated ? 'var(--color-primary)' : 'var(--color-border)',
+            backgroundColor: !showAutomated ? 'var(--color-primary-light)' : 'var(--color-surface)',
+            color: !showAutomated ? 'white' : 'var(--color-text-muted)',
             cursor: 'pointer',
             transition: 'all 0.2s',
             display: 'flex',
@@ -590,7 +590,7 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
             gap: '4px'
           }}
         >
-          {showAutomated ? 'Routine Ein' : 'Routine Aus'}
+          {showAutomated ? 'Filter Aus' : 'Filter Ein'}
         </button>
       </div>
 

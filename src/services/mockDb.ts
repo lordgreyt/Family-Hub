@@ -525,7 +525,7 @@ export const mockDb = {
       date,
       note: isAutomated ? 'Monatliche Sparrate (Auto)' : 'Monatliche Sparrate (Manuell)',
       createdAt: Date.now(),
-      isAutomated
+      isAutomated: true
     })).filter(t => t.amount !== 0);
 
     set(DB_KEYS.DEPOT_TRANSACTIONS, [...newTxs, ...txs]);
