@@ -545,7 +545,7 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
 
 
 const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotTransaction[], depots: Depot[], onDelete: (id: string) => void }) => {
-  const [showAutomated, setShowAutomated] = useState(true);
+  const [showAutomated, setShowAutomated] = useState(false);
   const settings = mockDb.getN26Settings();
   const closedYears = settings.closedYears || [];
   
