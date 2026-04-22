@@ -492,7 +492,14 @@ export const mockDb = {
   },
   getDepotTransactions: (depotId?: string): DepotTransaction[] => {
     const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
-    return depotId ? txs.filter(t => t.depotId === depotId) : txs;
+    // Migration: ensure all transactions with "Sparrate" in note are treated as automated/routine
+    const migratedTxs = txs.map(tx => {
+      if (!tx.isAutomated && tx.note?.includes('Sparrate')) {
+        return { ...tx, isAutomated: true };
+      }
+      return tx;
+    });
+    return depotId ? migratedTxs.filter(t => t.depotId === depotId) : migratedTxs;
   },
   addDepotTransaction: (tx: Omit<DepotTransaction, 'id' | 'createdAt'>) => {
     const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);

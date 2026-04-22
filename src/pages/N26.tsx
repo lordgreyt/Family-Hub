@@ -553,7 +553,7 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
     const grouped: Record<number, DepotTransaction[]> = {};
     transactions.forEach(tx => {
       const year = new Date(tx.date).getFullYear();
-      if (!showAutomated && tx.isAutomated) return;
+      if (!showAutomated && (tx.isAutomated || tx.note?.includes('Sparrate'))) return;
       if (!grouped[year]) grouped[year] = [];
       grouped[year].push(tx);
     });
@@ -652,7 +652,7 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
                 flexDirection: 'column',
                 gap: '0.25rem',
                 boxShadow: 'var(--shadow-sm)',
-                opacity: tx.isAutomated ? 0.7 : 1
+                opacity: (tx.isAutomated || tx.note?.includes('Sparrate')) ? 0.7 : 1
               }}>
                 {/* Top Row: Depot Name and Amount */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
