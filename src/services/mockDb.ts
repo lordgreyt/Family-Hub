@@ -160,6 +160,7 @@ export const DB_KEYS = {
   DEPOTS: 'family_hub_depots',
   DEPOT_TRANSACTIONS: 'family_hub_depot_transactions',
   N26_SETTINGS: 'family_hub_n26_settings',
+  UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -474,6 +475,17 @@ export const mockDb = {
     const rewards = mockDb.getRewardRequests();
     set(DB_KEYS.REWARDS, rewards.map(r => r.id === updatedReq.id ? updatedReq : r));
   },
+
+  // Videos
+  getUnlockedVideos: (): string[] => get(DB_KEYS.UNLOCKED_VIDEOS, []),
+  unlockVideo: (videoId: string) => {
+    const current = mockDb.getUnlockedVideos();
+    if (!current.includes(videoId)) {
+      set(DB_KEYS.UNLOCKED_VIDEOS, [...current, videoId]);
+    }
+  },
+  getCustomVideos: (): any[] => get('family_hub_custom_videos', []),
+  setCustomVideos: (videos: any[]) => set('family_hub_custom_videos', videos),
 
   // Leaderboard
   getLeaderboard: (): ScoreEntry[] => get(DB_KEYS.LEADERBOARD, []),

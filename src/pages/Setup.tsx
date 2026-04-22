@@ -214,6 +214,47 @@ export const Setup = () => {
             </p>
           </div>
         )}
+
+        {(user?.isAdmin || user?.id === 'Falko') && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)', fontSize: 'var(--font-sm)', fontWeight: 600 }}>
+              Video-Belohnungen
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Sterne pro Videominute</label>
+                <input 
+                  type="number" 
+                  className="input-field" 
+                  value={settings.videoCostPerMinute} 
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    updateSettings({ videoCostPerMinute: val });
+                  }}
+                  style={{ padding: '0.5rem', textAlign: 'center' }}
+                />
+              </div>
+              <div style={{ flex: 2, fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                Kosten für das Freischalten von Videos (EinfachGustaf). 
+                Ein 5-Minuten-Video kostet bei 2 Sternen/Min also 10 Sterne.
+              </div>
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>YouTube API Key (optional für Updates)</label>
+              <input 
+                type="password" 
+                className="input-field" 
+                value={settings.youtubeApiKey || ''} 
+                onChange={(e) => updateSettings({ youtubeApiKey: e.target.value })}
+                placeholder="AIzaSy..."
+                style={{ padding: '0.5rem' }}
+              />
+              <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                Wird benötigt, um die neuesten Videos automatisch direkt in der App zu laden.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {(user?.isAdmin || user?.id === 'Falko') && (

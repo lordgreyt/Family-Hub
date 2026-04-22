@@ -7,6 +7,8 @@ interface AppSettings {
   themeColor: ThemeColor;
   fontSize: FontSize;
   prioPoints: Record<number, number>;
+  videoCostPerMinute: number;
+  youtubeApiKey?: string;
 }
 
 interface SettingsContextType {
@@ -18,6 +20,8 @@ const defaultSettings: AppSettings = {
   themeColor: 'indigo',
   fontSize: 'base',
   prioPoints: { 1: 5, 2: 10, 3: 15 },
+  videoCostPerMinute: 2,
+  youtubeApiKey: '',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

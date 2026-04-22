@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
-import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal } from 'lucide-react';
+import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Video, Lock, Unlock } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
 import { FlappyGame } from '../components/FlappyGame';
@@ -23,6 +23,72 @@ export const Rewards = () => {
   const [activeGame, setActiveGame] = useState<'SNAKE' | 'MEMORY' | 'FLAPPY' | 'WHACKAMO' | null>(null);
   
   const [adjustments, setAdjustments] = useState<Record<string, number | ''>>({});
+  const [unlockedVideos, setUnlockedVideos] = useState<string[]>([]);
+  const [dynamicVideos, setDynamicVideos] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const DEFAULT_GUSTAF_VIDEOS = [
+    { id: 'MCRqhNQ1OFA', title: 'Minecraft in den BACKROOMS', duration: 66 },
+    { id: 'n36zDjj4tYk', title: 'Minecraft, aber SCHLAFEN ist OP', duration: 31 },
+    { id: 'pHCshmwpfO8', title: 'Wenn Minecraft MOBS sich RÄCHEN', duration: 19 },
+    { id: '2Mq6nFaVe44', title: 'Minecraft in einem VULKAN', duration: 44 },
+    { id: 'W9M4yxaCpOM', title: 'Alles mit GLÜCK verzaubern', duration: 29 },
+    { id: 'V7vERR-0QTQ', title: 'FUSSBALL in Minecraft', duration: 19 },
+    { id: 'NFoEZ8V2Wto', title: '10 TAGE auf einer BOHRINSEL', duration: 40 },
+    { id: 'UUNZSJKT-PY', title: 'Minecraft, aber KEINE BLÖCKE', duration: 28 },
+    { id: 'q3hdc69W9bM', title: 'REALISTISCHE FARM gebaut', duration: 36 },
+    { id: '72tQV-gX4eo', title: '48 SELTSAME Minecraft MYTHEN', duration: 31 }
+  ];
+
+  const displayVideos = dynamicVideos.length > 0 ? dynamicVideos : DEFAULT_GUSTAF_VIDEOS;
+
+  const fetchLatestVideos = async () => {
+    if (!settings.youtubeApiKey) {
+      alert("Bitte hinterlege erst einen YouTube API Key in den Einstellungen (Setup), um die Liste zu aktualisieren.");
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const channelId = 'UC0v5B9o2Z-z_S0hX_C6Sj_g';
+      // 1. Get latest 10 videos
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video&key=${settings.youtubeApiKey}`;
+      const searchRes = await fetch(searchUrl);
+      const searchData = await searchRes.json();
+
+      if (searchData.error) throw new Error(searchData.error.message);
+
+      const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
+
+      // 2. Get durations
+      const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoIds}&key=${settings.youtubeApiKey}`;
+      const videoRes = await fetch(videoUrl);
+      const videoData = await videoRes.json();
+
+      const parseDuration = (duration: string) => {
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 10;
+        const h = parseInt(match[1] || '0');
+        const m = parseInt(match[2] || '0');
+        const s = parseInt(match[3] || '0');
+        return h * 60 + m + s / 60;
+      };
+
+      const newVideos = videoData.items.map((item: any) => ({
+        id: item.id,
+        title: item.snippet.title,
+        duration: parseDuration(item.contentDetails.duration)
+      }));
+
+      mockDb.setCustomVideos(newVideos);
+      setDynamicVideos(newVideos);
+    } catch (err: any) {
+      console.error("YouTube Fetch Error:", err);
+      alert("Fehler beim Laden der YouTube-Videos: " + err.message);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     const load = () => {
@@ -30,6 +96,8 @@ export const Rewards = () => {
       setRequests(mockDb.getRewardRequests());
       setLeaderboard(mockDb.getLeaderboard());
       setUsers(mockDb.getUsers());
+      setUnlockedVideos(mockDb.getUnlockedVideos());
+      setDynamicVideos(mockDb.getCustomVideos());
     };
     load();
     window.addEventListener('db_updated', load);
@@ -92,6 +160,87 @@ export const Rewards = () => {
               <strong style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.5rem' }}>🔨 FANGEN</strong>
               {renderLeaderboardRows('WHACKAMO')}
           </div>
+      </div>
+    </div>
+  );
+
+  const videoRewardsSection = (
+    <div className="glass-panel" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(255,0,0,0.05) 0%, rgba(255,0,0,0.1) 100%)', border: '1px solid rgba(255,0,0,0.2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <h3 style={{ margin: 0, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Video size={20} /> Gustaf-Kino 🍿
+        </h3>
+        {!user.isChild && (
+          <button 
+            onClick={fetchLatestVideos} 
+            disabled={isRefreshing}
+            className="btn"
+            style={{ padding: '0.25rem 0.5rem', fontSize: '10px', background: 'rgba(220, 38, 38, 0.1)', color: '#dc2626', border: '1px solid #dc2626' }}
+          >
+            {isRefreshing ? 'Lädt...' : 'Liste aktualisieren'}
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem' }}>
+        {displayVideos.map(vid => {
+          const isUnlocked = unlockedVideos.includes(vid.id);
+          const cost = Math.ceil(vid.duration) * settings.videoCostPerMinute;
+          
+          return (
+            <div key={vid.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', aspectRatio: '16/9', backgroundColor: '#000', boxShadow: 'var(--shadow-md)' }}>
+                {isUnlocked ? (
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src={`https://www.youtube-nocookie.com/embed/${vid.id}`}
+                    title={vid.title}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen
+                  ></iframe>
+                ) : (
+                  <div 
+                    onClick={() => {
+                      if (balance >= cost) {
+                        if (confirm(`Möchtest du dieses Video für ${cost} Sterne freischalten?`)) {
+                          mockDb.addRewardRequest({
+                            id: `video-${vid.id}`,
+                            childId: user.id,
+                            stars: cost,
+                            status: 'APPROVED'
+                          });
+                          mockDb.unlockVideo(vid.id);
+                        }
+                      } else {
+                        alert(`Du brauchst ${cost} Sterne, um dieses Video freizuschalten! Du hast nur ${balance}.`);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', height: '100%', width: '100%' }}
+                  >
+                    <img 
+                      src={`https://i.ytimg.com/vi/${vid.id}/hqdefault.jpg`} 
+                      alt={vid.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }}
+                    />
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', color: 'white' }}>
+                      <Lock size={24} style={{ marginBottom: '0.25rem' }} />
+                      <div style={{ fontSize: 'var(--font-xs)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        {cost} <Star size={10} fill="currentColor" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {vid.title}
+              </div>
+              <div style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>
+                Dauer: {Math.floor(vid.duration)} Min.
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -214,6 +363,7 @@ export const Rewards = () => {
         )}
 
         {wallOfFame}
+        {videoRewardsSection}
         <div style={{ height: '4rem' }}></div>
       </div>
     );
@@ -482,6 +632,7 @@ export const Rewards = () => {
       </div>
 
       {wallOfFame}
+      {videoRewardsSection}
 
       {/* Exchange Form */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
