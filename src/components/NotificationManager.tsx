@@ -5,10 +5,11 @@ import { mockDb } from '../services/mockDb';
 export const NotificationManager = () => {
   const { user } = useAuth();
   const knownAssignments = useRef<Record<string, string | undefined>>({});
+  const knownRequests = useRef<Set<string>>(new Set());
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    if (!user || (user.id === 'Falko' && !user.isSetupComplete)) return;
+    if (!user || user.isChild || (user.id === 'Falko' && !user.isSetupComplete)) return;
 
     const requestPermission = async () => {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -73,24 +74,16 @@ export const NotificationManager = () => {
       const users = mockDb.getUsers();
       const currentUserId = user.id;
 
-      // 1. Initialisierung beim ersten Laden der Komponente (keine Benachrichtigungen für bestehende Aufgaben)
+      // 1. Initialisierung beim ersten Laden (keine Benachrichtigungen für Bestehendes)
       if (!isInitialized.current) {
         allTasks.forEach(t => {
           knownAssignments.current[t.id] = t.assignedTo;
         });
-        isInitialized.current = true;
         return;
       }
 
-      // 2. Neue oder geänderte Zuweisungen prüfen
       allTasks.forEach(t => {
         const prevAssignedTo = knownAssignments.current[t.id];
-        
-        // Benachrichtigen wenn:
-        // - Die Aufgabe dem aktuellen Nutzer zugewiesen ist
-        // - UND sie vorher nicht dem aktuellen Nutzer zugewiesen war (neu oder geändert)
-        // - UND der Ersteller nicht der aktuelle Nutzer ist
-        // - UND die Aufgabe nicht erledigt ist
         if (
           t.assignedTo === currentUserId && 
           prevAssignedTo !== currentUserId && 
@@ -106,26 +99,81 @@ export const NotificationManager = () => {
             renotify: true
           });
         }
-        
         knownAssignments.current[t.id] = t.assignedTo;
       });
 
-      // 3. Cleanup: IDs von gelöschten Aufgaben aus dem Speicher entfernen
       const currentIds = new Set(allTasks.map(t => t.id));
       Object.keys(knownAssignments.current).forEach(id => {
-        if (!currentIds.has(id)) {
-          delete knownAssignments.current[id];
+        if (!currentIds.has(id)) delete knownAssignments.current[id];
+      });
+    };
+
+    const checkNewRequests = () => {
+      const mealRequests = mockDb.getMealPlanItems().filter(i => i.status === 'PENDING');
+      const starRequests = mockDb.getRewardRequests().filter(r => r.status === 'PENDING');
+      const templates = mockDb.getMealTemplates();
+      const users = mockDb.getUsers();
+
+      // 1. Initialisierung
+      if (!isInitialized.current) {
+        mealRequests.forEach(r => knownRequests.current.add(r.id));
+        starRequests.forEach(r => knownRequests.current.add(r.id));
+        isInitialized.current = true;
+        return;
+      }
+
+      // 2. Meal Requests
+      mealRequests.forEach(r => {
+        if (!knownRequests.current.has(r.id)) {
+          const reqUser = users.find(u => u.id === r.requestedBy);
+          const template = templates.find(t => t.id === r.templateId);
+          showNotification('Neue Mahlzeiten-Anfrage!', {
+            body: `${reqUser?.avatar || '👤'} ${r.requestedBy} wünscht sich ${template?.emoji || '🍽️'} ${template?.title || 'ein Gericht'}.`,
+            icon: '/pwa-192x192.png',
+            tag: `meal-req-${r.id}`
+          });
+          knownRequests.current.add(r.id);
         }
+      });
+
+      // 3. Star Requests
+      starRequests.forEach(r => {
+        if (!knownRequests.current.has(r.id)) {
+          const reqUser = users.find(u => u.id === r.childId);
+          showNotification('Anfrage für Medienzeit!', {
+            body: `${reqUser?.avatar || '👤'} ${r.childId} möchte ${r.stars} Sterne einlösen.`,
+            icon: '/pwa-192x192.png',
+            tag: `star-req-${r.id}`
+          });
+          knownRequests.current.add(r.id);
+        }
+      });
+
+      // 4. Cleanup
+      const currentIds = new Set([...mealRequests.map(r => r.id), ...starRequests.map(r => r.id)]);
+      knownRequests.current.forEach(id => {
+        if (!currentIds.has(id)) knownRequests.current.delete(id);
       });
     };
 
     setTimeout(requestPermission, 2000);
 
-    // Listener für Datenbank-Updates
     const handleDbUpdate = () => {
       checkNewAssignments();
       checkAndNotifyReminders();
+      checkNewRequests();
     };
+
+    window.addEventListener('db_updated', handleDbUpdate);
+    const initialTimeout = setTimeout(handleDbUpdate, 2000);
+    const intervalId = setInterval(handleDbUpdate, 2 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener('db_updated', handleDbUpdate);
+      clearTimeout(initialTimeout);
+      clearInterval(intervalId);
+    };
+  }, [user]);
 
     window.addEventListener('db_updated', handleDbUpdate);
     
