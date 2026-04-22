@@ -290,7 +290,12 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Metrics Row */}
       <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1.25rem', textAlign: 'center', background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', color: 'white', border: 'none' }}>
+        <div className="glass-panel" style={{ 
+          flex: 1, minWidth: 0, padding: '1.25rem', 
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', 
+          color: 'white', border: 'none' 
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: 0.8, fontSize: 'var(--font-xs)', fontWeight: 600, marginBottom: '0.4rem' }}>
             <Landmark size={12} /> RÜCKLAGEN
           </div>
@@ -298,7 +303,11 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
             {totalBalance.toLocaleString('de-DE', { minimumFractionDigits: 0 })}€
           </div>
         </div>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1.25rem', textAlign: 'center', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        <div className="glass-panel" style={{ 
+          flex: 1, minWidth: 0, padding: '1.25rem', 
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' 
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--color-primary)', fontSize: 'var(--font-xs)', fontWeight: 600, marginBottom: '0.4rem' }}>
             {surplus !== null && surplus >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />} ÜBERSCHUSS
           </div>
