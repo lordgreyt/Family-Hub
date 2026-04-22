@@ -5,6 +5,8 @@ import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { NotificationManager } from '../NotificationManager';
 
+import { RequestPopup } from '../RequestPopup';
+
 export const MainLayout = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -50,6 +52,7 @@ export const MainLayout = () => {
         <Outlet />
       </main>
       <NotificationManager />
+      <RequestPopup />
     </>
   );
 };
