@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { BudgetItem } from '../services/mockDb';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Save, X } from 'lucide-react';
 
 export const Budget = () => {
   const { user } = useAuth();
@@ -11,6 +11,8 @@ export const Budget = () => {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
+  const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
+  const [pressTimer, setPressTimer] = useState<any>(null);
 
   useEffect(() => {
     const load = () => {
@@ -39,6 +41,28 @@ export const Budget = () => {
 
   const handleDelete = (id: string) => {
     mockDb.deleteBudgetItem(id);
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    mockDb.updateBudgetItem(editingItem);
+    setEditingItem(null);
+  };
+
+  const startPress = (item: BudgetItem) => {
+    const timer = setTimeout(() => {
+      setEditingItem({ ...item });
+      if ('vibrate' in navigator) navigator.vibrate(50);
+    }, 600);
+    setPressTimer(timer);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      setPressTimer(null);
+    }
   };
 
   const incomes = items.filter(i => i.type === 'INCOME');
@@ -72,13 +96,58 @@ export const Budget = () => {
         )}
         {list.map(item => {
           const author = mockDb.getUsers().find(u => u.id === item.createdBy);
+          const isEditing = editingItem?.id === item.id;
+
+          if (isEditing) {
+            return (
+              <form key={item.id} onSubmit={handleUpdate} className="glass-panel" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '2px solid var(--color-primary)', animation: 'fadeIn 0.2s' }}>
+                <input 
+                  className="input-field" 
+                  value={editingItem.title} 
+                  onChange={e => setEditingItem({ ...editingItem, title: e.target.value })}
+                  autoFocus
+                  required
+                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    className="input-field" 
+                    style={{ flex: 1 }}
+                    value={editingItem.amount} 
+                    onChange={e => setEditingItem({ ...editingItem, amount: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                  <button type="button" onClick={() => setEditingItem(null)} className="btn btn-secondary" style={{ padding: '0.5rem' }}><X size={18} /></button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem' }}><Save size={18} /></button>
+                </div>
+              </form>
+            );
+          }
+
           return (
-            <div key={item.id} className="glass-panel" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div 
+              key={item.id} 
+              className="glass-panel" 
+              style={{ 
+                padding: '0.75rem', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                cursor: 'pointer',
+                userSelect: 'none',
+                WebkitTouchCallout: 'none'
+              }}
+              onPointerDown={() => startPress(item)}
+              onPointerUp={cancelPress}
+              onPointerLeave={cancelPress}
+              onPointerCancel={cancelPress}
+            >
               <div>
                 <div style={{ fontWeight: 500 }}>{item.title} <span title={item.createdBy} style={{ fontSize: '0.8em' }}>{author?.avatar}</span></div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{item.amount.toFixed(2)} €</div>
               </div>
-              <button onClick={() => handleDelete(item.id)} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>
+              <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>
                 <Trash2 size={18} />
               </button>
             </div>

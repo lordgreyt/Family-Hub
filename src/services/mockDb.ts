@@ -41,6 +41,7 @@ export interface TaskItem {
   dueDate?: string;
   assignedTo?: string[];
   createdAt: number;
+  completedAt?: number;
   createdBy: string; // User ID
 }
 
@@ -323,6 +324,10 @@ export const mockDb = {
     const items = mockDb.getBudgetItems();
     set(DB_KEYS.BUDGET, items.filter(item => item.id !== id));
   },
+  updateBudgetItem: (updatedItem: BudgetItem) => {
+    const items = mockDb.getBudgetItems();
+    set(DB_KEYS.BUDGET, items.map(i => i.id === updatedItem.id ? updatedItem : i));
+  },
 
   // Notes (Shared & Private)
   getNotes: (): NoteItem[] => get(DB_KEYS.NOTES, []),
@@ -347,13 +352,42 @@ export const mockDb = {
   // Tasks (Shared & Private)
   getTasks: (): TaskItem[] => {
     const tasks = get<TaskItem[]>(DB_KEYS.TASKS, []);
-    // Migration: convert legacy single-string assignedTo to string[]
-    return tasks.map(t => {
-      if (t.assignedTo && typeof t.assignedTo === 'string') {
-        return { ...t, assignedTo: [t.assignedTo] };
+    const now = Date.now();
+    const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+    let changed = false;
+
+    // Filter and Migrate
+    const processed = tasks.filter(t => {
+      // Auto-delete after 5 days
+      if (t.isDone && t.completedAt && (now - t.completedAt) > fiveDaysMs) {
+        changed = true;
+        return false;
       }
-      return t;
+      return true;
+    }).map(t => {
+      let updated = { ...t };
+      let itemChanged = false;
+
+      // Migration: single string assignedTo -> array
+      if (t.assignedTo && typeof t.assignedTo === 'string') {
+        updated.assignedTo = [t.assignedTo as any];
+        itemChanged = true;
+      }
+
+      // Migration: Add completedAt to legacy done tasks
+      if (t.isDone && !t.completedAt) {
+        updated.completedAt = t.createdAt; // fallback to creation time
+        itemChanged = true;
+      }
+
+      if (itemChanged) changed = true;
+      return updated;
     });
+
+    if (changed) {
+      set(DB_KEYS.TASKS, processed);
+    }
+    return processed;
   },
   addTask: (task: Omit<TaskItem, 'id' | 'createdAt' | 'isDone'>) => {
     const tasks = mockDb.getTasks();
@@ -367,7 +401,17 @@ export const mockDb = {
   },
   toggleTask: (id: string) => {
     const tasks = mockDb.getTasks();
-    const updated = tasks.map(t => t.id === id ? { ...t, isDone: !t.isDone } : t);
+    const updated = tasks.map(t => {
+      if (t.id === id) {
+        const newIsDone = !t.isDone;
+        return { 
+          ...t, 
+          isDone: newIsDone,
+          completedAt: newIsDone ? Date.now() : undefined 
+        };
+      }
+      return t;
+    });
     set(DB_KEYS.TASKS, updated);
   },
   updateTask: (updatedTask: TaskItem) => {

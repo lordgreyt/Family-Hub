@@ -131,7 +131,7 @@ export const Rewards = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
               {childAccounts.map(child => {
-                const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(child.id));
+                const childCompletedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(child.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
                 const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
                 const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
                 const childBalance = childEarnedStars - childSpentStars;
@@ -220,7 +220,7 @@ export const Rewards = () => {
   }
 
   // === CHILD VIEW ===
-  const completedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(user.id));
+  const completedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(user.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
   const earnedStars = completedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
   const myRequests = requests.filter(r => r.childId === user.id);
   const spentOrPendingStars = myRequests
@@ -325,7 +325,7 @@ export const Rewards = () => {
         const rankings = users
           .filter(u => u.isChild)
           .map(child => {
-            const childCompletedTasks = tasks.filter(t => t.isDone && t.assignedTo?.includes(child.id));
+            const childCompletedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(child.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
             const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
             const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
             return { ...child, balance: childEarnedStars - childSpentStars };
