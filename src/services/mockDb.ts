@@ -2,6 +2,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
 import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/database';
 
+export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
+export type FontSize = 'small' | 'base' | 'large';
+
 // Types
 export interface User {
   id: string; // The user's typed alias (e.g. "Markus")
@@ -12,6 +15,8 @@ export interface User {
   isChild?: boolean;
   unlockedGames?: string[];
   defaultPath?: string;
+  themeColor?: ThemeColor;
+  fontSize?: FontSize;
 }
 
 export interface BudgetItem {

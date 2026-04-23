@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockDb } from '../services/mockDb';
-
-type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
-type FontSize = 'small' | 'base' | 'large';
+import { mockDb, ThemeColor, FontSize } from '../services/mockDb';
+import { useAuth } from './AuthContext';
 
 interface AppSettings {
   themeColor: ThemeColor;
@@ -28,6 +26,7 @@ const defaultSettings: AppSettings = {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = mockDb.getAppSettings();
     return saved ? { ...defaultSettings, ...saved } : defaultSettings;
@@ -38,7 +37,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const remoteSettings = mockDb.getAppSettings();
       if (remoteSettings) {
         setSettings(prev => {
-          // Only update if actually different to prevent loops
           if (JSON.stringify(prev) !== JSON.stringify({ ...defaultSettings, ...remoteSettings })) {
             return { ...defaultSettings, ...remoteSettings };
           }
@@ -51,19 +49,43 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => window.removeEventListener('db_updated', handleDbUpdate);
   }, []);
 
+  // Determine active display settings
+  const activeTheme = user?.themeColor || settings.themeColor;
+  const activeFontSize = user?.fontSize || settings.fontSize;
+
   useEffect(() => {
     mockDb.saveAppSettings(settings);
-    // Apply the settings to the DOM
-    document.documentElement.setAttribute('data-theme', settings.themeColor);
-    document.documentElement.setAttribute('data-font-size', settings.fontSize);
   }, [settings]);
 
+  useEffect(() => {
+    // Apply the active settings to the DOM
+    document.documentElement.setAttribute('data-theme', activeTheme);
+    document.documentElement.setAttribute('data-font-size', activeFontSize);
+  }, [activeTheme, activeFontSize]);
+
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    // If we are updating theme or font size AND a user is logged in, 
+    // we save it to the user profile instead of global settings.
+    if (user && (newSettings.themeColor || newSettings.fontSize)) {
+      mockDb.updateUser({
+        ...user,
+        themeColor: newSettings.themeColor || user.themeColor,
+        fontSize: newSettings.fontSize || user.fontSize,
+      });
+    } else {
+      setSettings((prev) => ({ ...prev, ...newSettings }));
+    }
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings }}>
+    <SettingsContext.Provider value={{ 
+      settings: { 
+        ...settings, 
+        themeColor: activeTheme, 
+        fontSize: activeFontSize 
+      }, 
+      updateSettings 
+    }}>
       {children}
     </SettingsContext.Provider>
   );
