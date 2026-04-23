@@ -128,7 +128,7 @@ export const N26 = () => {
             onDelete={(id) => mockDb.deleteDepotTransaction(id)} 
           />
         )}
-        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'settings' && <SettingsView transactions={transactions} />}
       </div>
 
       {/* Booking Form Overlay */}
@@ -699,9 +699,16 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
   );
 };
 
-const SettingsView = () => {
+const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) => {
   const [settings, setSettings] = useState(mockDb.getN26Settings());
   const [isManualBookingLoading, setIsManualBookingLoading] = useState(false);
+
+  const lastBookingDate = useMemo(() => {
+    const routineTxs = transactions.filter(t => t.note?.includes('Sparrate'));
+    if (routineTxs.length === 0) return null;
+    const sorted = [...routineTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sorted[0].date;
+  }, [transactions]);
 
   const handleToggleAuto = () => {
     const newSettings = { ...settings, autoBookingEnabled: !settings.autoBookingEnabled };
@@ -788,6 +795,11 @@ const SettingsView = () => {
         <p style={{ margin: '0.75rem 0 0 0', fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center' }}>
           Dies bucht alle für diesen Monat hinterlegten Sparbeträge manuell.
         </p>
+        {lastBookingDate && (
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '10px', color: 'var(--color-primary)', textAlign: 'center', fontWeight: 600 }}>
+            Letzte Buchung am: {new Date(lastBookingDate).toLocaleDateString('de-DE')}
+          </p>
+        )}
       </div>
 
       {/* Closed Years History Card */}
