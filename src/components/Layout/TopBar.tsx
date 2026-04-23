@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { mockDb } from '../../services/mockDb';
-import { X, Camera, Check, Menu } from 'lucide-react';
+import { useVictron } from '../../context/VictronContext';
+import { X, Camera, Check, Menu, Zap } from 'lucide-react';
 
 const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄', '🐱', '🐶', '🦊', '🐻', '🐼', '🦁', '🐯', '🐰', '🐵', '🐸'];
 
 export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { user, updateUser } = useAuth();
+  const { state: victron } = useVictron();
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
@@ -84,23 +86,33 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             Family Hub
           </h1>
         </div>
-        <button 
-          onClick={() => setShowProfile(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            backgroundColor: 'var(--color-surface-hover)',
-            padding: '0.25rem 0.75rem',
-            borderRadius: 'var(--radius-xl)',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <span style={{ fontSize: '1.25rem' }}>{user.avatar}</span>
-          <span style={{ fontWeight: 500 }}>{user.id}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {user && !user.isChild && victron.isConnected && (
+            <Zap 
+              size={18} 
+              color={victron.state === 2 ? 'var(--color-primary)' : 'var(--color-text-muted)'} 
+              fill={victron.state === 2 ? 'var(--color-primary)' : 'none'}
+              style={{ transition: 'all 0.3s ease' }}
+            />
+          )}
+          <button 
+            onClick={() => setShowProfile(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: 'var(--color-surface-hover)',
+              padding: '0.25rem 0.75rem',
+              borderRadius: 'var(--radius-xl)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span style={{ fontSize: '1.25rem' }}>{user.avatar}</span>
+            <span style={{ fontWeight: 500 }}>{user.id}</span>
+          </button>
+        </div>
       </header>
 
       {/* Profile Edit Modal */}

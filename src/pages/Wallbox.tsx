@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import mqtt from 'mqtt';
 import { useAuth } from '../context/AuthContext';
+import { useVictron } from '../context/VictronContext';
 import { mockDb } from '../services/mockDb';
 import { 
   Zap, 
@@ -16,237 +16,24 @@ import {
   Car
 } from 'lucide-react';
 
-interface VictronState {
-  power: number; // Watts
-  current: number; // Amps
-  maxCurrent: number; // Amps limit
-  energySession: number; // kWh
-  state: number; // 0: disconnected, 1: connected, 2: charging, 3: waiting, 4: error
-  mode: number; // 0: manual, 1: auto, 2: scheduled
-  isConnected: boolean;
-  batterySoc: number | null;
-  batteryPower: number | null;
-  automations: {
-    timerActive: boolean;
-    timerEndTime: number | null;
-    timerDuration: number;
-    nightDrainActive: boolean;
-    nightDrainThreshold: number;
-    nightDrainTime: string;
-  };
-}
-
 export const Wallbox = () => {
   const { user } = useAuth();
+  const { 
+    state, 
+    error, 
+    lastTopic, 
+    handleToggleMode, 
+    handleToggleCharge, 
+    handleMaxCurrentChange, 
+    updateAutomations 
+  } = useVictron();
+
   const [vrmSettings, setVrmSettings] = useState(mockDb.getVictronSettings());
   const [showSettings, setShowSettings] = useState(!vrmSettings.vrmId);
-  const [isSyncing, setIsSyncing] = useState(false);
-  
+
   if (user?.isChild) {
     return <Navigate to="/" replace />;
   }
-  
-  // Mock State (for UI demonstration until MQTT is wired)
-  const [state, setState] = useState<VictronState>({
-    power: 0,
-    current: 0,
-    maxCurrent: 16,
-    energySession: 0,
-    state: 0,
-    mode: 0,
-    isConnected: false,
-    batterySoc: null,
-    batteryPower: null,
-    automations: {
-      timerActive: false,
-      timerEndTime: null,
-      timerDuration: 2,
-      nightDrainActive: false,
-      nightDrainThreshold: 40,
-      nightDrainTime: '03:00'
-    }
-  });
-
-  const [error, setError] = useState<string | null>(null);
-  const [lastTopic, setLastTopic] = useState<string>('');
-
-  const clientRef = useRef<mqtt.MqttClient | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const calculateBrokerUrl = (vrmId: string) => {
-    if (!vrmId) return 'wss://mqtt.victronenergy.com:443/mqtt';
-    let sum = 0;
-    for (let i = 0; i < vrmId.length; i++) {
-      sum += vrmId.charCodeAt(i);
-    }
-    const index = sum % 128;
-    return `wss://webmqtt${index}.victronenergy.com:443/mqtt`;
-  };
-
-  useEffect(() => {
-    if (!vrmSettings.vrmId || !vrmSettings.username || !vrmSettings.password) {
-      setState(prev => ({ ...prev, isConnected: false, state: 0 }));
-      return;
-    }
-
-    const brokerUrl = calculateBrokerUrl(vrmSettings.vrmId);
-    const options = {
-      username: vrmSettings.username,
-      password: vrmSettings.password,
-      clientId: 'family_hub_' + Math.random().toString(16).slice(2, 10),
-      keepalive: 60,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000,
-      clean: true
-    };
-
-    console.log(`Connecting to Victron MQTT at ${brokerUrl}...`);
-    setError(null);
-
-    const client = mqtt.connect(brokerUrl, options);
-    clientRef.current = client;
-
-    client.on('connect', () => {
-      console.log("MQTT Connected!");
-      setState(prev => ({ ...prev, isConnected: true }));
-      setError(null);
-      
-      const vrmId = vrmSettings.vrmId;
-      
-      // Wir abonnieren mit Wildcards für die Instanzen (+), 
-      // damit wir nicht raten müssen, ob es 290, 40 oder 225 ist.
-      const topics = [
-        `N/${vrmId}/evcharger/+/Ac/Power`,
-        `N/${vrmId}/evcharger/+/Ac/L1/Current`,
-        `N/${vrmId}/evcharger/+/Ac/Energy/Forward`,
-        `N/${vrmId}/evcharger/+/Status`,
-        `N/${vrmId}/evcharger/+/Mode`,
-        `N/${vrmId}/evcharger/+/MaxCurrent`,
-        `N/${vrmId}/evcharger/+/SetCurrent`,
-        `N/${vrmId}/battery/+/Soc`,
-        `N/${vrmId}/battery/+/Dc/0/Power`,
-        `N/${vrmId}/system/0/Dc/Battery/Soc`,
-        `N/${vrmId}/system/0/Dc/Battery/Power`
-      ];
-      
-      client.subscribe(topics, (err) => {
-        if (err) console.error("Subscription error:", err);
-      });
-      
-      // Keep alive: Request system serial every 30s
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(() => {
-        if (client.connected) {
-          client.publish(`R/${vrmSettings.vrmId}/system/0/Serial`, '');
-        }
-      }, 30000);
-    });
-
-    client.on('message', (topic, message) => {
-      setLastTopic(topic);
-      try {
-        const payload = JSON.parse(message.toString());
-        const value = payload.value;
-        
-        // Wallbox (beliebige Instanz)
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Power')) setState(prev => ({ ...prev, power: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/L1/Current')) setState(prev => ({ ...prev, current: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Energy/Forward')) setState(prev => ({ ...prev, energySession: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Status')) setState(prev => ({ ...prev, state: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Mode')) setState(prev => ({ ...prev, mode: value }));
-        if (topic.includes('/evcharger/') && (topic.endsWith('/SetCurrent') || topic.endsWith('/MaxCurrent'))) setState(prev => ({ ...prev, maxCurrent: value }));
-        
-        // Battery (beliebige Instanz oder System-SoC)
-        if (topic.endsWith('/Soc')) setState(prev => ({ ...prev, batterySoc: value }));
-        if (topic.endsWith('/Power') && (topic.includes('/battery/') || topic.includes('/Dc/Battery/'))) {
-          setState(prev => ({ ...prev, batteryPower: value }));
-        }
-        
-      } catch (e) {
-        console.error("MQTT Parse Error:", e);
-      }
-    });
-
-    client.on('error', (err) => {
-      console.error("MQTT Error:", err);
-      setError(err.message || 'Verbindungsfehler');
-      setState(prev => ({ ...prev, isConnected: false, state: 4 }));
-    });
-
-    client.on('close', () => {
-      setState(prev => ({ ...prev, isConnected: false }));
-    });
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (client) client.end();
-    };
-  }, [vrmSettings.vrmId, vrmSettings.username, vrmSettings.password, vrmSettings.instance]);
-
-  // Automation Logic Loop (Every 10 seconds)
-  useEffect(() => {
-    const automationInterval = setInterval(() => {
-      const now = new Date();
-      const nowTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      
-      let updated = false;
-      const newAuto = { ...state.automations };
-
-      // 1. Timer Logic
-      if (newAuto.timerActive && newAuto.timerEndTime) {
-        if (now.getTime() > newAuto.timerEndTime) {
-          console.log("Timer expired. Stopping charge...");
-          handleToggleCharge(0); // Stop
-          newAuto.timerActive = false;
-          newAuto.timerEndTime = null;
-          updated = true;
-        }
-      }
-
-      // 2. Night Drain Logic
-      if (newAuto.nightDrainActive && nowTime === newAuto.nightDrainTime) {
-        if (state.batterySoc !== null && state.batterySoc > newAuto.nightDrainThreshold && state.state !== 2) {
-          console.log("Night Drain triggered! Battery SoC:", state.batterySoc);
-          handleToggleMode(0); // Force Manual
-          setTimeout(() => handleToggleCharge(1), 5000); // Start charging after mode change
-        }
-      }
-      
-      // 3. Night Drain Stop (if SoC falls below threshold or near empty)
-      if (newAuto.nightDrainActive && state.state === 2 && state.batterySoc !== null && state.batterySoc < 5) {
-         console.log("Battery empty. Stopping night drain...");
-         handleToggleCharge(0);
-      }
-
-      if (updated) {
-        setState(prev => ({ ...prev, automations: newAuto }));
-      }
-    }, 10000);
-
-    return () => clearInterval(automationInterval);
-  }, [state.automations, state.batterySoc, state.state]);
-
-  const handleToggleMode = (forceMode?: number) => {
-    if (!clientRef.current || !state.isConnected) return;
-    const nextMode = forceMode !== undefined ? forceMode : (state.mode + 1) % 3;
-    const topic = `W/${vrmSettings.vrmId}/evcharger/${vrmSettings.instance || '290'}/Mode`;
-    clientRef.current.publish(topic, JSON.stringify({ value: nextMode }));
-  };
-
-  const handleToggleCharge = (forceState?: number) => {
-    if (!clientRef.current || !state.isConnected) return;
-    const nextStart = forceState !== undefined ? forceState : (state.state === 2 ? 0 : 1);
-    const topic = `W/${vrmSettings.vrmId}/evcharger/${vrmSettings.instance || '290'}/StartStop`;
-    clientRef.current.publish(topic, JSON.stringify({ value: nextStart }));
-  };
-
-  const handleMaxCurrentChange = (val: number) => {
-    if (!clientRef.current || !state.isConnected) return;
-    const topic = `W/${vrmSettings.vrmId}/evcharger/${vrmSettings.instance || '290'}/SetCurrent`;
-    clientRef.current.publish(topic, JSON.stringify({ value: val }));
-    // Optimistic update
-    setState(prev => ({ ...prev, maxCurrent: val }));
-  };
 
   const getStatusText = () => {
     switch(state.state) {
@@ -259,17 +46,7 @@ export const Wallbox = () => {
     }
   };
 
-  const updateAutomations = (newAuto: any) => {
-    setState(prev => {
-      const updated = { ...prev, automations: newAuto };
-      // Auto-save to DB
-      mockDb.saveVictronSettings({
-        ...vrmSettings,
-        automations: newAuto
-      });
-      return updated;
-    });
-  };
+  const status = getStatusText();
 
   return (
     <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -374,9 +151,8 @@ export const Wallbox = () => {
 
       {/* Controls Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        {/* Toggle Mode */}
         <button 
-          onClick={handleToggleMode}
+          onClick={() => handleToggleMode()}
           className="glass-panel" 
           style={{ 
             padding: '1.25rem', 
@@ -396,9 +172,8 @@ export const Wallbox = () => {
           </div>
         </button>
 
-        {/* Toggle Charge */}
         <button 
-          onClick={handleToggleCharge}
+          onClick={() => handleToggleCharge()}
           className="glass-panel" 
           style={{ 
             padding: '1.25rem', 
@@ -431,26 +206,11 @@ export const Wallbox = () => {
         </div>
         
         <input 
-          type="range" 
-          min="6" 
-          max="32" 
-          step="1"
+          type="range" min="6" max="32" step="1"
           value={state.maxCurrent}
           onChange={(e) => handleMaxCurrentChange(parseInt(e.target.value))}
-          style={{ 
-            width: '100%', 
-            height: '6px', 
-            borderRadius: '3px', 
-            appearance: 'none', 
-            background: 'var(--color-border)',
-            outline: 'none'
-          }}
+          style={{ width: '100%', height: '6px', borderRadius: '3px', appearance: 'none', background: 'var(--color-border)', outline: 'none' }}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-          <span>6 A</span>
-          <span>16 A</span>
-          <span>32 A</span>
-        </div>
       </div>
 
       {/* Smart Charging Section */}
@@ -460,7 +220,6 @@ export const Wallbox = () => {
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Timer Automation */}
           <div style={{ padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -474,8 +233,8 @@ export const Wallbox = () => {
                   } else {
                     const endTime = Date.now() + state.automations.timerDuration * 60 * 60 * 1000;
                     updateAutomations({ ...state.automations, timerActive: true, timerEndTime: endTime });
-                    handleToggleMode(0); // Manual
-                    setTimeout(() => handleToggleCharge(1), 2000); // Start
+                    handleToggleMode(0);
+                    setTimeout(() => handleToggleCharge(1), 2000);
                   }
                 }}
                 style={{ 
@@ -487,8 +246,7 @@ export const Wallbox = () => {
                 {state.automations.timerActive ? 'Timer stoppen' : 'Timer starten'}
               </button>
             </div>
-            
-            {!state.automations.timerActive ? (
+            {!state.automations.timerActive && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <input 
                   type="range" min="1" max="10" step="1" 
@@ -498,14 +256,9 @@ export const Wallbox = () => {
                 />
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3rem' }}>{state.automations.timerDuration} h</span>
               </div>
-            ) : (
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                Aktiv bis {new Date(state.automations.timerEndTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr
-              </div>
             )}
           </div>
 
-          {/* Night Drain Automation */}
           <div style={{ padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -527,7 +280,6 @@ export const Wallbox = () => {
                 }} />
               </button>
             </div>
-            
             {state.automations.nightDrainActive && (
               <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
@@ -560,41 +312,22 @@ export const Wallbox = () => {
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', fontWeight: 700 }}>VRM Portal ID</label>
               <input 
-                type="text" 
-                className="input-field" 
-                placeholder="z.B. d0ff... "
-                value={vrmSettings.vrmId}
+                type="text" className="input-field" value={vrmSettings.vrmId}
                 onChange={(e) => setVrmSettings({ ...vrmSettings, vrmId: e.target.value })}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', fontWeight: 700 }}>VRM Username (E-Mail)</label>
               <input 
-                type="text" 
-                className="input-field" 
-                placeholder="Deine VRM E-Mail"
-                value={vrmSettings.username || ''}
+                type="text" className="input-field" value={vrmSettings.username || ''}
                 onChange={(e) => setVrmSettings({ ...vrmSettings, username: e.target.value })}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', fontWeight: 700 }}>VRM Passwort / Token</label>
               <input 
-                type="password" 
-                className="input-field" 
-                placeholder="Dein VRM Passwort"
-                value={vrmSettings.password || ''}
+                type="password" className="input-field" value={vrmSettings.password || ''}
                 onChange={(e) => setVrmSettings({ ...vrmSettings, password: e.target.value })}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', fontWeight: 700 }}>Device Instance</label>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="Standard: 290"
-                value={vrmSettings.instance}
-                onChange={(e) => setVrmSettings({ ...vrmSettings, instance: e.target.value })}
               />
             </div>
             <button 
@@ -602,27 +335,16 @@ export const Wallbox = () => {
               onClick={() => {
                 mockDb.saveVictronSettings(vrmSettings);
                 setShowSettings(false);
+                window.location.reload(); // Quick way to restart the global context
               }}
             >
               Speichern & Verbinden
             </button>
-            {error && (
-              <div style={{ color: 'var(--color-danger)', fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem', fontWeight: 600 }}>
-                <AlertCircle size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                {error}
-              </div>
-            )}
-            <div style={{ marginTop: '1rem', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Last Topic: {lastTopic || 'None'}
-            </div>
+            {error && <div style={{ color: 'var(--color-danger)', fontSize: '0.7rem', textAlign: 'center' }}>{error}</div>}
+            <div style={{ fontSize: '0.5rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>Last: {lastTopic}</div>
           </div>
         </div>
       )}
-
-      {/* Footer / Info */}
-      <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>
-        Victron Wallbox Integration &bull; VRM MQTT Bridge
-      </div>
 
       <style>{`
         .spin { animation: spin 2s linear infinite; }

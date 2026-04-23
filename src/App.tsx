@@ -14,6 +14,7 @@ import { Setup } from './pages/Setup';
 import { Expenses } from './pages/Expenses';
 import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
+import { VictronProvider } from './context/VictronContext';
 
 import { useEffect } from 'react';
 import { initFirebase } from './services/mockDb';
@@ -28,7 +29,8 @@ function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <BrowserRouter>
+        <VictronProvider>
+          <BrowserRouter>
           <Routes>
             <Route element={<MainLayout />}>
               <Route path="/" element={<Dashboard />} />
@@ -46,6 +48,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+        </VictronProvider>
       </SettingsProvider>
     </AuthProvider>
   );
