@@ -15,10 +15,16 @@ export const MainLayout = () => {
   const redirectionPerformed = useRef(false);
 
   useEffect(() => {
-    if (!loading && user?.defaultPath && location.pathname === '/' && !redirectionPerformed.current) {
-      redirectionPerformed.current = true;
-      if (user.defaultPath !== '/') {
-        navigate(user.defaultPath, { replace: true });
+    if (!loading && user?.defaultPath) {
+      if (location.pathname === '/' && !redirectionPerformed.current) {
+        redirectionPerformed.current = true;
+        if (user.defaultPath !== '/') {
+          navigate(user.defaultPath, { replace: true });
+        }
+      } else if (location.pathname !== '/') {
+        // If the user lands on a deep link or navigates away, 
+        // we should not perform the initial "Home -> Default" redirect anymore.
+        redirectionPerformed.current = true;
       }
     }
   }, [user, loading, location.pathname, navigate]);

@@ -706,5 +706,13 @@ export const mockDb = {
         closedYears: [...closedYears, year].sort((a, b) => b - a)
       });
     }
+  },
+  importFinancialData: (data: any) => {
+    if (data[DB_KEYS.DEPOTS]) set(DB_KEYS.DEPOTS, data[DB_KEYS.DEPOTS]);
+    if (data[DB_KEYS.DEPOT_TRANSACTIONS]) set(DB_KEYS.DEPOT_TRANSACTIONS, data[DB_KEYS.DEPOT_TRANSACTIONS]);
+    if (data[DB_KEYS.N26_SETTINGS]) set(DB_KEYS.N26_SETTINGS, data[DB_KEYS.N26_SETTINGS]);
+    if (data[DB_KEYS.BUDGET]) set(DB_KEYS.BUDGET, data[DB_KEYS.BUDGET]);
+    if (data[DB_KEYS.EXPENSE_BUDGETS]) set(DB_KEYS.EXPENSE_BUDGETS, data[DB_KEYS.EXPENSE_BUDGETS]);
+    if (data[DB_KEYS.EXPENSES]) set(DB_KEYS.EXPENSES, data[DB_KEYS.EXPENSES]);
   }
 };

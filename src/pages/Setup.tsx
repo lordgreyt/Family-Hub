@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Lock } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Lock, Database, Download, Upload } from 'lucide-react';
+import { DB_KEYS } from '../services/mockDb';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -141,6 +142,51 @@ export const Setup = () => {
     }
     
     setTimeout(() => setPwMessage({ type: '', text: '' }), 5000);
+  };
+
+  const handleExportN26Data = () => {
+    const data = {
+      [DB_KEYS.DEPOTS]: mockDb.getDepots(),
+      [DB_KEYS.DEPOT_TRANSACTIONS]: mockDb.getDepotTransactions(),
+      [DB_KEYS.N26_SETTINGS]: mockDb.getN26Settings(),
+      [DB_KEYS.BUDGET]: mockDb.getBudgetItems(),
+      [DB_KEYS.EXPENSE_BUDGETS]: mockDb.getExpenseBudgets(),
+      [DB_KEYS.EXPENSES]: mockDb.getExpenses(),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `family-hub-financial-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportN26Data = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm('Möchtest du die Finanzdaten wirklich überschreiben? Dies kann nicht rückgängig gemacht werden.')) {
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        mockDb.importFinancialData(json);
+        alert('Finanzdaten erfolgreich importiert!');
+      } catch (err) {
+        console.error("Import error:", err);
+        alert('Fehler beim Importieren der Datei. Bitte stelle sicher, dass es eine gültige Backup-Datei ist.');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
   };
   
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -432,6 +478,45 @@ export const Setup = () => {
           )}
         </form>
       </div>
+
+      {(user?.isAdmin || user?.id === 'Falko') && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
+            <Database size={20} /> System & Backup
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+              Sichere alle Finanzdaten (N26, Depots, Budget, Ausgaben) als lokale Datei oder stelle sie aus einem Backup wieder her.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button 
+                onClick={handleExportN26Data} 
+                className="btn btn-secondary" 
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem' }}
+              >
+                <Download size={18} /> Backup erstellen
+              </button>
+              
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleImportN26Data} 
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 2 }} 
+                />
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem' }}
+                >
+                  <Upload size={18} /> Restore
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button onClick={logout} className="btn" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
         <LogOut size={20} /> Abmelden ({user?.id})
