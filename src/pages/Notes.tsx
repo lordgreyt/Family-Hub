@@ -12,6 +12,7 @@ export const Notes = () => {
   const [activeTab, setActiveTab] = useState<'SHARED' | 'PRIVATE'>('SHARED');
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
 
@@ -42,6 +43,7 @@ export const Notes = () => {
     e.preventDefault();
     if (!content || !user) return;
 
+    setIsSyncing(true);
     mockDb.addNote({
       title: title.trim() || undefined,
       content,
@@ -52,6 +54,7 @@ export const Notes = () => {
     setContent('');
     setTitle('');
     setIsAdding(false);
+    setTimeout(() => setIsSyncing(false), 1500); // Visual feedback
   };
 
   const handleDelete = (id: string) => {
@@ -127,8 +130,8 @@ export const Notes = () => {
           </div>
         </form>
       ) : (
-        <button onClick={() => setIsAdding(true)} className="btn btn-primary" style={{ width: '100%' }}>
-          <Plus size={20} /> Notiz hinzufügen
+        <button onClick={() => setIsAdding(true)} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <Plus size={20} /> {isSyncing ? 'Wird synchronisiert...' : 'Notiz hinzufügen'}
         </button>
       )}
 

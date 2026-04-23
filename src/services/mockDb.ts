@@ -183,7 +183,13 @@ function set<T>(key: string, data: T): void {
   window.dispatchEvent(new Event('db_updated'));
   
   // 2. Push to Cloud
-  firebaseSet(ref(db, key), data).catch(e => console.error("Firebase write error:", e));
+  console.log(`Syncing ${key} to Cloud...`, data);
+  firebaseSet(ref(db, key), data)
+    .then(() => console.log(`Cloud sync success for ${key}`))
+    .catch(e => {
+      console.error(`Firebase write error for ${key}:`, e);
+      // Optional: notify user of sync error
+    });
 }
 
 // Global initialization function to wire up Firebase Cloud Sync
@@ -212,6 +218,9 @@ export const initFirebase = async () => {
         [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, []),
         [DB_KEYS.DEPOTS]: get(DB_KEYS.DEPOTS, INITIAL_DEPOTS),
         [DB_KEYS.DEPOT_TRANSACTIONS]: get(DB_KEYS.DEPOT_TRANSACTIONS, []),
+        [DB_KEYS.N26_SETTINGS]: get(DB_KEYS.N26_SETTINGS, { autoBookingEnabled: false, bookingDay: 1, closedYears: [] }),
+        [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
+        [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
