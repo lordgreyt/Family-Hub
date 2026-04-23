@@ -280,10 +280,9 @@ export const Rewards = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
               {childAccounts.map(child => {
-                const childCompletedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(child.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
-                const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
-                const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
-                const childBalance = childEarnedStars - childSpentStars;
+                const childBalance = requests
+                  .filter(r => r.childId === child.id && r.status !== 'REJECTED')
+                  .reduce((sum, r) => sum - r.stars, 0);
                 
                 return (
                   <div key={child.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
@@ -370,14 +369,10 @@ export const Rewards = () => {
   }
 
   // === CHILD VIEW ===
-  const completedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(user.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
-  const earnedStars = completedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
   const myRequests = requests.filter(r => r.childId === user.id);
-  const spentOrPendingStars = myRequests
+  const balance = myRequests
     .filter(r => r.status !== 'REJECTED')
-    .reduce((sum, r) => sum + r.stars, 0);
-
-  const balance = earnedStars - spentOrPendingStars;
+    .reduce((sum, r) => sum - r.stars, 0);
 
   const handleRequest = () => {
     if (exchangeAmount === '' || exchangeAmount <= 0) return;
@@ -475,10 +470,10 @@ export const Rewards = () => {
         const rankings = users
           .filter(u => u.isChild)
           .map(child => {
-            const childCompletedTasks = tasks.filter(t => t.isDone && (t.assignedTo?.includes(child.id) || (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))));
-            const childEarnedStars = childCompletedTasks.reduce((sum, t) => sum + (PRIO_STARS[t.priority] || 0), 0);
-            const childSpentStars = requests.filter(r => r.childId === child.id && r.status !== 'REJECTED').reduce((sum, r) => sum + r.stars, 0);
-            return { ...child, balance: childEarnedStars - childSpentStars };
+            const balance = requests
+              .filter(r => r.childId === child.id && r.status !== 'REJECTED')
+              .reduce((sum, r) => sum - r.stars, 0);
+            return { ...child, balance };
           })
           .sort((a, b) => b.balance - a.balance);
 
@@ -721,18 +716,23 @@ export const Rewards = () => {
         </h3>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Earnings (Tasks) */}
+          {/* Earnings (Tasks & Bonuses) */}
           <div>
-            <h4 style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Verdienst (Aufgaben)</h4>
+            <h4 style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Verdienst & Gutschriften</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {completedTasks.length === 0 ? (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontStyle: 'italic' }}>Noch keine Aufgaben erledigt.</p>
+              {myRequests.filter(r => r.stars < 0 && r.status === 'APPROVED').length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontStyle: 'italic' }}>Noch keine Sterne verdient.</p>
               ) : (
-                completedTasks.map(t => (
-                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
-                    <span style={{ fontSize: 'var(--font-sm)' }}>{t.content}</span>
-                    <span style={{ fontWeight: 600, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
-                      +{PRIO_STARS[t.priority]} <Star size={12} fill="#f59e0b" />
+                myRequests.filter(r => r.stars < 0 && r.status === 'APPROVED')
+                  .sort((a,b) => b.createdAt - a.createdAt)
+                  .map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 'var(--font-sm)' }}>{r.description || 'Gutschrift'}</span>
+                      <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.createdAt).toLocaleDateString('de-DE')}</span>
+                    </div>
+                    <span style={{ fontWeight: 600, color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
+                      +{Math.abs(r.stars)} <Star size={12} fill="var(--color-success)" />
                     </span>
                   </div>
                 ))
@@ -744,17 +744,19 @@ export const Rewards = () => {
           <div>
             <h4 style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Eintausch & Abzüge</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {myRequests.filter(r => r.status === 'APPROVED' && !r.id.startsWith('game-') && r.stars !== 5).length === 0 ? (
+              {myRequests.filter(r => r.stars > 0 && r.status === 'APPROVED').length === 0 ? (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontStyle: 'italic' }}>Noch nichts eingetauscht.</p>
               ) : (
-                myRequests.filter(r => r.status === 'APPROVED' && !r.id.startsWith('game-') && r.stars !== 5).sort((a,b) => b.createdAt - a.createdAt).map(r => (
+                myRequests.filter(r => r.stars > 0 && r.status === 'APPROVED')
+                  .sort((a,b) => b.createdAt - a.createdAt)
+                  .map(r => (
                   <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: 'var(--font-sm)' }}>{r.stars > 0 ? (r.id.startsWith('game-') ? 'Gespielt' : 'Medienzeit') : 'Gutschrift (Eltern)'}</span>
+                      <span style={{ fontSize: 'var(--font-sm)' }}>{r.id.startsWith('game-') ? 'Gespielt' : 'Medienzeit'}</span>
                       <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.createdAt).toLocaleDateString('de-DE')}</span>
                     </div>
-                    <span style={{ fontWeight: 600, color: r.stars > 0 ? 'var(--color-danger)' : 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
-                      {r.stars > 0 ? '-' : '+'}{Math.abs(r.stars)} <Star size={12} fill="currentColor" />
+                    <span style={{ fontWeight: 600, color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
+                      -{Math.abs(r.stars)} <Star size={12} fill="currentColor" />
                     </span>
                   </div>
                 ))

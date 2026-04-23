@@ -64,10 +64,12 @@ export interface MealPlanItem {
 export interface RewardRequest {
   id: string;
   childId: string;
-  stars: number;
+  stars: number; // Positive = spending, Negative = earning/bonus
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: number;
   acknowledged?: boolean;
+  taskId?: string; // If this comes from a completed task
+  description?: string; // Optional description
 }
 
 export interface ScoreEntry {
@@ -241,6 +243,52 @@ export const initFirebase = async () => {
       }
     }
   });
+  
+  // 3. One-time migration: Convert completed tasks to RewardRequests
+  const migrationKey = 'migration_tasks_to_rewards_v2';
+  if (!localStorage.getItem(migrationKey)) {
+    console.log("Running migration: Tasks to RewardRequests...");
+    const tasks = mockDb.getTasks();
+    const rewards = mockDb.getRewardRequests();
+    let newRewards = [...rewards];
+    let changed = false;
+
+    // We need prio points. Since we don't have settings context here, 
+    // we try to get them from localStorage or use defaults.
+    const settingsRaw = localStorage.getItem('family_hub_settings');
+    const settings = settingsRaw ? JSON.parse(settingsRaw) : { prioPoints: { 1: 5, 2: 10, 3: 20 } };
+    const prioPoints = settings.prioPoints || { 1: 5, 2: 10, 3: 20 };
+    const users = mockDb.getUsers();
+
+    tasks.filter(t => t.isDone).forEach(task => {
+      // Find children who should get points for this task
+      const eligibleChildren = users.filter(u => 
+        u.isChild && (task.assignedTo?.includes(u.id) || (task.isShared && (!task.assignedTo || task.assignedTo.length === 0)))
+      );
+
+      eligibleChildren.forEach(child => {
+        const rewardId = `task-stars-${task.id}-${child.id}`;
+        if (!newRewards.some(r => r.id === rewardId)) {
+          newRewards.push({
+            id: rewardId,
+            childId: child.id,
+            stars: -(prioPoints[task.priority] || 0),
+            status: 'APPROVED',
+            createdAt: task.completedAt || task.createdAt,
+            taskId: task.id,
+            description: `Erledigt: ${task.content}`
+          } as RewardRequest);
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      set(DB_KEYS.REWARDS, newRewards);
+      console.log(`Migration complete: Created ${newRewards.length - rewards.length} reward entries.`);
+    }
+    localStorage.setItem(migrationKey, 'true');
+  }
 };
 
 
@@ -400,20 +448,52 @@ export const mockDb = {
     };
     set(DB_KEYS.TASKS, [newTask, ...tasks]);
   },
-  toggleTask: (id: string) => {
+  toggleTask: (id: string, starPoints?: number) => {
     const tasks = mockDb.getTasks();
+    const users = mockDb.getUsers();
+    let taskToUpdate: TaskItem | undefined;
+
     const updated = tasks.map(t => {
       if (t.id === id) {
         const newIsDone = !t.isDone;
-        return { 
+        taskToUpdate = { 
           ...t, 
           isDone: newIsDone,
           completedAt: newIsDone ? Date.now() : undefined 
         };
+        return taskToUpdate;
       }
       return t;
     });
-    set(DB_KEYS.TASKS, updated);
+
+    if (taskToUpdate) {
+      set(DB_KEYS.TASKS, updated);
+
+      // Handle Stars
+      if (taskToUpdate.isDone && starPoints !== undefined) {
+        const eligibleChildren = users.filter(u => 
+          u.isChild && (taskToUpdate!.assignedTo?.includes(u.id) || (taskToUpdate!.isShared && (!taskToUpdate!.assignedTo || taskToUpdate!.assignedTo.length === 0)))
+        );
+
+        eligibleChildren.forEach(child => {
+          mockDb.addRewardRequest({
+            id: `task-stars-${taskToUpdate!.id}-${child.id}`,
+            childId: child.id,
+            stars: -starPoints,
+            status: 'APPROVED',
+            taskId: taskToUpdate!.id,
+            description: `Erledigt: ${taskToUpdate!.content}`
+          });
+        });
+      } else if (!taskToUpdate.isDone) {
+        // Remove stars if task is un-completed
+        const rewards = mockDb.getRewardRequests();
+        const filtered = rewards.filter(r => r.taskId !== id);
+        if (filtered.length !== rewards.length) {
+          set(DB_KEYS.REWARDS, filtered);
+        }
+      }
+    }
   },
   updateTask: (updatedTask: TaskItem) => {
     const tasks = mockDb.getTasks();
@@ -469,7 +549,14 @@ export const mockDb = {
   },
   addRewardRequest: (req: Omit<RewardRequest, 'id' | 'createdAt'> & { id?: string }) => {
     const rewards = mockDb.getRewardRequests();
-    set(DB_KEYS.REWARDS, [...rewards, { id: uuidv4(), ...req, createdAt: Date.now() }]);
+    // Don't add duplicate IDs (important for task-stars migration)
+    if (req.id && rewards.some(r => r.id === req.id)) return;
+    
+    set(DB_KEYS.REWARDS, [...rewards, { 
+      id: req.id || uuidv4(), 
+      ...req, 
+      createdAt: Date.now() 
+    } as RewardRequest]);
   },
   updateRewardRequest: (updatedReq: RewardRequest) => {
     const rewards = mockDb.getRewardRequests();

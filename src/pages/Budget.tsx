@@ -74,6 +74,17 @@ export const Budget = () => {
   const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0) + fixedDepotAmount;
   const excess = totalIncome - totalExpense;
 
+  useEffect(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const budgets = mockDb.getExpenseBudgets();
+    const existing = budgets.find(b => b.month === currentMonth);
+    
+    // Auto-sync excess to expense budget
+    if (!existing || existing.amount !== excess) {
+      mockDb.setExpenseBudget({ month: currentMonth, amount: excess });
+    }
+  }, [excess]);
+
   const renderList = (list: BudgetItem[], title: string, total: number, color: string, isExpense = false) => (
     <div style={{ flex: 1, minWidth: '280px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: `2px solid ${color}`, paddingBottom: '0.5rem' }}>

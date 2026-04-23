@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, User } from '../services/mockDb';
 import { Plus, Trash2, CheckCircle2, Circle, Calendar, AlertTriangle, User as UserIcon, Edit2, X, Save } from 'lucide-react';
 
 export const Tasks = () => {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'SHARED' | 'PRIVATE'>('SHARED');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [content, setContent] = useState('');
@@ -95,8 +97,9 @@ export const Tasks = () => {
     mockDb.deleteTask(id);
   };
 
-  const handleToggle = (id: string) => {
-    mockDb.toggleTask(id);
+  const handleToggle = (task: TaskItem) => {
+    const points = settings.prioPoints[task.priority] || 0;
+    mockDb.toggleTask(task.id, points);
   };
 
   const handleStartEdit = (task: TaskItem) => {
@@ -337,7 +340,7 @@ export const Tasks = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <button 
-                    onClick={!isChild ? () => handleToggle(task.id) : undefined} 
+                    onClick={!isChild ? () => handleToggle(task) : undefined} 
                     style={{ 
                       color: task.isDone ? 'var(--color-success)' : 'var(--color-text-muted)',
                       display: 'flex',
