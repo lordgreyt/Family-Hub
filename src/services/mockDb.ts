@@ -163,6 +163,7 @@ export const DB_KEYS = {
   DEPOT_TRANSACTIONS: 'family_hub_depot_transactions',
   N26_SETTINGS: 'family_hub_n26_settings',
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
+  APP_SETTINGS: 'family_hub_settings',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -714,5 +715,12 @@ export const mockDb = {
     if (data[DB_KEYS.BUDGET]) set(DB_KEYS.BUDGET, data[DB_KEYS.BUDGET]);
     if (data[DB_KEYS.EXPENSE_BUDGETS]) set(DB_KEYS.EXPENSE_BUDGETS, data[DB_KEYS.EXPENSE_BUDGETS]);
     if (data[DB_KEYS.EXPENSES]) set(DB_KEYS.EXPENSES, data[DB_KEYS.EXPENSES]);
+    if (data[DB_KEYS.APP_SETTINGS]) set(DB_KEYS.APP_SETTINGS, data[DB_KEYS.APP_SETTINGS]);
+  },
+  getAppSettings: (): any => {
+    return get(DB_KEYS.APP_SETTINGS, null);
+  },
+  saveAppSettings: (settings: any) => {
+    set(DB_KEYS.APP_SETTINGS, settings);
   }
 };

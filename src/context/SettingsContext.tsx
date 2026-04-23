@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { mockDb } from '../services/mockDb';
 
 type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
 type FontSize = 'small' | 'base' | 'large';
@@ -28,12 +29,30 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('family_hub_settings');
-    return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+    const saved = mockDb.getAppSettings();
+    return saved ? { ...defaultSettings, ...saved } : defaultSettings;
   });
 
   useEffect(() => {
-    localStorage.setItem('family_hub_settings', JSON.stringify(settings));
+    const handleDbUpdate = () => {
+      const remoteSettings = mockDb.getAppSettings();
+      if (remoteSettings) {
+        setSettings(prev => {
+          // Only update if actually different to prevent loops
+          if (JSON.stringify(prev) !== JSON.stringify({ ...defaultSettings, ...remoteSettings })) {
+            return { ...defaultSettings, ...remoteSettings };
+          }
+          return prev;
+        });
+      }
+    };
+
+    window.addEventListener('db_updated', handleDbUpdate);
+    return () => window.removeEventListener('db_updated', handleDbUpdate);
+  }, []);
+
+  useEffect(() => {
+    mockDb.saveAppSettings(settings);
     // Apply the settings to the DOM
     document.documentElement.setAttribute('data-theme', settings.themeColor);
     document.documentElement.setAttribute('data-font-size', settings.fontSize);
