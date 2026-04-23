@@ -164,6 +164,7 @@ export const DB_KEYS = {
   N26_SETTINGS: 'family_hub_n26_settings',
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
   APP_SETTINGS: 'family_hub_settings',
+  VICTRON_SETTINGS: 'family_hub_victron_settings',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -731,5 +732,11 @@ export const mockDb = {
   },
   saveAppSettings: (settings: any) => {
     set(DB_KEYS.APP_SETTINGS, settings);
+  },
+  getVictronSettings: (): any => {
+    return get(DB_KEYS.VICTRON_SETTINGS, { vrmId: '', instance: '290', portalId: '' });
+  },
+  saveVictronSettings: (settings: any) => {
+    set(DB_KEYS.VICTRON_SETTINGS, settings);
   }
 };
