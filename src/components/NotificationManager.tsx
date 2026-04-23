@@ -6,6 +6,7 @@ export const NotificationManager = () => {
   const { user } = useAuth();
   const knownAssignments = useRef<Record<string, string | undefined>>({});
   const knownRequests = useRef<Set<string>>(new Set());
+  const knownNotes = useRef<Set<string>>(new Set());
   const isInitialized = useRef(false);
 
   useEffect(() => {
@@ -149,10 +150,44 @@ export const NotificationManager = () => {
         }
       });
 
-      // 4. Cleanup
-      const currentIds = new Set([...mealRequests.map(r => r.id), ...starRequests.map(r => r.id)]);
       knownRequests.current.forEach(id => {
         if (!currentIds.has(id)) knownRequests.current.delete(id);
+      });
+    };
+
+    const checkNewNotes = () => {
+      const allNotes = mockDb.getNotes().filter(n => n.isShared);
+      const users = mockDb.getUsers();
+
+      // 1. Initialisierung
+      if (!isInitialized.current) {
+        allNotes.forEach(n => knownNotes.current.add(n.id));
+        return;
+      }
+
+      // 2. New Shared Notes
+      allNotes.forEach(n => {
+        if (!knownNotes.current.has(n.id)) {
+          knownNotes.current.add(n.id);
+          
+          // Nur benachrichtigen, wenn nicht selbst erstellt
+          if (n.createdBy !== user.id) {
+            const author = users.find(u => u.id === n.createdBy);
+            const preview = n.title || (n.content.replace(/<[^>]*>/g, '').slice(0, 50) + '...');
+            
+            showNotification('Neue gemeinsame Notiz!', {
+              body: `${author?.avatar || '📝'} ${n.createdBy} hat eine Notiz erstellt: "${preview}"`,
+              icon: '/pwa-192x192.png',
+              tag: `new-note-${n.id}`
+            });
+          }
+        }
+      });
+
+      // 3. Cleanup deleted notes
+      const currentIds = new Set(allNotes.map(n => n.id));
+      knownNotes.current.forEach(id => {
+        if (!currentIds.has(id)) knownNotes.current.delete(id);
       });
     };
 
@@ -162,6 +197,7 @@ export const NotificationManager = () => {
       checkNewAssignments();
       checkAndNotifyReminders();
       checkNewRequests();
+      checkNewNotes();
     };
 
     window.addEventListener('db_updated', handleDbUpdate);
