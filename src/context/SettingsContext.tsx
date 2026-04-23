@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockDb, ThemeColor, FontSize } from '../services/mockDb';
+import { mockDb } from '../services/mockDb';
+import type { ThemeColor, FontSize } from '../services/mockDb';
 import { useAuth } from './AuthContext';
 
 interface AppSettings {
