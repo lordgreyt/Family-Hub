@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Navigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
@@ -40,6 +41,10 @@ export const Wallbox = () => {
   const [vrmSettings, setVrmSettings] = useState(mockDb.getVictronSettings());
   const [showSettings, setShowSettings] = useState(!vrmSettings.vrmId);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  if (user?.isChild) {
+    return <Navigate to="/" replace />;
+  }
   
   // Mock State (for UI demonstration until MQTT is wired)
   const [state, setState] = useState<VictronState>({

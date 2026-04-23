@@ -20,12 +20,10 @@ export const getNavItems = (user: User | null): NavItem[] => {
     ] : []),
     ...(!user.isChild ? [
       { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
-      { to: '/budget', icon: Calculator, label: 'Budget' }
-    ] : []),
-    { to: '/rewards', icon: Star, label: 'Sterne' },
-    ...(user.id === 'Falko' ? [
+      { to: '/budget', icon: Calculator, label: 'Budget' },
       { to: '/wallbox', icon: Zap, label: 'Wallbox' }
     ] : []),
+    { to: '/rewards', icon: Star, label: 'Sterne' },
     { to: '/setup', icon: Settings, label: 'Setup' },
   ];
 };
