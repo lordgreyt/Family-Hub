@@ -259,7 +259,17 @@ export const Wallbox = () => {
     }
   };
 
-  const status = getStatusText();
+  const updateAutomations = (newAuto: any) => {
+    setState(prev => {
+      const updated = { ...prev, automations: newAuto };
+      // Auto-save to DB
+      mockDb.saveVictronSettings({
+        ...vrmSettings,
+        automations: newAuto
+      });
+      return updated;
+    });
+  };
 
   return (
     <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -460,10 +470,10 @@ export const Wallbox = () => {
               <button 
                 onClick={() => {
                   if (state.automations.timerActive) {
-                    setState(prev => ({ ...prev, automations: { ...prev.automations, timerActive: false, timerEndTime: null } }));
+                    updateAutomations({ ...state.automations, timerActive: false, timerEndTime: null });
                   } else {
                     const endTime = Date.now() + state.automations.timerDuration * 60 * 60 * 1000;
-                    setState(prev => ({ ...prev, automations: { ...prev.automations, timerActive: true, timerEndTime: endTime } }));
+                    updateAutomations({ ...state.automations, timerActive: true, timerEndTime: endTime });
                     handleToggleMode(0); // Manual
                     setTimeout(() => handleToggleCharge(1), 2000); // Start
                   }
@@ -483,7 +493,7 @@ export const Wallbox = () => {
                 <input 
                   type="range" min="1" max="10" step="1" 
                   value={state.automations.timerDuration}
-                  onChange={(e) => setState(prev => ({ ...prev, automations: { ...prev.automations, timerDuration: parseInt(e.target.value) } }))}
+                  onChange={(e) => updateAutomations({ ...state.automations, timerDuration: parseInt(e.target.value) })}
                   style={{ flex: 1 }}
                 />
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3rem' }}>{state.automations.timerDuration} h</span>
@@ -503,7 +513,7 @@ export const Wallbox = () => {
                 <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Nacht-Entladung</span>
               </div>
               <button 
-                onClick={() => setState(prev => ({ ...prev, automations: { ...prev.automations, nightDrainActive: !prev.automations.nightDrainActive } }))}
+                onClick={() => updateAutomations({ ...state.automations, nightDrainActive: !state.automations.nightDrainActive })}
                 style={{ 
                   width: '44px', height: '24px', borderRadius: '12px', border: '1px solid var(--color-border)',
                   backgroundColor: state.automations.nightDrainActive ? 'var(--color-success)' : 'rgba(0,0,0,0.2)',
@@ -524,7 +534,7 @@ export const Wallbox = () => {
                   <label style={{ display: 'block', fontSize: '0.6rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Startzeit</label>
                   <input 
                     type="time" value={state.automations.nightDrainTime}
-                    onChange={(e) => setState(prev => ({ ...prev, automations: { ...prev.automations, nightDrainTime: e.target.value } }))}
+                    onChange={(e) => updateAutomations({ ...state.automations, nightDrainTime: e.target.value })}
                     style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'rgba(0,0,0,0.05)', color: 'var(--color-text)', fontSize: '0.8rem' }}
                   />
                 </div>
@@ -532,7 +542,7 @@ export const Wallbox = () => {
                   <label style={{ display: 'block', fontSize: '0.6rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Min. Akku (%)</label>
                   <input 
                     type="number" min="5" max="100" value={state.automations.nightDrainThreshold}
-                    onChange={(e) => setState(prev => ({ ...prev, automations: { ...prev.automations, nightDrainThreshold: parseInt(e.target.value) } }))}
+                    onChange={(e) => updateAutomations({ ...state.automations, nightDrainThreshold: parseInt(e.target.value) })}
                     style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'rgba(0,0,0,0.05)', color: 'var(--color-text)', fontSize: '0.8rem' }}
                   />
                 </div>
