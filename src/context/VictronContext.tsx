@@ -41,7 +41,9 @@ export const VictronProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [error, setError] = useState<string | null>(null);
   const [lastTopic, setLastTopic] = useState<string>('');
   
-  const [state, setState] = useState<VictronState>({
+  // Load initial state from localStorage if available
+  const savedState = localStorage.getItem('victron_cache');
+  const initialState = savedState ? JSON.parse(savedState) : {
     power: 0,
     current: 0,
     maxCurrent: 16,
@@ -59,7 +61,14 @@ export const VictronProvider: React.FC<{ children: React.ReactNode }> = ({ child
       nightDrainThreshold: 40,
       nightDrainTime: '03:00'
     }
-  });
+  };
+
+  const [state, setState] = useState<VictronState>(initialState);
+
+  // Cache state changes
+  useEffect(() => {
+    localStorage.setItem('victron_cache', JSON.stringify(state));
+  }, [state]);
 
   const clientRef = useRef<mqtt.MqttClient | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);

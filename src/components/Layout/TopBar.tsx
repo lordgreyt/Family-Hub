@@ -87,12 +87,15 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {user && !user.isChild && victron.isConnected && (
+          {user && !user.isChild && (
             <Zap 
               size={18} 
               color={victron.state === 2 ? 'var(--color-primary)' : 'var(--color-text-muted)'} 
               fill={victron.state === 2 ? 'var(--color-primary)' : 'none'}
-              style={{ transition: 'all 0.3s ease' }}
+              style={{ 
+                transition: 'all 0.3s ease',
+                opacity: victron.isConnected ? 1 : 0.4
+              }}
             />
           )}
           <button 
