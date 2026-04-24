@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Minus, Calculator, Wallet, TrendingDown, TrendingUp, Check, X, Menu, LayoutGrid, PieChart, Tag, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, Calculator, Wallet, TrendingDown, TrendingUp, Check, X, Menu, LayoutGrid, PieChart, Tag, ChevronDown, CalendarPlus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { ExpenseItem, ExpenseBudget } from '../services/mockDb';
 import { ExpenseForm, CATEGORIES } from '../components/Expenses/ExpenseForm';
@@ -7,6 +8,7 @@ import { ExpenseForm, CATEGORIES } from '../components/Expenses/ExpenseForm';
 const LONG_PRESS_MS = 600;
 
 export const Expenses = () => {
+  const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [showForm, setShowForm] = useState<{ show: boolean, type: 'INCOME' | 'EXPENSE' }>({ show: false, type: 'EXPENSE' });
   const [expenses, setExpenses] = useState<ExpenseItem[]>(mockDb.getExpenses());
@@ -16,6 +18,7 @@ export const Expenses = () => {
   const [viewMode, setViewMode] = useState<'CHART' | 'DAILY' | 'CATEGORY'>('CHART');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<ExpenseItem | null>(null);
+  const [showConfirmNewMonth, setShowConfirmNewMonth] = useState(false);
   
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +65,33 @@ export const Expenses = () => {
     const date = new Date(y, m - 1, 1);
     date.setMonth(date.getMonth() + 1);
     setCurrentMonth(`${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`);
+  };
+
+  const handleNewMonth = () => {
+    setShowConfirmNewMonth(true);
+  };
+
+  const executeNewMonth = () => {
+    const [y, m] = currentMonth.split('-').map(Number);
+    const nextDate = new Date(y, m, 1);
+    const nextMonthStr = `${nextDate.getFullYear()}-${(nextDate.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    if (stats.balance > 0) {
+      mockDb.addExpense({
+        amount: stats.balance,
+        category: 'Korrektur',
+        date: `${nextMonthStr}-01`,
+        type: 'INCOME',
+        description: `Übertrag aus ${formatDate(currentMonth)}`,
+        createdBy: user?.id || 'System'
+      });
+    }
+    
+    setCurrentMonth(nextMonthStr);
+    
+    // Smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowConfirmNewMonth(false);
   };
 
   const handleSaveBudget = () => {
@@ -422,6 +452,25 @@ export const Expenses = () => {
         paddingBottom: 'calc(1rem + safe-area-inset-bottom)'
       }}>
         <button 
+          onClick={handleNewMonth}
+          style={{ 
+            position: 'absolute',
+            left: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.25rem',
+            background: 'none',
+            border: 'none',
+            color: 'var(--color-text-muted)',
+            cursor: 'pointer',
+            opacity: 0.8
+          }}>
+          <CalendarPlus size={24} />
+          <span style={{ fontSize: '0.6rem', fontWeight: 600 }}>NEUER MONAT</span>
+        </button>
+
+        <button 
           onClick={() => setShowForm({ show: true, type: 'INCOME' })}
           style={{ 
             width: '56px', 
@@ -498,6 +547,61 @@ export const Expenses = () => {
               <button 
                 className="btn" 
                 onClick={() => setItemToDelete(null)}
+                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', height: '48px', cursor: 'pointer' }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirmNewMonth && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2rem', textAlign: 'center', animation: 'fadeIn 0.2s ease' }}>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', marginBottom: '1rem' }}>Neuer Monat?</h3>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Möchtest du wirklich zum nächsten Monat wechseln? 
+            </p>
+            
+            {stats.balance > 0 && (
+              <div style={{ 
+                backgroundColor: 'var(--color-primary-light)', 
+                color: 'var(--color-primary)', 
+                padding: '1rem', 
+                borderRadius: 'var(--radius-md)', 
+                marginBottom: '2rem',
+                fontSize: '0.85rem',
+                fontWeight: 600
+              }}>
+                Der Überschuss von <strong>{stats.balance.toFixed(2)}€</strong> wird automatisch übernommen.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button 
+                className="btn" 
+                onClick={executeNewMonth}
+                style={{ backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', height: '48px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Ja, jetzt wechseln
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => setShowConfirmNewMonth(false)}
                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', height: '48px', cursor: 'pointer' }}
               >
                 Abbrechen
