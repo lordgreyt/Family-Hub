@@ -7,6 +7,7 @@ export const NotificationManager = () => {
   const knownAssignments = useRef<Record<string, string | undefined>>({});
   const knownRequests = useRef<Set<string>>(new Set());
   const knownNotes = useRef<Set<string>>(new Set());
+  const knownCompletedTasks = useRef<Set<string>>(new Set());
   const isInitialized = useRef(false);
 
   useEffect(() => {
@@ -190,6 +191,45 @@ export const NotificationManager = () => {
         if (!currentIds.has(id)) knownNotes.current.delete(id);
       });
     };
+    
+    const checkTaskCompletions = () => {
+      const allTasks = mockDb.getTasks();
+      
+      // 1. Initialisierung
+      if (!isInitialized.current) {
+        allTasks.forEach(t => {
+          if (t.isDone) knownCompletedTasks.current.add(t.id);
+        });
+        return;
+      }
+
+      // 2. Neue Abschlüsse
+      allTasks.forEach(t => {
+        const wasKnownDone = knownCompletedTasks.current.has(t.id);
+        
+        if (t.isDone && !wasKnownDone) {
+          knownCompletedTasks.current.add(t.id);
+          
+          // Wir benachrichtigen die Erwachsenen
+          showNotification('Aufgabe erledigt! ✅', {
+            body: `Die Aufgabe "${t.content}" wurde abgeschlossen.`,
+            icon: '/pwa-192x192.png',
+            badge: '/masked-icon.svg',
+            tag: `task-done-${t.id}`,
+            renotify: true
+          });
+        } else if (!t.isDone && wasKnownDone) {
+          // Falls eine Aufgabe wieder auf "offen" gesetzt wird
+          knownCompletedTasks.current.delete(t.id);
+        }
+      });
+
+      // Cleanup gelöschte Aufgaben
+      const currentIds = new Set(allTasks.map(t => t.id));
+      knownCompletedTasks.current.forEach(id => {
+        if (!currentIds.has(id)) knownCompletedTasks.current.delete(id);
+      });
+    };
 
     setTimeout(requestPermission, 2000);
 
@@ -198,6 +238,7 @@ export const NotificationManager = () => {
       checkAndNotifyReminders();
       checkNewRequests();
       checkNewNotes();
+      checkTaskCompletions();
     };
 
     window.addEventListener('db_updated', handleDbUpdate);
