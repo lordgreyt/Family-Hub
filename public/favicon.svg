@@ -16,6 +16,6 @@
   <!-- House -->
   <path d="M256 140 L140 240 V380 H372 V240 L256 140Z" fill="white" fill-opacity="0.95"/>
   
-  <!-- Heart cutout in the center of the house -->
-  <path d="M256 315 C256 302 238 302 238 315 C238 332 256 345 256 345 C256 345 274 332 274 315 C274 302 256 302 256 315Z" fill="url(#bg)"/>
+  <!-- Larger Heart cutout -->
+  <path d="M256 315 C256 285 210 285 210 315 C210 350 256 375 256 375 C256 375 302 350 302 315 C302 285 256 285 256 315Z" fill="url(#bg)"/>
 </svg>
