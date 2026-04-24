@@ -9,7 +9,6 @@ import {
   Activity, 
   Settings, 
   Power, 
-  Gauge, 
   RefreshCw, 
   AlertCircle,
   Clock,
@@ -24,7 +23,6 @@ export const Wallbox = () => {
     lastTopic, 
     handleToggleMode, 
     handleToggleCharge, 
-    handleMaxCurrentChange, 
     updateAutomations 
   } = useVictron();
 
@@ -138,11 +136,6 @@ export const Wallbox = () => {
         
         <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{state.current.toFixed(1)} <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>A</span></div>
-            <div style={{ fontSize: '0.6rem', opacity: 0.7, textTransform: 'uppercase' }}>Stromstärke</div>
-          </div>
-          <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{state.energySession.toFixed(1)} <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>kWh</span></div>
             <div style={{ fontSize: '0.6rem', opacity: 0.7, textTransform: 'uppercase' }}>Diese Sitzung</div>
           </div>
@@ -195,23 +188,6 @@ export const Wallbox = () => {
         </button>
       </div>
 
-      {/* Amperage Slider */}
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Gauge size={20} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Max. Ladestrom</span>
-          </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-primary)' }}>{state.maxCurrent} <span style={{ fontSize: '0.8rem' }}>A</span></span>
-        </div>
-        
-        <input 
-          type="range" min="6" max="32" step="1"
-          value={state.maxCurrent}
-          onChange={(e) => handleMaxCurrentChange(parseInt(e.target.value))}
-          style={{ width: '100%', height: '6px', borderRadius: '3px', appearance: 'none', background: 'var(--color-border)', outline: 'none' }}
-        />
-      </div>
 
       {/* Smart Charging Section */}
       <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.05)' }}>

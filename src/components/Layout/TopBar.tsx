@@ -90,7 +90,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           {user && !user.isChild && (
             <Zap 
               size={18} 
-              color={victron.state === 2 ? 'var(--color-primary)' : 'var(--color-text-muted)'} 
+              color={victron.isConnected ? (victron.state === 2 ? 'var(--color-primary)' : 'var(--color-text)') : 'var(--color-text-muted)'} 
               fill={victron.state === 2 ? 'var(--color-primary)' : 'none'}
               style={{ 
                 transition: 'all 0.3s ease',

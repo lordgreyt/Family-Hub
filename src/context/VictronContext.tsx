@@ -138,15 +138,15 @@ export const VictronProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const payload = JSON.parse(message.toString());
         const value = payload.value;
         
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Power')) setState(prev => ({ ...prev, power: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/L1/Current')) setState(prev => ({ ...prev, current: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Energy/Forward')) setState(prev => ({ ...prev, energySession: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Status')) setState(prev => ({ ...prev, state: value }));
-        if (topic.includes('/evcharger/') && topic.endsWith('/Mode')) setState(prev => ({ ...prev, mode: value }));
-        if (topic.includes('/evcharger/') && (topic.endsWith('/SetCurrent') || topic.endsWith('/MaxCurrent'))) setState(prev => ({ ...prev, maxCurrent: value }));
-        if (topic.endsWith('/Soc')) setState(prev => ({ ...prev, batterySoc: value }));
+        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Power')) setState(prev => ({ ...prev, power: value, isConnected: true }));
+        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/L1/Current')) setState(prev => ({ ...prev, current: value, isConnected: true }));
+        if (topic.includes('/evcharger/') && topic.endsWith('/Ac/Energy/Forward')) setState(prev => ({ ...prev, energySession: value, isConnected: true }));
+        if (topic.includes('/evcharger/') && topic.endsWith('/Status')) setState(prev => ({ ...prev, state: value, isConnected: true }));
+        if (topic.includes('/evcharger/') && topic.endsWith('/Mode')) setState(prev => ({ ...prev, mode: value, isConnected: true }));
+        if (topic.includes('/evcharger/') && (topic.endsWith('/SetCurrent') || topic.endsWith('/MaxCurrent'))) setState(prev => ({ ...prev, maxCurrent: value, isConnected: true }));
+        if (topic.endsWith('/Soc')) setState(prev => ({ ...prev, batterySoc: value, isConnected: true }));
         if (topic.endsWith('/Power') && (topic.includes('/battery/') || topic.includes('/Dc/Battery/'))) {
-          setState(prev => ({ ...prev, batteryPower: value }));
+          setState(prev => ({ ...prev, batteryPower: value, isConnected: true }));
         }
       } catch (e) {}
     });
