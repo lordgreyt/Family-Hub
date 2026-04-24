@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Family Hub',
         short_name: 'Family Hub',
         description: 'Die PWA für Paare und Familien',
-        theme_color: '#4f46e5',
+        theme_color: '#6366f1',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
