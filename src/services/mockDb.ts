@@ -198,8 +198,13 @@ function set<T>(key: string, data: T): void {
     });
 }
 
+let isInitialized = false;
+
 // Global initialization function to wire up Firebase Cloud Sync
 export const initFirebase = async () => {
+  if (isInitialized) return;
+  isInitialized = true;
+
   const rootRef = ref(db, '/');
   
   // 1. Check if Firebase is empty. If yes, upload local data!

@@ -16,15 +16,12 @@ import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
 import { VictronProvider } from './context/VictronContext';
 
-import { useEffect } from 'react';
-import { initFirebase } from './services/mockDb';
+
 
 import './index.css';
 
 function App() {
-  useEffect(() => {
-    initFirebase();
-  }, []);
+
 
   return (
     <AuthProvider>

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { mockDb } from '../services/mockDb';
+import { mockDb, initFirebase } from '../services/mockDb';
 import type { User } from '../services/mockDb';
 
 interface AuthContextType {
@@ -21,6 +21,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        // Init firebase sync now that we have permission
+        initFirebase();
+        
         // Find our hub user by uid
         const allUsers = mockDb.getUsers();
         const hubUser = allUsers.find(u => u.uid === firebaseUser.uid);
