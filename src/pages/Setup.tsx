@@ -28,9 +28,10 @@ export const Setup = () => {
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
-  const [pwMessage, setPwMessage] = useState({ type: '', text: '' });
+  const [changePwOld, setChangePwOld] = useState('');
+  const [changePwNew, setChangePwNew] = useState('');
+  const [changePwConfirm, setChangePwConfirm] = useState('');
+  const [isChangingPw, setIsChangingPw] = useState(false);
 
   useEffect(() => {
     const load = () => setDbUsers(mockDb.getUsers());
@@ -110,38 +111,42 @@ export const Setup = () => {
     e.preventDefault();
     if (!auth.currentUser || !user) return;
     
-    if (newPassword.length < 6) {
-      setPwMessage({ type: 'error', text: 'Das neue Passwort muss mindestens 6 Zeichen lang sein.' });
+    if (changePwNew.length < 6) {
+      alert('Das neue Passwort muss mindestens 6 Zeichen lang sein.');
       return;
     }
     
-    if (newPassword !== newPasswordConfirm) {
-      setPwMessage({ type: 'error', text: 'Die neuen Passwörter stimmen nicht überein.' });
+    if (changePwNew !== changePwConfirm) {
+      alert('Die neuen Passwörter stimmen nicht überein.');
       return;
     }
 
+    setIsChangingPw(true);
+
     try {
       if (auth.currentUser.email) {
-        const credential = EmailAuthProvider.credential(auth.currentUser.email, oldPassword);
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, changePwOld);
         await reauthenticateWithCredential(auth.currentUser, credential);
-        await updatePassword(auth.currentUser, newPassword);
-        setPwMessage({ type: 'success', text: 'Passwort erfolgreich geändert!' });
-        setOldPassword('');
-        setNewPassword('');
-        setNewPasswordConfirm('');
+        await updatePassword(auth.currentUser, changePwNew);
+        
+        alert('Passwort erfolgreich geändert!');
+        
+        setChangePwOld('');
+        setChangePwNew('');
+        setChangePwConfirm('');
       } else {
-        setPwMessage({ type: 'error', text: 'Keine E-Mail-Adresse für diesen Account hinterlegt.' });
+        alert('Fehler: Keine E-Mail-Adresse für diesen Account hinterlegt.');
       }
     } catch (err: any) {
       console.error("Password change error:", err);
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        setPwMessage({ type: 'error', text: 'Das aktuelle Passwort ist falsch.' });
+        alert('Passwort ändern fehlgeschlagen: Das aktuelle Passwort ist falsch.');
       } else {
-        setPwMessage({ type: 'error', text: 'Fehler beim Ändern des Passworts. Bitte erneut anmelden.' });
+        alert('Passwort ändern fehlgeschlagen: Bitte logge dich einmal neu ein und versuche es erneut.');
       }
+    } finally {
+      setIsChangingPw(false);
     }
-    
-    setTimeout(() => setPwMessage({ type: '', text: '' }), 5000);
   };
 
   const handleExportN26Data = () => {
@@ -434,8 +439,8 @@ export const Setup = () => {
             </label>
             <input 
               type="password" 
-              value={oldPassword}
-              onChange={e => setOldPassword(e.target.value)}
+              value={changePwOld}
+              onChange={e => setChangePwOld(e.target.value)}
               className="input-field" 
               required 
             />
@@ -447,8 +452,8 @@ export const Setup = () => {
             </label>
             <input 
               type="password" 
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
+              value={changePwNew}
+              onChange={e => setChangePwNew(e.target.value)}
               className="input-field" 
               required 
             />
@@ -460,22 +465,16 @@ export const Setup = () => {
             </label>
             <input 
               type="password" 
-              value={newPasswordConfirm}
-              onChange={e => setNewPasswordConfirm(e.target.value)}
+              value={changePwConfirm}
+              onChange={e => setChangePwConfirm(e.target.value)}
               className="input-field" 
               required 
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
-            Passwort in Firebase aktualisieren
+          <button type="submit" className="btn btn-primary" disabled={isChangingPw} style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
+            {isChangingPw ? 'Wird aktualisiert...' : 'Passwort in Firebase aktualisieren'}
           </button>
-          
-          {pwMessage.text && (
-            <div style={{ marginTop: '0.5rem', fontSize: 'var(--font-sm)', color: pwMessage.type === 'error' ? 'var(--color-danger)' : 'var(--color-success)' }}>
-              {pwMessage.text}
-            </div>
-          )}
         </form>
       </div>
 
