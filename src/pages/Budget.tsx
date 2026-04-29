@@ -77,12 +77,21 @@ export const Budget = () => {
   useEffect(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const budgets = mockDb.getExpenseBudgets();
-    const existing = budgets.find(b => b.month === currentMonth);
+    const existingCurrent = budgets.find(b => b.month === currentMonth);
     
-    // Auto-sync excess to expense budget
-    if (!existing || existing.amount !== excess) {
+    // 1. Wenn für den aktuellen Monat noch KEIN Budget gesetzt wurde (z.B. am 1. des Monats), setzen wir es.
+    // Wenn es schon existiert, lassen wir es unangetastet (damit es gelockt bleibt).
+    if (!existingCurrent) {
       mockDb.setExpenseBudget({ month: currentMonth, amount: excess });
     }
+
+    // 2. Wir schreiben jede Änderung am Budget automatisch in den NÄCHSTEN Monat.
+    // So wirken sich Änderungen während des Monats erst im Folgemonat aus.
+    const [y, m] = currentMonth.split('-').map(Number);
+    const nextDate = new Date(y, m, 1);
+    const nextMonthStr = `${nextDate.getFullYear()}-${(nextDate.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    mockDb.setExpenseBudget({ month: nextMonthStr, amount: excess });
   }, [excess]);
 
   const renderList = (list: BudgetItem[], title: string, total: number, color: string, isExpense = false) => (

@@ -36,7 +36,16 @@ export const Expenses = () => {
   }, [expenses, currentMonth]);
 
   const currentBudget = useMemo(() => {
-    return budgets.find(b => b.month === currentMonth)?.amount || 0;
+    const existing = budgets.find(b => b.month === currentMonth);
+    if (existing) return existing.amount;
+    
+    // Fallback to the most recent budget if the selected month has no specific budget yet
+    if (budgets.length > 0) {
+      const sorted = [...budgets].sort((a, b) => b.month.localeCompare(a.month));
+      return sorted[0].amount;
+    }
+    
+    return 0;
   }, [budgets, currentMonth]);
 
   const stats = useMemo(() => {
