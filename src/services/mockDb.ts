@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
-import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/database';
+import { ref, set as firebaseSet, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
 export type FontSize = 'small' | 'base' | 'large';
@@ -198,6 +198,21 @@ function set<T>(key: string, data: T): void {
     });
 }
 
+// Atomic helper: Uses Firebase runTransaction to prevent race conditions from stale clients.
+function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): void {
+  // 1. Optimistic Local Update
+  const currentLocal = get<T[]>(key, []);
+  const newLocal = mutator(currentLocal);
+  localStorage.setItem(key, JSON.stringify(newLocal));
+  window.dispatchEvent(new Event('db_updated'));
+
+  // 2. Atomic Cloud Sync
+  runTransaction(ref(db, key), (serverData) => {
+    const safeData = serverData || [];
+    return mutator(safeData);
+  }).catch(e => console.error(`Transaction failed for ${key}:`, e));
+}
+
 let isInitialized = false;
 
 // Global initialization function to wire up Firebase Cloud Sync
@@ -365,58 +380,52 @@ export const mockDb = {
     return data;
   },
   addUser: (user: User) => {
-    const users = mockDb.getUsers();
-    if (!users.find((u) => u.id === user.id)) {
-      set(DB_KEYS.USERS, [...users, user]);
-    }
+    updateCollection<User>(DB_KEYS.USERS, users => {
+      if (!users.find((u) => u.id === user.id)) {
+        return [...users, user];
+      }
+      return users;
+    });
   },
   updateUser: (updatedUser: User) => {
-    const users = mockDb.getUsers();
-    set(DB_KEYS.USERS, users.map(u => u.id === updatedUser.id ? updatedUser : u));
+    updateCollection<User>(DB_KEYS.USERS, users => users.map(u => u.id === updatedUser.id ? updatedUser : u));
   },
   deleteUser: (id: string) => {
-    const users = mockDb.getUsers();
-    set(DB_KEYS.USERS, users.filter(u => u.id !== id));
+    updateCollection<User>(DB_KEYS.USERS, users => users.filter(u => u.id !== id));
   },
 
   // Budget (Always Shared)
   getBudgetItems: (): BudgetItem[] => get(DB_KEYS.BUDGET, []),
   addBudgetItem: (item: Omit<BudgetItem, 'id' | 'createdAt'>) => {
-    const items = mockDb.getBudgetItems();
     const newItem: BudgetItem = {
       ...item,
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    set(DB_KEYS.BUDGET, [newItem, ...items]);
+    updateCollection<BudgetItem>(DB_KEYS.BUDGET, items => [newItem, ...items]);
   },
   deleteBudgetItem: (id: string) => {
-    const items = mockDb.getBudgetItems();
-    set(DB_KEYS.BUDGET, items.filter(item => item.id !== id));
+    updateCollection<BudgetItem>(DB_KEYS.BUDGET, items => items.filter(item => item.id !== id));
   },
   updateBudgetItem: (updatedItem: BudgetItem) => {
-    const items = mockDb.getBudgetItems();
-    set(DB_KEYS.BUDGET, items.map(i => i.id === updatedItem.id ? updatedItem : i));
+    updateCollection<BudgetItem>(DB_KEYS.BUDGET, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
   },
 
   // Notes (Shared & Private)
   getNotes: (): NoteItem[] => get(DB_KEYS.NOTES, []),
   addNote: (note: Omit<NoteItem, 'id' | 'createdAt'>) => {
-    const notes = mockDb.getNotes();
     const newNote: NoteItem = {
       ...note,
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    set(DB_KEYS.NOTES, [newNote, ...notes]);
+    updateCollection<NoteItem>(DB_KEYS.NOTES, notes => [newNote, ...notes]);
   },
   deleteNote: (id: string) => {
-    const notes = mockDb.getNotes();
-    set(DB_KEYS.NOTES, notes.filter(note => note.id !== id));
+    updateCollection<NoteItem>(DB_KEYS.NOTES, notes => notes.filter(note => note.id !== id));
   },
   updateNote: (updatedNote: NoteItem) => {
-    const notes = mockDb.getNotes();
-    set(DB_KEYS.NOTES, notes.map(n => n.id === updatedNote.id ? updatedNote : n));
+    updateCollection<NoteItem>(DB_KEYS.NOTES, notes => notes.map(n => n.id === updatedNote.id ? updatedNote : n));
   },
 
   // Tasks (Shared & Private)
@@ -460,69 +469,67 @@ export const mockDb = {
     return processed;
   },
   addTask: (task: Omit<TaskItem, 'id' | 'createdAt' | 'isDone'>) => {
-    const tasks = mockDb.getTasks();
     const newTask: TaskItem = {
       ...task,
       id: uuidv4(),
       createdAt: Date.now(),
       isDone: false,
     };
-    set(DB_KEYS.TASKS, [newTask, ...tasks]);
+    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks => [newTask, ...tasks]);
   },
   toggleTask: (id: string, starPoints?: number) => {
     const tasks = mockDb.getTasks();
     const users = mockDb.getUsers();
-    let taskToUpdate: TaskItem | undefined;
+    
+    // We get the local state to determine the toggle direction.
+    // The transaction will apply this direction to whatever the server state is.
+    const localTask = tasks.find(t => t.id === id);
+    if (!localTask) return;
+    
+    const newIsDone = !localTask.isDone;
+    const completedAt = newIsDone ? Date.now() : undefined;
 
-    const updated = tasks.map(t => {
-      if (t.id === id) {
-        const newIsDone = !t.isDone;
-        taskToUpdate = { 
-          ...t, 
-          isDone: newIsDone,
-          completedAt: newIsDone ? Date.now() : undefined 
-        };
-        return taskToUpdate;
-      }
-      return t;
-    });
-
-    if (taskToUpdate) {
-      set(DB_KEYS.TASKS, updated);
-
-      // Handle Stars
-      if (taskToUpdate.isDone && starPoints !== undefined) {
-        const eligibleChildren = users.filter(u => 
-          u.isChild && (taskToUpdate!.assignedTo?.includes(u.id) || (taskToUpdate!.isShared && (!taskToUpdate!.assignedTo || taskToUpdate!.assignedTo.length === 0)))
-        );
-
-        eligibleChildren.forEach(child => {
-          mockDb.addRewardRequest({
-            id: `task-stars-${taskToUpdate!.id}-${child.id}`,
-            childId: child.id,
-            stars: -starPoints,
-            status: 'APPROVED',
-            taskId: taskToUpdate!.id,
-            description: `Erledigt: ${taskToUpdate!.content}`
-          });
-        });
-      } else if (!taskToUpdate.isDone) {
-        // Remove stars if task is un-completed
-        const rewards = mockDb.getRewardRequests();
-        const filtered = rewards.filter(r => r.taskId !== id);
-        if (filtered.length !== rewards.length) {
-          set(DB_KEYS.REWARDS, filtered);
+    updateCollection<TaskItem>(DB_KEYS.TASKS, currentTasks => 
+      currentTasks.map(t => {
+        if (t.id === id) {
+          return { ...t, isDone: newIsDone, completedAt };
         }
-      }
+        return t;
+      })
+    );
+
+    // Handle Stars
+    if (newIsDone && starPoints !== undefined) {
+      const eligibleChildren = users.filter(u => 
+        u.isChild && (localTask.assignedTo?.includes(u.id) || (localTask.isShared && (!localTask.assignedTo || localTask.assignedTo.length === 0)))
+      );
+
+      eligibleChildren.forEach(child => {
+        mockDb.addRewardRequest({
+          id: `task-stars-${localTask.id}-${child.id}`,
+          childId: child.id,
+          stars: -starPoints,
+          status: 'APPROVED',
+          taskId: localTask.id,
+          description: `Erledigt: ${localTask.content}`
+        });
+      });
+    } else if (!newIsDone) {
+      // Remove stars if task is un-completed
+      updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => 
+        rewards.filter(r => r.taskId !== id)
+      );
     }
   },
   updateTask: (updatedTask: TaskItem) => {
-    const tasks = mockDb.getTasks();
-    set(DB_KEYS.TASKS, tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks => 
+      tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+    );
   },
   deleteTask: (id: string) => {
-    const tasks = mockDb.getTasks();
-    set(DB_KEYS.TASKS, tasks.filter(task => task.id !== id));
+    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks => 
+      tasks.filter(task => task.id !== id)
+    );
   },
 
   // Meals
@@ -532,28 +539,24 @@ export const mockDb = {
     { id: '3', title: 'Pfannkuchen', emoji: '🥞', createdBy: 'Falko' },
   ]),
   addMealTemplate: (template: Omit<MealTemplate, 'id'>) => {
-    const templates = mockDb.getMealTemplates();
-    set(DB_KEYS.MEAL_TEMPLATES, [...templates, { ...template, id: uuidv4() }]);
+    updateCollection<MealTemplate>(DB_KEYS.MEAL_TEMPLATES, templates => [...templates, { ...template, id: uuidv4() }]);
   },
   deleteMealTemplate: (id: string) => {
-    set(DB_KEYS.MEAL_TEMPLATES, mockDb.getMealTemplates().filter(t => t.id !== id));
+    updateCollection<MealTemplate>(DB_KEYS.MEAL_TEMPLATES, templates => templates.filter(t => t.id !== id));
   },
   updateMealTemplate: (updatedTemplate: MealTemplate) => {
-    const templates = mockDb.getMealTemplates();
-    set(DB_KEYS.MEAL_TEMPLATES, templates.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+    updateCollection<MealTemplate>(DB_KEYS.MEAL_TEMPLATES, templates => templates.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
   },
 
   getMealPlanItems: (): MealPlanItem[] => get(DB_KEYS.MEAL_PLAN, []),
   addMealPlanItem: (item: Omit<MealPlanItem, 'id' | 'createdAt'>) => {
-    const items = mockDb.getMealPlanItems();
-    set(DB_KEYS.MEAL_PLAN, [...items, { ...item, id: uuidv4(), createdAt: Date.now() }]);
+    updateCollection<MealPlanItem>(DB_KEYS.MEAL_PLAN, items => [...items, { ...item, id: uuidv4(), createdAt: Date.now() }]);
   },
   updateMealPlanItem: (updatedItem: MealPlanItem) => {
-    const items = mockDb.getMealPlanItems();
-    set(DB_KEYS.MEAL_PLAN, items.map(i => i.id === updatedItem.id ? updatedItem : i));
+    updateCollection<MealPlanItem>(DB_KEYS.MEAL_PLAN, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
   },
   deleteMealPlanItem: (id: string) => {
-    set(DB_KEYS.MEAL_PLAN, mockDb.getMealPlanItems().filter(i => i.id !== id));
+    updateCollection<MealPlanItem>(DB_KEYS.MEAL_PLAN, items => items.filter(i => i.id !== id));
   },
 
   // Rewards
@@ -569,28 +572,26 @@ export const mockDb = {
     return reqs;
   },
   addRewardRequest: (req: Omit<RewardRequest, 'id' | 'createdAt'> & { id?: string }) => {
-    const rewards = mockDb.getRewardRequests();
-    // Don't add duplicate IDs (important for task-stars migration)
-    if (req.id && rewards.some(r => r.id === req.id)) return;
-    
-    set(DB_KEYS.REWARDS, [...rewards, { 
-      id: req.id || uuidv4(), 
-      ...req, 
-      createdAt: Date.now() 
-    } as RewardRequest]);
+    // We check duplicates inside the mutator
+    updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => {
+      if (req.id && rewards.some(r => r.id === req.id)) return rewards;
+      return [...rewards, { 
+        id: req.id || uuidv4(), 
+        ...req, 
+        createdAt: Date.now() 
+      } as RewardRequest];
+    });
   },
   updateRewardRequest: (updatedReq: RewardRequest) => {
-    const rewards = mockDb.getRewardRequests();
-    set(DB_KEYS.REWARDS, rewards.map(r => r.id === updatedReq.id ? updatedReq : r));
+    updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => rewards.map(r => r.id === updatedReq.id ? updatedReq : r));
   },
 
   // Videos
   getUnlockedVideos: (): string[] => get(DB_KEYS.UNLOCKED_VIDEOS, []),
   unlockVideo: (videoId: string) => {
-    const current = mockDb.getUnlockedVideos();
-    if (!current.includes(videoId)) {
-      set(DB_KEYS.UNLOCKED_VIDEOS, [...current, videoId]);
-    }
+    updateCollection<string>(DB_KEYS.UNLOCKED_VIDEOS, current => 
+      current.includes(videoId) ? current : [...current, videoId]
+    );
   },
   getCustomVideos: (): any[] => get('family_hub_custom_videos', []),
   setCustomVideos: (videos: any[]) => set('family_hub_custom_videos', videos),
@@ -598,43 +599,44 @@ export const mockDb = {
   // Leaderboard
   getLeaderboard: (): ScoreEntry[] => get(DB_KEYS.LEADERBOARD, []),
   updateHighScore: (entry: ScoreEntry, lowerIsBetter: boolean = false) => {
-    const board = mockDb.getLeaderboard();
-    const existing = board.find(e => e.gameId === entry.gameId && e.childId === entry.childId);
-    if (!existing) {
-      set(DB_KEYS.LEADERBOARD, [...board, entry]);
-    } else {
+    updateCollection<ScoreEntry>(DB_KEYS.LEADERBOARD, board => {
+      const existing = board.find(e => e.gameId === entry.gameId && e.childId === entry.childId);
+      if (!existing) {
+        return [...board, entry];
+      }
       const isNewHigh = lowerIsBetter ? entry.score < existing.score : entry.score > existing.score;
       if (isNewHigh) {
-        set(DB_KEYS.LEADERBOARD, board.map(e => e.gameId === entry.gameId && e.childId === entry.childId ? entry : e));
+        return board.map(e => e.gameId === entry.gameId && e.childId === entry.childId ? entry : e);
       }
-    }
+      return board;
+    });
   },
 
   // Expenses
   getExpenses: (): ExpenseItem[] => get(DB_KEYS.EXPENSES, []),
   addExpense: (expense: Omit<ExpenseItem, 'id' | 'createdAt'>) => {
-    const expenses = mockDb.getExpenses();
     const newExpense: ExpenseItem = {
       ...expense,
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    set(DB_KEYS.EXPENSES, [...expenses, newExpense]);
+    updateCollection<ExpenseItem>(DB_KEYS.EXPENSES, expenses => [...expenses, newExpense]);
   },
   deleteExpense: (id: string) => {
-    const expenses = mockDb.getExpenses();
-    set(DB_KEYS.EXPENSES, expenses.filter(e => e.id !== id));
+    updateCollection<ExpenseItem>(DB_KEYS.EXPENSES, expenses => expenses.filter(e => e.id !== id));
   },
   getExpenseBudgets: (): ExpenseBudget[] => get(DB_KEYS.EXPENSE_BUDGETS, []),
   setExpenseBudget: (budget: ExpenseBudget) => {
-    const budgets = mockDb.getExpenseBudgets();
-    const existingIndex = budgets.findIndex(b => b.month === budget.month);
-    if (existingIndex > -1) {
-      budgets[existingIndex] = budget;
-      set(DB_KEYS.EXPENSE_BUDGETS, [...budgets]);
-    } else {
-      set(DB_KEYS.EXPENSE_BUDGETS, [...budgets, budget]);
-    }
+    updateCollection<ExpenseBudget>(DB_KEYS.EXPENSE_BUDGETS, budgets => {
+      const existingIndex = budgets.findIndex(b => b.month === budget.month);
+      if (existingIndex > -1) {
+        const newBudgets = [...budgets];
+        newBudgets[existingIndex] = budget;
+        return newBudgets;
+      } else {
+        return [...budgets, budget];
+      }
+    });
   },
 
   // Depots
@@ -644,24 +646,20 @@ export const mockDb = {
     return data.filter(d => d && typeof d === 'object' && d.name);
   },
   addDepot: (depot: Omit<Depot, 'id' | 'createdAt'>) => {
-    const depots = mockDb.getDepots();
     const newDepot: Depot = {
       ...depot,
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    set(DB_KEYS.DEPOTS, [...depots, newDepot]);
+    updateCollection<Depot>(DB_KEYS.DEPOTS, depots => [...depots, newDepot]);
   },
   deleteDepot: (id: string) => {
-    const depots = mockDb.getDepots();
-    set(DB_KEYS.DEPOTS, depots.filter(d => d.id !== id));
+    updateCollection<Depot>(DB_KEYS.DEPOTS, depots => depots.filter(d => d.id !== id));
     // Also cleanup transactions
-    const transactions = mockDb.getDepotTransactions();
-    set(DB_KEYS.DEPOT_TRANSACTIONS, transactions.filter(t => t.depotId !== id));
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => txs.filter(t => t.depotId !== id));
   },
   updateDepot: (updatedDepot: Depot) => {
-    const depots = mockDb.getDepots();
-    set(DB_KEYS.DEPOTS, depots.map(d => d.id === updatedDepot.id ? updatedDepot : d));
+    updateCollection<Depot>(DB_KEYS.DEPOTS, depots => depots.map(d => d.id === updatedDepot.id ? updatedDepot : d));
   },
   getDepotTransactions: (depotId?: string): DepotTransaction[] => {
     const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
@@ -675,17 +673,15 @@ export const mockDb = {
     return depotId ? migratedTxs.filter(t => t.depotId === depotId) : migratedTxs;
   },
   addDepotTransaction: (tx: Omit<DepotTransaction, 'id' | 'createdAt'>) => {
-    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
     const newTx: DepotTransaction = {
       ...tx,
       id: uuidv4(),
       createdAt: Date.now(),
     };
-    set(DB_KEYS.DEPOT_TRANSACTIONS, [newTx, ...txs]);
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => [newTx, ...txs]);
   },
   deleteDepotTransaction: (id: string) => {
-    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
-    set(DB_KEYS.DEPOT_TRANSACTIONS, txs.filter(t => t.id !== id));
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => txs.filter(t => t.id !== id));
   },
   getN26Settings: (): N26Settings => {
     const defaults: N26Settings = { autoBookingEnabled: false, bookingDay: 1, closedYears: [] };
@@ -696,7 +692,6 @@ export const mockDb = {
   },
   executeMonthlyBookings: (date: string, isAutomated: boolean = false) => {
     const depots = mockDb.getDepots();
-    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
     
     const newTxs: DepotTransaction[] = depots.map(depot => ({
       id: uuidv4(),
@@ -708,7 +703,7 @@ export const mockDb = {
       isAutomated: true
     })).filter(t => t.amount !== 0);
 
-    set(DB_KEYS.DEPOT_TRANSACTIONS, [...newTxs, ...txs]);
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => [...newTxs, ...txs]);
     
     if (isAutomated) {
       const settings = mockDb.getN26Settings();
