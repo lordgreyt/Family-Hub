@@ -183,7 +183,7 @@ export const Rewards = () => {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem' }}>
         {displayVideos.map(vid => {
-          const isUnlocked = unlockedVideos.includes(vid.id);
+          const isUnlocked = !user.isChild || unlockedVideos.includes(vid.id);
           const cost = Math.ceil(vid.duration) * settings.videoCostPerMinute;
           
           return (
