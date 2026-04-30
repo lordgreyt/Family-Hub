@@ -50,9 +50,24 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => window.removeEventListener('db_updated', handleDbUpdate);
   }, []);
 
+  const [localUserConfig, setLocalUserConfig] = useState<{themeColor?: ThemeColor, fontSize?: FontSize}>({});
+
+  useEffect(() => {
+    if (user) {
+      const savedTheme = localStorage.getItem(`local_theme_${user.id}`) as ThemeColor;
+      const savedFont = localStorage.getItem(`local_font_${user.id}`) as FontSize;
+      setLocalUserConfig({
+        themeColor: savedTheme || undefined,
+        fontSize: savedFont || undefined
+      });
+    } else {
+      setLocalUserConfig({});
+    }
+  }, [user]);
+
   // Determine active display settings
-  const activeTheme = user?.themeColor || settings.themeColor;
-  const activeFontSize = user?.fontSize || settings.fontSize;
+  const activeTheme = localUserConfig.themeColor || user?.themeColor || settings.themeColor;
+  const activeFontSize = localUserConfig.fontSize || user?.fontSize || settings.fontSize;
 
   useEffect(() => {
     mockDb.saveAppSettings(settings);
@@ -66,12 +81,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     // If we are updating theme or font size AND a user is logged in, 
-    // we save it to the user profile instead of global settings.
+    // we save it LOCALLY to the device, not to Firebase, to prevent sync overrides.
     if (user && (newSettings.themeColor || newSettings.fontSize)) {
-      mockDb.updateUser({
-        ...user,
-        themeColor: newSettings.themeColor || user.themeColor,
-        fontSize: newSettings.fontSize || user.fontSize,
+      setLocalUserConfig(prev => {
+        const next = { ...prev };
+        if (newSettings.themeColor) {
+          localStorage.setItem(`local_theme_${user.id}`, newSettings.themeColor);
+          next.themeColor = newSettings.themeColor;
+        }
+        if (newSettings.fontSize) {
+          localStorage.setItem(`local_font_${user.id}`, newSettings.fontSize);
+          next.fontSize = newSettings.fontSize;
+        }
+        return next;
       });
     } else {
       setSettings((prev) => ({ ...prev, ...newSettings }));
