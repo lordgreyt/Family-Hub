@@ -9,6 +9,7 @@ import { mockDb } from '../../services/mockDb';
 
 interface ExpenseFormProps {
   type: 'INCOME' | 'EXPENSE';
+  currentMonth: string;
   onClose: () => void;
 }
 
@@ -38,7 +39,7 @@ const CATEGORY_ICONS: Record<string, any> = {
   'Waki': Trees
 };
 
-export const ExpenseForm = ({ type, onClose }: ExpenseFormProps) => {
+export const ExpenseForm = ({ type, currentMonth, onClose }: ExpenseFormProps) => {
   const { user } = useAuth();
   const [amount, setAmount] = useState('0');
   const [description, setDescription] = useState('');
@@ -66,7 +67,9 @@ export const ExpenseForm = ({ type, onClose }: ExpenseFormProps) => {
     mockDb.addExpense({
       amount: val,
       category,
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().startsWith(currentMonth) 
+        ? new Date().toISOString().split('T')[0] 
+        : `${currentMonth}-01`,
       type,
       description,
       createdBy: user?.id || 'Unknown'

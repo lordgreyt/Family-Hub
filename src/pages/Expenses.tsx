@@ -518,6 +518,7 @@ export const Expenses = () => {
       {showForm.show && (
         <ExpenseForm 
           type={showForm.type} 
+          currentMonth={currentMonth}
           onClose={() => setShowForm({ ...showForm, show: false })} 
         />
       )}
