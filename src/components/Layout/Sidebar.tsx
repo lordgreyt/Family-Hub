@@ -107,7 +107,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <LogOut size={14} /> Abmelden
             </button>
           </div>
-          <p style={{ margin: 0, opacity: 0.6 }}>Family Hub v1.0</p>
+          <p style={{ margin: 0, opacity: 0.6 }}>Family Hub v1.1</p>
         </div>
       </aside>
 
