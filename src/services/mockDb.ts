@@ -88,6 +88,7 @@ export interface ExpenseItem {
   amount: number;
   category: string;
   date: string; // YYYY-MM-DD
+  budgetMonth?: string; // YYYY-MM
   type: 'INCOME' | 'EXPENSE';
   description?: string;
   createdAt: number;

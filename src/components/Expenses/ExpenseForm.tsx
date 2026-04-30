@@ -67,9 +67,8 @@ export const ExpenseForm = ({ type, currentMonth, onClose }: ExpenseFormProps) =
     mockDb.addExpense({
       amount: val,
       category,
-      date: new Date().toISOString().startsWith(currentMonth) 
-        ? new Date().toISOString().split('T')[0] 
-        : `${currentMonth}-01`,
+      date: new Date().toISOString().split('T')[0],
+      budgetMonth: currentMonth,
       type,
       description,
       createdBy: user?.id || 'Unknown'

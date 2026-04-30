@@ -32,7 +32,10 @@ export const Expenses = () => {
   }, []);
 
   const monthExpenses = useMemo(() => {
-    return expenses.filter(e => e.date.startsWith(currentMonth));
+    return expenses.filter(e => {
+      const eMonth = e.budgetMonth || e.date.substring(0, 7);
+      return eMonth === currentMonth;
+    });
   }, [expenses, currentMonth]);
 
   const currentBudget = useMemo(() => {
