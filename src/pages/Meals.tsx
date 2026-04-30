@@ -298,7 +298,25 @@ export const Meals = () => {
           <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <h4 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--color-text)' }}>
               <span>Wann gibt es <span style={{ fontSize: '1.2rem' }}>{selectedTemplate.emoji}</span> {selectedTemplate.title}?</span>
-              <button title="Abbrechen" onClick={() => setSelectedTemplate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}><X size={16} /></button>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {!isChild && (
+                  <button 
+                    title="Gericht endgültig löschen" 
+                    onClick={() => {
+                      if (confirm(`Möchtest du das Gericht "${selectedTemplate.title}" wirklich aus der Liste löschen?`)) {
+                        mockDb.deleteMealTemplate(selectedTemplate.id);
+                        setSelectedTemplate(null);
+                      }
+                    }} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+                <button title="Abbrechen" onClick={() => setSelectedTemplate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
+                  <X size={20} />
+                </button>
+              </div>
             </h4>
             <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
               {next7Days.map(d => {
