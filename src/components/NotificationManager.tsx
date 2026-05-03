@@ -120,7 +120,6 @@ export const NotificationManager = () => {
       if (!isInitialized.current) {
         mealRequests.forEach(r => knownRequests.current.add(r.id));
         starRequests.forEach(r => knownRequests.current.add(r.id));
-        isInitialized.current = true;
         return;
       }
 
@@ -234,11 +233,16 @@ export const NotificationManager = () => {
     setTimeout(requestPermission, 2000);
 
     const handleDbUpdate = () => {
+      const wasInitialized = isInitialized.current;
       checkNewAssignments();
       checkAndNotifyReminders();
       checkNewRequests();
       checkNewNotes();
       checkTaskCompletions();
+      
+      if (!wasInitialized) {
+        isInitialized.current = true;
+      }
     };
 
     window.addEventListener('db_updated', handleDbUpdate);

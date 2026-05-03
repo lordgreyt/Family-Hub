@@ -23,6 +23,7 @@ export const Rewards = () => {
   const [activeGame, setActiveGame] = useState<'SNAKE' | 'MEMORY' | 'FLAPPY' | 'WHACKAMO' | null>(null);
   
   const [adjustments, setAdjustments] = useState<Record<string, number | ''>>({});
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [unlockedVideos, setUnlockedVideos] = useState<string[]>([]);
   const [dynamicVideos, setDynamicVideos] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -325,6 +326,48 @@ export const Rewards = () => {
                         <Minus size={18} />
                       </button>
                     </div>
+
+                    {/* History Toggle */}
+                    <button 
+                      onClick={() => setExpandedHistory(expandedHistory === child.id ? null : child.id)}
+                      className="btn btn-secondary"
+                      style={{ marginTop: '0.5rem', width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}
+                    >
+                      <History size={16} /> {expandedHistory === child.id ? 'Historie ausblenden' : 'Historie anzeigen'}
+                    </button>
+
+                    {/* History List */}
+                    {expandedHistory === child.id && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {(() => {
+                          const childRequests = requests
+                            .filter(r => r.childId === child.id && r.status === 'APPROVED')
+                            .sort((a, b) => b.createdAt - a.createdAt);
+
+                          if (childRequests.length === 0) {
+                            return <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', textAlign: 'center' }}>Noch keine Historie vorhanden.</p>;
+                          }
+
+                          return childRequests.map(r => {
+                            const isAddition = r.stars < 0; // Negative stars in DB mean earning
+                            const absStars = Math.abs(r.stars);
+                            let reason = r.description || (r.id.startsWith('game-') ? 'Arcade-Spiel' : (isAddition ? 'Manuelle Gutschrift' : 'Manuelle Einlösung / Medienzeit'));
+
+                            return (
+                              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 'var(--font-sm)', fontWeight: 500 }}>{reason}</span>
+                                  <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.createdAt).toLocaleDateString('de-DE')} {new Date(r.createdAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <span style={{ fontWeight: 600, color: isAddition ? 'var(--color-success)' : 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)' }}>
+                                  {isAddition ? '+' : '-'}{absStars} <Star size={12} fill={isAddition ? 'var(--color-success)' : 'currentColor'} />
+                                </span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -466,6 +509,7 @@ export const Rewards = () => {
       </div>
 
       {/* Podium (Ranking) */}
+      {/* Podium (Ranking) */}
       {(() => {
         const rankings = users
           .filter(u => u.isChild)
@@ -479,6 +523,12 @@ export const Rewards = () => {
 
         if (rankings.length < 1) return null;
 
+        const maxBalance = Math.max(rankings[0].balance, 1);
+        const getMaxHeight = (balance: number) => {
+          if (balance <= 0) return 4;
+          return Math.max(30, (balance / maxBalance) * 90);
+        };
+
         return (
           <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: 'var(--color-text-muted)' }}>Siegertreppchen</h3>
@@ -487,9 +537,14 @@ export const Rewards = () => {
               {rankings[1] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                   <div style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>{rankings[1].avatar}</div>
+                  {rankings[1].balance <= 0 && (
+                    <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
+                      0 <Star size={10} fill="currentColor" />
+                    </span>
+                  )}
                   <div style={{ 
                     width: '100%', 
-                    height: '50px', 
+                    height: `${getMaxHeight(rankings[1].balance)}px`, 
                     background: 'linear-gradient(to bottom, #94a3b8, #64748b)', 
                     borderRadius: '8px 8px 0 0', 
                     display: 'flex', 
@@ -500,10 +555,14 @@ export const Rewards = () => {
                     color: 'white',
                     boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
                   }}>
-                    <Medal size={16} color="#e2e8f0" fill="#e2e8f0" style={{ position: 'absolute', top: '-10px' }} />
-                    <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
-                      {rankings[1].balance} <Star size={10} fill="currentColor" />
-                    </span>
+                    {rankings[1].balance > 0 && (
+                      <>
+                        <Medal size={16} color="#e2e8f0" fill="#e2e8f0" style={{ position: 'absolute', top: '-10px' }} />
+                        <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                          {rankings[1].balance} <Star size={10} fill="currentColor" />
+                        </span>
+                      </>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.7rem', marginTop: '0.4rem', fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[1].id}</span>
                 </div>
@@ -513,9 +572,14 @@ export const Rewards = () => {
               {rankings[0] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
                   <div style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>{rankings[0].avatar}</div>
+                  {rankings[0].balance <= 0 && (
+                    <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
+                      0 <Star size={10} fill="currentColor" />
+                    </span>
+                  )}
                   <div style={{ 
                     width: '100%', 
-                    height: '90px', 
+                    height: `${getMaxHeight(rankings[0].balance)}px`, 
                     background: 'linear-gradient(to bottom, #f59e0b, #d97706)', 
                     borderRadius: '8px 8px 0 0', 
                     display: 'flex', 
@@ -526,10 +590,14 @@ export const Rewards = () => {
                     color: 'white',
                     boxShadow: '0 -4px 15px rgba(245, 158, 11, 0.2)'
                   }}>
-                    <Trophy size={20} color="#fef3c7" fill="#fef3c7" style={{ position: 'absolute', top: '-14px' }} />
-                    <span style={{ fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      {rankings[0].balance} <Star size={14} fill="currentColor" />
-                    </span>
+                    {rankings[0].balance > 0 && (
+                      <>
+                        <Trophy size={20} color="#fef3c7" fill="#fef3c7" style={{ position: 'absolute', top: '-14px' }} />
+                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          {rankings[0].balance} <Star size={14} fill="currentColor" />
+                        </span>
+                      </>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.8rem', marginTop: '0.4rem', fontWeight: 800, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[0].id}</span>
                 </div>
@@ -539,9 +607,14 @@ export const Rewards = () => {
               {rankings[2] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                   <div style={{ fontSize: '1rem', marginBottom: '0.2rem' }}>{rankings[2].avatar}</div>
+                  {rankings[2].balance <= 0 && (
+                    <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
+                      0 <Star size={10} fill="currentColor" />
+                    </span>
+                  )}
                   <div style={{ 
                     width: '100%', 
-                    height: '35px', 
+                    height: `${getMaxHeight(rankings[2].balance)}px`, 
                     background: 'linear-gradient(to bottom, #b45309, #78350f)', 
                     borderRadius: '8px 8px 0 0', 
                     display: 'flex', 
@@ -552,10 +625,14 @@ export const Rewards = () => {
                     color: 'white',
                     boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
                   }}>
-                    <Medal size={14} color="#fde68a" fill="#b45309" style={{ position: 'absolute', top: '-8px' }} />
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
-                      {rankings[2].balance} <Star size={10} fill="currentColor" />
-                    </span>
+                    {rankings[2].balance > 0 && (
+                      <>
+                        <Medal size={14} color="#fde68a" fill="#b45309" style={{ position: 'absolute', top: '-8px' }} />
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                          {rankings[2].balance} <Star size={10} fill="currentColor" />
+                        </span>
+                      </>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.7rem', marginTop: '0.4rem', fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{rankings[2].id}</span>
                 </div>
