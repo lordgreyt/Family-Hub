@@ -18,6 +18,7 @@ import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
+import { initNotificationService } from './services/notificationService';
 
 
 
@@ -26,8 +27,9 @@ import './index.css';
 function App() {
 
   useEffect(() => {
-    const cleanup = initBackupService();
-    return cleanup;
+    const cleanupBackup = initBackupService();
+    const cleanupNotify = initNotificationService();
+    return () => { cleanupBackup(); cleanupNotify(); };
   }, []);
 
   return (

@@ -129,9 +129,12 @@ export interface MoodEntry {
   id: string; // Same as date
   date: string; // YYYY-MM-DD
   mentalMood: number; // 1-5 (1 = worst, 5 = best)
-  physicalMood: number; // 1-5 (1 = worst, 5 = best)
+  physicalMood: number; // 1-5
+  tags?: string[]; // Context-Tags (z.B. "schule", "sport", "freunde")
   createdAt: number;
 }
+
+export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
 const INITIAL_USERS: User[] = [
@@ -180,6 +183,7 @@ export const DB_KEYS = {
   APP_SETTINGS: 'family_hub_settings',
   VICTRON_SETTINGS: 'family_hub_victron_settings',
   EDIARY: 'family_hub_ediary',
+  CUSTOM_TAGS: 'family_hub_custom_tags',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -817,13 +821,16 @@ export const mockDb = {
     const raw = get<any[]>(DB_KEYS.EDIARY, []);
     // Migration: convert old {mood} entries to new {mentalMood, physicalMood} format
     return raw.map((e: any) => {
-      if (e.mentalMood !== undefined && e.physicalMood !== undefined) return e as MoodEntry;
+      if (e.mentalMood !== undefined && e.physicalMood !== undefined) {
+        return { ...e, tags: e.tags || [] } as MoodEntry;
+      }
       // Legacy entry with single 'mood' field
       return {
         id: e.id || e.date,
         date: e.date,
         mentalMood: e.mood || 3,
         physicalMood: e.mood || 3,
+        tags: [],
         createdAt: e.createdAt || Date.now(),
       } as MoodEntry;
     });
@@ -839,5 +846,39 @@ export const mockDb = {
       }
       return [...entries, newEntry];
     });
-  }
+  },
+
+  // Custom Tags (für E-Diary Kontext — Firebase-synced)
+  getCustomTags: (): TagOption[] => {
+    const tags = get<TagOption[]>(DB_KEYS.CUSTOM_TAGS, []);
+    if (tags.length > 0) return tags;
+    // Migration von altem localStorage-Key
+    try {
+      const oldRaw = localStorage.getItem('ediary_custom_tags');
+      if (oldRaw) {
+        const oldTags = JSON.parse(oldRaw);
+        if (oldTags.length > 0) {
+          set(DB_KEYS.CUSTOM_TAGS, oldTags);
+          return oldTags;
+        }
+      }
+    } catch {}
+    // Default-Tags
+    const defaults: TagOption[] = [
+      { id: 'schule', emoji: '📚', label: 'Schule / Arbeit' },
+      { id: 'sport', emoji: '⚽', label: 'Sport / Bewegung' },
+      { id: 'freunde', emoji: '👫', label: 'Freunde / Soziales' },
+      { id: 'krank', emoji: '🤒', label: 'Krank / Unwohl' },
+      { id: 'familie', emoji: '👨‍👩‍👧‍👦', label: 'Familie' },
+      { id: 'wetter', emoji: '☀️', label: 'Wetter / Draußen' },
+      { id: 'hobby', emoji: '🎨', label: 'Hobby / Kreativ' },
+      { id: 'ruhe', emoji: '🧘', label: 'Ruhe / Entspannung' },
+    ];
+    set(DB_KEYS.CUSTOM_TAGS, defaults);
+    return defaults;
+  },
+
+  saveCustomTags: (tags: TagOption[]) => {
+    set(DB_KEYS.CUSTOM_TAGS, tags);
+  },
 };
