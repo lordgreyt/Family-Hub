@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Download, Upload, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -10,7 +10,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { secondaryAuth } from '../services/firebase';
 
 import { isDriveConnected, requestAccessToken, disconnectDrive, getGoogleClientId, setGoogleClientId } from '../services/googleDrive';
-import { runBackup, getLastBackupInfo, isBackupDue } from '../services/backupService';
+import { runBackup, getLastBackupInfo, isBackupDue, fetchDriveBackups, restoreFromDrive } from '../services/backupService';
 
 import { getNavItems } from '../utils/navigation';
 
@@ -43,6 +43,13 @@ export const Setup = () => {
   const [driveSuccess, setDriveSuccess] = useState('');
   const [isRunningBackup, setIsRunningBackup] = useState(false);
   const lastBackup = getLastBackupInfo();
+
+  // Restore Dialog State
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [driveBackups, setDriveBackups] = useState<{ id: string; name: string; createdTime: string }[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
+  const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
     const load = () => setDbUsers(mockDb.getUsers());
@@ -210,41 +217,41 @@ export const Setup = () => {
     }
   };
 
-  const handleExportAllData = () => {
-    const data = mockDb.exportAllData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `family-hub-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleOpenRestore = async () => {
+    setShowRestoreDialog(true);
+    setRestoreError('');
+    setDriveBackups([]);
+    setIsLoadingBackups(true);
+    try {
+      const backups = await fetchDriveBackups(5);
+      setDriveBackups(backups);
+    } catch (err: any) {
+      setRestoreError(err.message || 'Backups konnten nicht geladen werden');
+    } finally {
+      setIsLoadingBackups(false);
+    }
   };
 
-  const handleImportAllData = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!confirm('Möchtest du wirklich ALLE Family Hub Daten mit diesem Backup überschreiben? Dies kann nicht rückgängig gemacht werden. Alle aktuellen Daten (Nutzer, Tasks, Notizen, Finanzen, Stimmungstagebuch, Spiele, Einstellungen) werden ersetzt.')) {
-      e.target.value = '';
+  const handleRestoreBackup = async (fileId: string, fileName: string) => {
+    if (!confirm(`Möchtest du wirklich ALLE Family Hub Daten mit dem Backup "${fileName}" überschreiben? Dies kann nicht rückgängig gemacht werden.`)) {
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        const count = mockDb.importAllData(json);
-        alert(`${count} Datenbereiche erfolgreich wiederhergestellt!`);
-      } catch (err) {
-        console.error("Import error:", err);
-        alert('Fehler beim Importieren der Datei. Bitte stelle sicher, dass es eine gültige Family Hub Backup-Datei ist.');
+    setIsRestoring(true);
+    setRestoreError('');
+    try {
+      const result = await restoreFromDrive(fileId, fileName);
+      if (result.success) {
+        setDriveSuccess(`${result.restoredCount} Datenbereiche aus "${fileName}" wiederhergestellt!`);
+        setTimeout(() => setDriveSuccess(''), 6000);
+        setShowRestoreDialog(false);
+      } else {
+        setRestoreError(result.error || 'Restore fehlgeschlagen');
       }
-      e.target.value = '';
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      setRestoreError(err.message || 'Restore fehlgeschlagen');
+    } finally {
+      setIsRestoring(false);
+    }
   };
   
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -622,37 +629,80 @@ export const Setup = () => {
             )}
           </div>
 
-          {/* Manuelles Backup & Restore */}
+          {/* Restore aus Google Drive */}
           <div>
-            <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: 'var(--color-text)' }}>Manuelles Backup & Restore</h4>
+            <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: 'var(--color-text)' }}>Backup wiederherstellen</h4>
             <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', margin: '0 0 0.75rem 0' }}>
-              Backup als Datei herunterladen oder ein früheres Backup wieder einspielen.
+              Wähle eines der letzten 5 Backups aus Google Drive zum Wiederherstellen aus.
             </p>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button
-                onClick={handleExportAllData}
-                className="btn btn-secondary"
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem' }}
-              >
-                <Download size={18} /> Backup erstellen
-              </button>
+            <button
+              onClick={handleOpenRestore}
+              disabled={!driveConnected}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', width: '100%', opacity: driveConnected ? 1 : 0.5 }}
+            >
+              <Database size={18} /> {driveConnected ? 'Backup aus Google Drive wiederherstellen' : 'Nicht mit Drive verbunden'}
+            </button>
 
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportAllData}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 2 }}
-                />
-                <button
-                  className="btn btn-secondary"
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem' }}
-                >
-                  <Upload size={18} /> Restore
-                </button>
+            {/* Restore Dialog */}
+            {showRestoreDialog && (
+              <div style={{
+                position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+                alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000
+              }} onClick={() => setShowRestoreDialog(false)}>
+                <div style={{
+                  backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                  width: '100%', maxWidth: '500px', maxHeight: '70vh', overflow: 'auto', padding: '1.5rem'
+                }} onClick={e => e.stopPropagation()}>
+                  <h4 style={{ color: 'var(--color-text)', marginBottom: '1rem' }}>Backup auswählen</h4>
+
+                  {isLoadingBackups ? (
+                    <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem' }}>
+                      <RotateCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> Backups werden geladen...
+                    </p>
+                  ) : restoreError ? (
+                    <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{restoreError}</p>
+                  ) : driveBackups.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem' }}>
+                      Keine Backups in Google Drive gefunden.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {driveBackups.map(backup => (
+                        <button
+                          key={backup.id}
+                          onClick={() => handleRestoreBackup(backup.id, backup.name)}
+                          disabled={isRestoring}
+                          className="btn btn-secondary"
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '0.75rem 1rem', textAlign: 'left', width: '100%',
+                            opacity: isRestoring ? 0.5 : 1
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--color-text)' }}>{backup.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                              {new Date(backup.createdTime).toLocaleString('de-DE')}
+                            </div>
+                          </div>
+                          {isRestoring && <RotateCw size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowRestoreDialog(false)}
+                    className="btn"
+                    style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', backgroundColor: 'var(--color-surface-hover)' }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -58,6 +58,18 @@ function clearToken() {
  * Fordert ein Access Token via Google Identity Services an.
  * Öffnet ein Popup, falls der User noch nicht authorisiert hat.
  */
+// Wartet bis das Google GIS Script geladen ist (max 5s)
+async function waitForGis(): Promise<any> {
+  const maxWait = 5000;
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    const gis = (window as any).google?.accounts?.oauth2;
+    if (gis) return gis;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return null;
+}
+
 export async function requestAccessToken(): Promise<string> {
   const clientId = getGoogleClientId();
   if (!clientId) throw new Error('Google Client ID nicht konfiguriert.');
@@ -66,13 +78,19 @@ export async function requestAccessToken(): Promise<string> {
   const stored = getStoredToken();
   if (stored) return stored.access_token;
 
+  // Warte auf Google GIS Script
+  const gis = await waitForGis();
+  if (!gis) {
+    throw new Error('Google Services konnten nicht geladen werden. Bitte Seite neu laden und sicherstellen, dass du mit dem Internet verbunden bist.');
+  }
+
+  // Client ID bereinigen
+  const cleanId = clientId.trim();
+  if (cleanId !== clientId) {
+    setGoogleClientId(cleanId);
+  }
+
   return new Promise((resolve, reject) => {
-    // Google GIS muss geladen sein (wird in index.html eingebunden)
-    const gis = (window as any).google?.accounts?.oauth2;
-    if (!gis) {
-      reject(new Error('Google Identity Services nicht geladen. Bitte Seite neu laden.'));
-      return;
-    }
 
     const client = gis.initTokenClient({
       client_id: clientId,
@@ -198,6 +216,38 @@ export async function uploadBackup(fileName: string, content: string): Promise<{
 
   const data = await res.json();
   return { fileId: data.id, fileName: data.name };
+}
+
+/**
+ * Listet die letzten N Backup-Dateien aus dem Backup_App-Ordner auf.
+ */
+export async function listBackups(maxResults: number = 5): Promise<{ id: string; name: string; createdTime: string }[]> {
+  const accessToken = await requestAccessToken();
+  const folderId = await findOrCreateFolder(accessToken);
+
+  const listRes = await fetch(
+    `${DRIVE_API_BASE}/drive/v3/files?q='${folderId}' in parents and mimeType='application/json' and trashed=false&fields=files(id,name,createdTime)&orderBy=createdTime desc&pageSize=${maxResults}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  if (!listRes.ok) throw new Error(`Backup-Liste konnte nicht geladen werden: ${listRes.status}`);
+  const listData = await listRes.json();
+  return listData.files || [];
+}
+
+/**
+ * Lädt den Inhalt einer Backup-Datei von Google Drive herunter.
+ */
+export async function getBackupContent(fileId: string): Promise<string> {
+  const accessToken = await requestAccessToken();
+
+  const res = await fetch(
+    `${DRIVE_API_BASE}/drive/v3/files/${fileId}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  if (!res.ok) throw new Error(`Backup-Download fehlgeschlagen: ${res.status}`);
+  return res.text();
 }
 
 /**

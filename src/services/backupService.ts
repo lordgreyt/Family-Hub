@@ -6,7 +6,7 @@
  */
 
 import { mockDb } from './mockDb';
-import { isDriveConnected, uploadBackup, cleanupOldBackups } from './googleDrive';
+import { isDriveConnected, uploadBackup, cleanupOldBackups, listBackups, getBackupContent } from './googleDrive';
 
 const LAST_BACKUP_KEY = 'family_hub_last_backup';
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 Stunden
@@ -96,6 +96,45 @@ export async function runBackup(): Promise<BackupResult> {
     return { success: false, error: err.message, timestamp: new Date().toISOString() };
   } finally {
     isRunning = false;
+  }
+}
+
+export interface DriveBackupEntry {
+  id: string;
+  name: string;
+  createdTime: string;
+  size?: string;
+}
+
+/**
+ * Ruft die letzten N Backups von Google Drive ab.
+ */
+export async function fetchDriveBackups(maxResults: number = 5): Promise<DriveBackupEntry[]> {
+  if (!isDriveConnected()) {
+    throw new Error('Google Drive nicht verbunden.');
+  }
+  return listBackups(maxResults);
+}
+
+export interface RestoreResult {
+  success: boolean;
+  restoredCount?: number;
+  error?: string;
+  fileName?: string;
+}
+
+/**
+ * Stellt ein Backup von Google Drive wieder her.
+ * Lädt den Inhalt der Datei herunter und importiert alle Daten.
+ */
+export async function restoreFromDrive(fileId: string, fileName: string): Promise<RestoreResult> {
+  try {
+    const content = await getBackupContent(fileId);
+    const data = JSON.parse(content);
+    const count = mockDb.importAllData(data);
+    return { success: true, restoredCount: count, fileName };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Restore fehlgeschlagen', fileName };
   }
 }
 
