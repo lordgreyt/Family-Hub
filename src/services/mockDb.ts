@@ -128,7 +128,8 @@ export interface N26Settings {
 export interface MoodEntry {
   id: string; // Same as date
   date: string; // YYYY-MM-DD
-  mood: number; // 1-5
+  mentalMood: number; // 1-5 (1 = worst, 5 = best)
+  physicalMood: number; // 1-5 (1 = worst, 5 = best)
   createdAt: number;
 }
 
@@ -756,7 +757,21 @@ export const mockDb = {
   },
 
   // E-Diary
-  getMoodEntries: (): MoodEntry[] => get(DB_KEYS.EDIARY, []),
+  getMoodEntries: (): MoodEntry[] => {
+    const raw = get<any[]>(DB_KEYS.EDIARY, []);
+    // Migration: convert old {mood} entries to new {mentalMood, physicalMood} format
+    return raw.map((e: any) => {
+      if (e.mentalMood !== undefined && e.physicalMood !== undefined) return e as MoodEntry;
+      // Legacy entry with single 'mood' field
+      return {
+        id: e.id || e.date,
+        date: e.date,
+        mentalMood: e.mood || 3,
+        physicalMood: e.mood || 3,
+        createdAt: e.createdAt || Date.now(),
+      } as MoodEntry;
+    });
+  },
   addOrUpdateMoodEntry: (entry: Omit<MoodEntry, 'createdAt' | 'id'>) => {
     updateCollection<MoodEntry>(DB_KEYS.EDIARY, entries => {
       const existing = entries.findIndex(e => e.date === entry.date);
