@@ -125,6 +125,13 @@ export interface N26Settings {
   closedYears?: number[];
 }
 
+export interface MoodEntry {
+  id: string; // Same as date
+  date: string; // YYYY-MM-DD
+  mood: number; // 1-5
+  createdAt: number;
+}
+
 // Initial Data
 const INITIAL_USERS: User[] = [
   { id: 'Falko', uid: 'thOJVf4L9cd2BysM2bFOeuC14yV2', avatar: '👨', isAdmin: true, isSetupComplete: true },
@@ -171,6 +178,7 @@ export const DB_KEYS = {
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
   APP_SETTINGS: 'family_hub_settings',
   VICTRON_SETTINGS: 'family_hub_victron_settings',
+  EDIARY: 'family_hub_ediary',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -248,6 +256,7 @@ export const initFirebase = async () => {
         [DB_KEYS.N26_SETTINGS]: get(DB_KEYS.N26_SETTINGS, { autoBookingEnabled: false, bookingDay: 1, closedYears: [] }),
         [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
+        [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -744,5 +753,20 @@ export const mockDb = {
   },
   saveVictronSettings: (settings: any) => {
     set(DB_KEYS.VICTRON_SETTINGS, settings);
+  },
+
+  // E-Diary
+  getMoodEntries: (): MoodEntry[] => get(DB_KEYS.EDIARY, []),
+  addOrUpdateMoodEntry: (entry: Omit<MoodEntry, 'createdAt' | 'id'>) => {
+    updateCollection<MoodEntry>(DB_KEYS.EDIARY, entries => {
+      const existing = entries.findIndex(e => e.date === entry.date);
+      const newEntry = { ...entry, id: entry.date, createdAt: Date.now() };
+      if (existing > -1) {
+        const newEntries = [...entries];
+        newEntries[existing] = newEntry;
+        return newEntries;
+      }
+      return [...entries, newEntry];
+    });
   }
 };
