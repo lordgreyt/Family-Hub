@@ -734,6 +734,62 @@ export const mockDb = {
       });
     }
   },
+  // Full backup: export all data as a JSON snapshot
+  exportAllData: () => {
+    const allKeys = Object.values(DB_KEYS) as string[];
+    // Also include keys not in DB_KEYS
+    const extraKeys = ['family_hub_custom_videos', 'victron_cache'];
+    const dump: Record<string, any> = {};
+
+    allKeys.forEach(key => {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) {
+        try { dump[key] = JSON.parse(raw); } catch { dump[key] = raw; }
+      }
+    });
+    extraKeys.forEach(key => {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) {
+        try { dump[key] = JSON.parse(raw); } catch { dump[key] = raw; }
+      }
+    });
+
+    // Add export metadata
+    dump['_backup_meta'] = {
+      version: 2,
+      createdAt: new Date().toISOString(),
+      appName: 'Family Hub',
+      description: 'Vollständiges Backup aller Family Hub Daten',
+    };
+
+    return dump;
+  },
+
+  // Full restore: import a complete JSON backup snapshot
+  importAllData: (dump: Record<string, any>) => {
+    const allKeys = Object.values(DB_KEYS) as string[];
+    const extraKeys = ['family_hub_custom_videos', 'victron_cache'];
+    const allWritableKeys = [...allKeys, ...extraKeys];
+
+    let restoredCount = 0;
+    allWritableKeys.forEach(key => {
+      if (dump[key] !== undefined) {
+        localStorage.setItem(key, JSON.stringify(dump[key]));
+        // Push to Firebase Cloud
+        if (allKeys.includes(key)) {
+          firebaseSet(ref(db, key), dump[key]).catch(e =>
+            console.error(`Firebase write error for ${key}:`, e)
+          );
+        }
+        restoredCount++;
+      }
+    });
+
+    // Notify the app that data changed
+    window.dispatchEvent(new Event('db_updated'));
+    return restoredCount;
+  },
+
   importFinancialData: (data: any) => {
     if (data[DB_KEYS.DEPOTS]) set(DB_KEYS.DEPOTS, data[DB_KEYS.DEPOTS]);
     if (data[DB_KEYS.DEPOT_TRANSACTIONS]) set(DB_KEYS.DEPOT_TRANSACTIONS, data[DB_KEYS.DEPOT_TRANSACTIONS]);
