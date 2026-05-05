@@ -16,7 +16,7 @@ const MOODS = [
 export const EDiary = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [timeRange, setTimeRange] = useState<30 | 60>(30);
   const [showToast, setShowToast] = useState(false);
@@ -44,22 +44,22 @@ export const EDiary = () => {
   if (!user || !user.isAdmin) return null;
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
       gap: '1.5rem',
       padding: '1rem',
       paddingBottom: '90px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>E-Diary</h1>
+        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Gefühle-Tagebuch</h1>
       </div>
 
       {/* Evening Check-in Section */}
-      <div className="glass-panel" style={{ 
-        padding: '1.5rem', 
-        backgroundColor: 'var(--color-surface)', 
-        borderRadius: 'var(--radius-xl)', 
+      <div className="glass-panel" style={{
+        padding: '1.5rem',
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-xl)',
         border: '1px solid var(--color-border)',
         boxShadow: 'var(--shadow-sm)'
       }}>
@@ -69,10 +69,10 @@ export const EDiary = () => {
         <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>
           Wie war dein Tag heute?
         </p>
-        
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           gap: '0.5rem'
         }}>
@@ -205,11 +205,11 @@ const MoodCalendar = ({ entries }: { entries: MoodEntry[] }) => {
   };
 
   return (
-    <div className="glass-panel" style={{ 
-      padding: '1.25rem', 
-      backgroundColor: 'var(--color-surface)', 
-      borderRadius: 'var(--radius-xl)', 
-      border: '1px solid var(--color-border)' 
+    <div className="glass-panel" style={{
+      padding: '1.25rem',
+      backgroundColor: 'var(--color-surface)',
+      borderRadius: 'var(--radius-xl)',
+      border: '1px solid var(--color-border)'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -217,11 +217,11 @@ const MoodCalendar = ({ entries }: { entries: MoodEntry[] }) => {
           {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h3>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button 
+          <button
             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
             style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.2rem' }}
           >&lt;</button>
-          <button 
+          <button
             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
             style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.2rem' }}
           >&gt;</button>
@@ -241,10 +241,10 @@ const MoodCalendar = ({ entries }: { entries: MoodEntry[] }) => {
           const color = getMoodColor(day);
           const hasEntry = color !== 'var(--color-background)';
           return (
-            <div 
-              key={day} 
-              style={{ 
-                aspectRatio: '1', 
+            <div
+              key={day}
+              style={{
+                aspectRatio: '1',
                 backgroundColor: color,
                 borderRadius: 'var(--radius-sm)',
                 display: 'flex',
@@ -287,9 +287,9 @@ const MoodGraph = ({ entries, days }: { entries: MoodEntry[], days: number }) =>
 
   const height = 150;
   // Let's reserve some horizontal padding
-  const paddingX = 20; 
+  const paddingX = 20;
   // Let's assume a fixed viewBox width for calculation
-  const width = 300; 
+  const width = 300;
 
   // Filter out nulls to connect the line only between existing data points
   const points = chartData.map((d, i) => {
@@ -298,24 +298,24 @@ const MoodGraph = ({ entries, days }: { entries: MoodEntry[], days: number }) =>
     // Y-Axis: Mood 5 = 20, Mood 1 = 130
     const y = 130 - ((d.mood - 1) * (110 / 4));
     return { x, y, mood: d.mood, displayDate: d.displayDate };
-  }).filter(Boolean) as {x: number, y: number, mood: number, displayDate: string}[];
+  }).filter(Boolean) as { x: number, y: number, mood: number, displayDate: string }[];
 
-  const pathD = points.length > 0 
-    ? `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}` 
+  const pathD = points.length > 0
+    ? `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`
     : '';
 
   return (
-    <div className="glass-panel" style={{ 
-      padding: '1.25rem', 
-      backgroundColor: 'var(--color-surface)', 
-      borderRadius: 'var(--radius-xl)', 
-      border: '1px solid var(--color-border)' 
+    <div className="glass-panel" style={{
+      padding: '1.25rem',
+      backgroundColor: 'var(--color-surface)',
+      borderRadius: 'var(--radius-xl)',
+      border: '1px solid var(--color-border)'
     }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <TrendingUp size={18} color="var(--color-primary)" />
         Trend ({days} Tage)
       </h3>
-      
+
       {points.length < 2 ? (
         <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
           Nicht genug Daten für einen Trend.
@@ -333,15 +333,15 @@ const MoodGraph = ({ entries, days }: { entries: MoodEntry[], days: number }) =>
                 </g>
               );
             })}
-            
+
             {/* Trend Line */}
             <path d={pathD} fill="none" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            
+
             {/* Data Points */}
             {points.map((p, i) => (
               <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--color-surface)" stroke="var(--color-primary)" strokeWidth="2" />
             ))}
-            
+
             {/* X-Axis Labels (show ~5 labels to not crowd) */}
             {chartData.map((d, i) => {
               if (i % Math.ceil(days / 5) !== 0 && i !== days - 1) return null;
