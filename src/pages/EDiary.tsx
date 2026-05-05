@@ -13,13 +13,35 @@ const MOOD_LEVELS = [
   { value: 5, emoji: '😄', color: '#22c55e', label: 'Sehr gut' },
 ];
 
-// Weighted average: mental 2/3, physical 1/3
+// Weighted average: mental 2/3, physical 1/3 — raw float for granular colors
 const getWeightedAverage = (mental: number, physical: number): number => {
-  return Math.round((mental * 2 + physical * 1) / 3);
+  return (mental * 2 + physical * 1) / 3;
 };
 
+// Smooth color interpolation across the full 1.0–5.0 range
 const getMoodColor = (avg: number): string => {
-  return MOOD_LEVELS.find(m => m.value === avg)?.color || '#eab308';
+  const t = (avg - 1) / 4; // 0 to 1
+  const stops = [
+    { t: 0,    r: 0xef, g: 0x44, b: 0x44 }, // rot
+    { t: 0.25, r: 0xf9, g: 0x73, b: 0x16 }, // orange
+    { t: 0.5,  r: 0xea, g: 0xb3, b: 0x08 }, // gelb
+    { t: 0.75, r: 0x84, g: 0xcc, b: 0x16 }, // limette
+    { t: 1,    r: 0x22, g: 0xc5, b: 0x5e }, // grün
+  ];
+
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i].t && t <= stops[i + 1].t) { lo = stops[i]; hi = stops[i + 1]; break; }
+  }
+  if (t < 0) { lo = stops[0]; hi = stops[0]; }
+  if (t > 1) { lo = stops[stops.length - 1]; hi = stops[stops.length - 1]; }
+
+  const range = hi.t - lo.t || 1;
+  const f = (t - lo.t) / range;
+  const r = Math.round(lo.r + (hi.r - lo.r) * f);
+  const g = Math.round(lo.g + (hi.g - lo.g) * f);
+  const b = Math.round(lo.b + (hi.b - lo.b) * f);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
 export const EDiary = () => {
@@ -220,7 +242,7 @@ const MoodCheckIn = ({ onSave, existingEntry }: { onSave: (mental: number, physi
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <Brain size={18} color="var(--color-primary)" />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Mentale Gesundheit</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Mental</span>
           {mental > 0 && (
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
               {MOOD_LEVELS.find(m => m.value === mental)?.label}
@@ -261,7 +283,7 @@ const MoodCheckIn = ({ onSave, existingEntry }: { onSave: (mental: number, physi
       <div style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <Activity size={18} color="var(--color-primary)" />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Körperliche Gesundheit</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Körperlich</span>
           {physical > 0 && (
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
               {MOOD_LEVELS.find(m => m.value === physical)?.label}
@@ -303,9 +325,9 @@ const MoodCheckIn = ({ onSave, existingEntry }: { onSave: (mental: number, physi
         {avg !== null && !saved && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
             <span>Gesamt:</span>
-            <span style={{ fontSize: '1.2rem' }}>{MOOD_LEVELS.find(m => m.value === avg)?.emoji}</span>
+            <span style={{ fontSize: '1.2rem' }}>{MOOD_LEVELS[Math.round(avg) - 1]?.emoji}</span>
             <span style={{ fontWeight: 600, color: getMoodColor(avg) }}>
-              ({mental * 2 + physical * 1}/3 → {avg})
+              ({mental}×2 + {physical}×1)/3 = {avg.toFixed(1)}
             </span>
           </div>
         )}
@@ -378,7 +400,7 @@ const EditDialog = ({ date, existingEntry, onSave, onClose }: {
         <div style={{ marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <Brain size={18} color="var(--color-primary)" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text)' }}>Mentale Gesundheit</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text)' }}>Mental</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
             {MOOD_LEVELS.map(m => (
@@ -411,7 +433,7 @@ const EditDialog = ({ date, existingEntry, onSave, onClose }: {
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <Activity size={18} color="var(--color-primary)" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text)' }}>Körperliche Gesundheit</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text)' }}>Körperlich</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
             {MOOD_LEVELS.map(m => (
@@ -528,6 +550,7 @@ const MoodCalendar = ({ entries, onEditDay }: { entries: MoodEntry[], onEditDay:
           const { dateStr, color, avg, entry } = getDayInfo(day);
           const hasEntry = avg !== null;
           const isToday = dateStr === todayStr;
+          const isFuture = dateStr > todayStr;
 
           return (
             <CalendarDay
@@ -536,6 +559,7 @@ const MoodCalendar = ({ entries, onEditDay }: { entries: MoodEntry[], onEditDay:
               color={color}
               hasEntry={hasEntry}
               isToday={isToday}
+              isFuture={isFuture}
               entry={entry}
               onEdit={() => onEditDay(dateStr)}
             />
@@ -551,7 +575,7 @@ const MoodCalendar = ({ entries, onEditDay }: { entries: MoodEntry[], onEditDay:
             <span style={{ fontSize: '0.8rem' }}>{m.emoji}</span>
           </div>
         ))}
-        <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: '0.5rem' }}>Tipp: Lange drücken zum Bearbeiten</span>
+        <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: '0.5rem' }}>Tipp: Vergangene Tage lang drücken zum Bearbeiten</span>
       </div>
     </div>
   );
@@ -559,11 +583,12 @@ const MoodCalendar = ({ entries, onEditDay }: { entries: MoodEntry[], onEditDay:
 
 // --- Calendar Day (with long-press support) ---
 
-const CalendarDay = ({ day, color, hasEntry, isToday, entry, onEdit }: {
+const CalendarDay = ({ day, color, hasEntry, isToday, isFuture, entry, onEdit }: {
   day: number;
   color: string;
   hasEntry: boolean;
   isToday: boolean;
+  isFuture: boolean;
   entry: MoodEntry | null;
   onEdit: () => void;
 }) => {
@@ -571,6 +596,7 @@ const CalendarDay = ({ day, color, hasEntry, isToday, entry, onEdit }: {
   const [isPressed, setIsPressed] = useState(false);
 
   const startPress = () => {
+    if (isFuture) return; // Future days cannot be edited
     setIsPressed(true);
     pressTimer.current = setTimeout(() => {
       onEdit();
@@ -606,7 +632,7 @@ const CalendarDay = ({ day, color, hasEntry, isToday, entry, onEdit }: {
         color: hasEntry ? 'white' : 'var(--color-text-muted)',
         border: isToday ? '2px solid var(--color-primary)' : hasEntry ? 'none' : '1px solid var(--color-border)',
         opacity: hasEntry ? 0.9 : 0.6,
-        cursor: 'pointer',
+        cursor: isFuture ? 'default' : 'pointer',
         transition: 'transform 0.1s, box-shadow 0.1s',
         transform: isPressed ? 'scale(0.92)' : 'scale(1)',
         boxShadow: isPressed ? 'inset 0 0 0 2px var(--color-primary)' : 'none',
