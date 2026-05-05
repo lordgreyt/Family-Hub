@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 
@@ -16,6 +17,7 @@ import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
 import { VictronProvider } from './context/VictronContext';
+import { initBackupService } from './services/backupService';
 
 
 
@@ -23,6 +25,10 @@ import './index.css';
 
 function App() {
 
+  useEffect(() => {
+    const cleanup = initBackupService();
+    return cleanup;
+  }, []);
 
   return (
     <AuthProvider>

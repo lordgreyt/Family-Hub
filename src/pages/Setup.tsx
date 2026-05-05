@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Download, Upload } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Download, Upload, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { secondaryAuth } from '../services/firebase';
+
+import { isDriveConnected, requestAccessToken, disconnectDrive, getGoogleClientId, setGoogleClientId } from '../services/googleDrive';
+import { runBackup, getLastBackupInfo, isBackupDue } from '../services/backupService';
 
 import { getNavItems } from '../utils/navigation';
 
@@ -31,6 +34,15 @@ export const Setup = () => {
   const [changePwNew, setChangePwNew] = useState('');
   const [changePwConfirm, setChangePwConfirm] = useState('');
   const [isChangingPw, setIsChangingPw] = useState(false);
+
+  // Google Drive State
+  const [driveConnected, setDriveConnected] = useState(isDriveConnected());
+  const [googleClientId, setGoogleClientIdLocal] = useState(getGoogleClientId());
+  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+  const [driveError, setDriveError] = useState('');
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [isRunningBackup, setIsRunningBackup] = useState(false);
+  const lastBackup = getLastBackupInfo();
 
   useEffect(() => {
     const load = () => setDbUsers(mockDb.getUsers());
@@ -145,6 +157,56 @@ export const Setup = () => {
       }
     } finally {
       setIsChangingPw(false);
+    }
+  };
+
+  const handleConnectDrive = async () => {
+    setIsConnectingDrive(true);
+    setDriveError('');
+    setDriveSuccess('');
+    try {
+      const token = await requestAccessToken();
+      if (token) {
+        setDriveConnected(true);
+        setDriveSuccess('Google Drive erfolgreich verbunden!');
+        setTimeout(() => setDriveSuccess(''), 4000);
+      }
+    } catch (err: any) {
+      setDriveError(err.message || 'Verbindung fehlgeschlagen');
+    } finally {
+      setIsConnectingDrive(false);
+    }
+  };
+
+  const handleDisconnectDrive = () => {
+    disconnectDrive();
+    setDriveConnected(false);
+    setDriveSuccess('');
+  };
+
+  const handleSaveClientId = () => {
+    if (!googleClientId.trim()) return;
+    setGoogleClientId(googleClientId.trim());
+    setDriveSuccess('Client ID gespeichert. Du kannst dich jetzt verbinden.');
+    setTimeout(() => setDriveSuccess(''), 4000);
+  };
+
+  const handleManualBackup = async () => {
+    setIsRunningBackup(true);
+    setDriveError('');
+    setDriveSuccess('');
+    try {
+      const result = await runBackup();
+      if (result.success) {
+        setDriveSuccess(`Backup gespeichert: ${result.fileName}`);
+        setTimeout(() => setDriveSuccess(''), 4000);
+      } else {
+        setDriveError(result.error || 'Backup fehlgeschlagen');
+      }
+    } catch (err: any) {
+      setDriveError(err.message || 'Backup fehlgeschlagen');
+    } finally {
+      setIsRunningBackup(false);
     }
   };
 
@@ -475,9 +537,96 @@ export const Setup = () => {
             <Database size={20} /> System & Backup
           </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-              Erstelle ein vollständiges Backup aller Family Hub Daten (Nutzer, Finanzen, Tasks, Notizen, Essensplan, Belohnungen, Stimmungstagebuch, Spiele, Einstellungen) oder stelle ein früheres Backup wieder her.
+          {/* Google Drive Verbindung */}
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', marginBottom: '0.75rem', color: 'var(--color-text)' }}>
+              <HardDrive size={18} /> Google Drive Backup
+            </h4>
+
+            {!driveConnected ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>
+                    Google OAuth 2.0 Client ID
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={googleClientId}
+                      onChange={e => setGoogleClientIdLocal(e.target.value)}
+                      placeholder="123456789-xxx.apps.googleusercontent.com"
+                      style={{ padding: '0.5rem', fontSize: '0.8rem' }}
+                    />
+                    <button onClick={handleSaveClientId} className="btn btn-secondary" style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                      Speichern
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                    Erstelle eine OAuth 2.0 Client ID in der Google Cloud Console (Webanwendung). Authorized origins: http://localhost:5173
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleConnectDrive}
+                  disabled={!googleClientId.trim() || isConnectingDrive}
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: !googleClientId.trim() ? 0.5 : 1 }}
+                >
+                  <Cloud size={18} /> {isConnectingDrive ? 'Verbinde...' : 'Mit Google Drive verbinden'}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.6rem 0.75rem',
+                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  marginBottom: '0.75rem',
+                }}>
+                  <Cloud size={18} color="var(--color-success)" />
+                  <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-success)' }}>Google Drive verbunden</span>
+                  <button onClick={handleDisconnectDrive} style={{ marginLeft: 'auto', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}>
+                    <CloudOff size={14} /> Trennen
+                  </button>
+                </div>
+
+                {lastBackup && (
+                  <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
+                    Letztes Backup: {new Date(lastBackup.timestamp).toLocaleString('de-DE')}
+                    {isBackupDue() && <span style={{ color: 'var(--color-primary)', marginLeft: '0.5rem' }}>– Neues Backup fällig</span>}
+                  </p>
+                )}
+
+                <button
+                  onClick={handleManualBackup}
+                  disabled={isRunningBackup}
+                  className="btn btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                >
+                  <RotateCw size={16} style={isRunningBackup ? { animation: 'spin 1s linear infinite' } : {}} />
+                  {isRunningBackup ? 'Läuft...' : 'Jetzt Backup durchführen'}
+                </button>
+              </div>
+            )}
+
+            {driveError && (
+              <p style={{ color: 'var(--color-danger)', fontSize: '0.75rem', marginTop: '0.5rem' }}>{driveError}</p>
+            )}
+            {driveSuccess && (
+              <p style={{ color: 'var(--color-success)', fontSize: '0.75rem', marginTop: '0.5rem' }}>{driveSuccess}</p>
+            )}
+          </div>
+
+          {/* Manuelles Backup & Restore */}
+          <div>
+            <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: 'var(--color-text)' }}>Manuelles Backup & Restore</h4>
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', margin: '0 0 0.75rem 0' }}>
+              Backup als Datei herunterladen oder ein früheres Backup wieder einspielen.
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -504,15 +653,16 @@ export const Setup = () => {
                 </button>
               </div>
             </div>
-
-            <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', margin: 0, lineHeight: 1.6 }}>
-                Das Backup enthält: Nutzerprofile, Budget, Notizen, Aufgaben, Essensplan, Belohnungen, Highscores, Ausgaben & Depots, N26-Einstellungen, freigeschaltete Videos, App-Einstellungen, Victron/Wallbox-Einstellungen, Stimmungstagebuch und den Victron-Daten-Cache.
-              </p>
-            </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
 
       <button onClick={logout} className="btn" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
         <LogOut size={20} /> Abmelden ({user?.id})
