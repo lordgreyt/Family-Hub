@@ -199,7 +199,7 @@ export const Tasks = () => {
                     transition: 'all 0.2s'
                   }}
                 >
-                  {u.avatar} {u.id}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.65rem', flexShrink: 0 }}>{u.avatar}</span> {u.id}
                 </button>
               );
             })}
@@ -300,7 +300,7 @@ export const Tasks = () => {
                               transition: 'all 0.2s'
                             }}
                           >
-                            {u.avatar} {u.id}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.65rem', flexShrink: 0 }}>{u.avatar}</span> {u.id}
                           </button>
                         );
                       })}

@@ -378,7 +378,12 @@ export const Setup = () => {
             {dbUsers.map(u => (
               <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1.25rem' }}>{u.avatar}</span>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    backgroundColor: u.avatarColor || '#6366f1',
+                    fontSize: '1rem', flexShrink: 0,
+                  }}>{u.avatar}</span>
                   <strong>{u.id}</strong>
                   {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
                   {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}

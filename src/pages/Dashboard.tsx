@@ -179,7 +179,12 @@ export const Dashboard = () => {
                   whiteSpace: 'nowrap'
                 }}
               >
-                {u.avatar} {u.id}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: '22px', height: '22px', borderRadius: '50%',
+                  backgroundColor: u.avatarColor || '#6366f1',
+                  fontSize: '0.75rem', marginRight: '0.3rem', verticalAlign: 'middle',
+                }}>{u.avatar}</span>{u.id}
               </button>
             ))}
           </div>

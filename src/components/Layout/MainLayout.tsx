@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { NotificationManager } from '../NotificationManager';
-
+import { UpdateNotification } from '../UpdateNotification';
 import { RequestPopup } from '../RequestPopup';
 
 export const MainLayout = () => {
@@ -58,6 +58,7 @@ export const MainLayout = () => {
         <Outlet />
       </main>
       <NotificationManager />
+      <UpdateNotification />
       <RequestPopup />
     </>
   );

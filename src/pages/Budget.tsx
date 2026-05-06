@@ -164,7 +164,7 @@ export const Budget = () => {
               onPointerCancel={cancelPress}
             >
               <div>
-                <div style={{ fontWeight: 500 }}>{item.title} <span title={item.createdBy} style={{ fontSize: '0.8em' }}>{author?.avatar}</span></div>
+                <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>{item.title} {author && <span title={item.createdBy} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: author.avatarColor || '#6366f1', fontSize: '0.7rem', flexShrink: 0 }}>{author.avatar}</span>}</div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{item.amount.toFixed(2)} €</div>
               </div>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>

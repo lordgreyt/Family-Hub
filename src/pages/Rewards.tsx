@@ -130,7 +130,7 @@ export const Rewards = () => {
                   const u = users.find(usr => usr.id === s.childId);
                   return (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)' }}>
-                          <span>{idx === 0 ? '👑 ' : ''}{u?.avatar || '👤'} {u?.id || s.childId}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{idx === 0 ? '👑 ' : ''}{u && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.7rem', flexShrink: 0 }}>{u.avatar || '👤'}</span>} {u?.id || s.childId}</span>
                           <span style={{ fontWeight: idx === 0 ? 'bold' : 'normal', color: idx === 0 ? '#f59e0b' : 'inherit' }}>{s.score}</span>
                       </div>
                   );
@@ -289,7 +289,12 @@ export const Rewards = () => {
                   <div key={child.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '1.5rem' }}>{child.avatar}</span>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: '36px', height: '36px', borderRadius: '50%',
+                          backgroundColor: child.avatarColor || '#6366f1',
+                          fontSize: '1.15rem', flexShrink: 0,
+                        }}>{child.avatar}</span>
                         <strong style={{ fontSize: '1.1rem' }}>{child.id}</strong>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '1.2rem', fontWeight: 'bold', color: '#f59e0b' }}>
@@ -387,7 +392,7 @@ export const Rewards = () => {
                 return (
                   <div key={req.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                     <div>
-                      <strong>{reqUser?.avatar} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
+                      <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.8rem', marginRight: '0.2rem', verticalAlign: 'middle' }}>{reqUser.avatar}</span>} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button onClick={() => mockDb.updateRewardRequest({ ...req, status: 'REJECTED' })} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -536,7 +541,7 @@ export const Rewards = () => {
               {/* 2nd Place */}
               {rankings[1] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>{rankings[1].avatar}</div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', backgroundColor: rankings[1].avatarColor || '#6366f1', fontSize: '1rem' }}>{rankings[1].avatar}</span></div>
                   {rankings[1].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -571,7 +576,7 @@ export const Rewards = () => {
               {/* 1st Place */}
               {rankings[0] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                  <div style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>{rankings[0].avatar}</div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: rankings[0].avatarColor || '#6366f1', fontSize: '1.3rem' }}>{rankings[0].avatar}</span></div>
                   {rankings[0].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -606,7 +611,7 @@ export const Rewards = () => {
               {/* 3rd Place */}
               {rankings[2] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ fontSize: '1rem', marginBottom: '0.2rem' }}>{rankings[2].avatar}</div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: rankings[2].avatarColor || '#6366f1', fontSize: '0.85rem' }}>{rankings[2].avatar}</span></div>
                   {rankings[2].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />

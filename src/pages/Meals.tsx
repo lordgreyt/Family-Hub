@@ -163,7 +163,7 @@ export const Meals = () => {
               return (
                 <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                   <div>
-                    <strong>{reqUser?.avatar} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
+                    <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.8rem', marginRight: '0.2rem', verticalAlign: 'middle' }}>{reqUser.avatar}</span>} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => handleDeleteItem(req.id)} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -399,7 +399,7 @@ export const Meals = () => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{template.emoji}</span>
                             <span style={{ fontWeight: 500, color: 'var(--color-text)' }}>{template.title}</span>
-                            {isPending && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginLeft: '0.5rem' }}>(Anfrage von {reqUser?.avatar})</span>}
+                            {isPending && reqUser && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginLeft: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>(Anfrage von <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.6rem' }}>{reqUser.avatar}</span>)</span>}
                           </div>
                           
                           {canDelete && (

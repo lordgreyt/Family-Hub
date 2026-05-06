@@ -149,7 +149,7 @@ export const RequestPopup = () => {
                   gap: '0.75rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                     <span style={{ fontSize: '1.5rem' }}>{reqUser?.avatar || '👤'}</span>
+                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', backgroundColor: reqUser?.avatarColor || '#6366f1', fontSize: '1.25rem', flexShrink: 0 }}>{reqUser?.avatar || '👤'}</span>
                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                        <span style={{ fontWeight: 700, fontSize: 'var(--font-sm)' }}>{reqUser?.id}</span>
                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Mahlzeiten-Anfrage</span>
@@ -202,7 +202,7 @@ export const RequestPopup = () => {
                   gap: '0.75rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                     <span style={{ fontSize: '1.5rem' }}>{reqUser?.avatar || '👤'}</span>
+                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', backgroundColor: reqUser?.avatarColor || '#6366f1', fontSize: '1.25rem', flexShrink: 0 }}>{reqUser?.avatar || '👤'}</span>
                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                        <span style={{ fontWeight: 700, fontSize: 'var(--font-sm)' }}>{reqUser?.id}</span>
                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Medienzeit / Sterne</span>

@@ -10,6 +10,7 @@ export interface User {
   id: string; // The user's typed alias (e.g. "Markus")
   uid?: string; // Firebase Authentication UID
   avatar: string; // Emoji
+  avatarColor?: string; // Hintergrundfarbe für den Avatar-Kreis
   isAdmin?: boolean;
   isSetupComplete?: boolean;
   isChild?: boolean;
