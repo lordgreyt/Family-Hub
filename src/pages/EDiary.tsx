@@ -1015,8 +1015,10 @@ const CalendarDay = ({ day, color, hasEntry, isToday, isFuture, entry, onEdit, c
         backgroundColor: color,
         borderRadius: isToday ? 'var(--radius-md)' : 'var(--radius-sm)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: '12%',
         fontSize: '0.75rem',
         fontWeight: hasEntry ? 700 : 500,
         color: hasEntry ? 'white' : 'var(--color-text-muted)',
@@ -1027,35 +1029,50 @@ const CalendarDay = ({ day, color, hasEntry, isToday, isFuture, entry, onEdit, c
         transform: isPressed ? 'scale(0.92)' : 'scale(1)',
         boxShadow: isPressed ? 'inset 0 0 0 2px var(--color-primary)' : 'none',
         position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {day}
+      <span style={{ position: 'relative', zIndex: 1, lineHeight: 1 }}>
+        {day}
+      </span>
+
       {hasEntry && entry && (
-        <div style={{
-          position: 'absolute',
-          bottom: '1px',
-          display: 'flex',
-          gap: '1px',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}>
-          <div style={{ display: 'flex', gap: '1px' }}>
-            <span style={{ fontSize: '0.45rem', lineHeight: 1 }}>
-              {MOOD_LEVELS.find(m => m.value === entry.mentalMood)?.emoji}
-            </span>
-            <span style={{ fontSize: '0.45rem', lineHeight: 1 }}>
-              {MOOD_LEVELS.find(m => m.value === entry.physicalMood)?.emoji}
-            </span>
+        <>
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '30%',
+            display: 'flex',
+          }}>
+            <div style={{
+              flex: 1,
+              backgroundColor: MOOD_LEVELS.find(m => m.value === entry.mentalMood)?.color || '#888',
+              opacity: 0.85,
+            }} />
+            <div style={{
+              flex: 1,
+              backgroundColor: MOOD_LEVELS.find(m => m.value === entry.physicalMood)?.color || '#888',
+              opacity: 0.85,
+            }} />
           </div>
+
           {entry.tags && entry.tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '1px' }}>
+            <div style={{
+              position: 'absolute',
+              bottom: '31%',
+              display: 'flex',
+              gap: '1px',
+              zIndex: 2,
+            }}>
               {entry.tags.slice(0, 3).map(tagId => {
                 const tag = customTags.find(t => t.id === tagId);
-                return tag ? <span key={tagId} style={{ fontSize: '0.35rem', lineHeight: 1 }}>{tag.emoji}</span> : null;
+                return tag ? <span key={tagId} style={{ fontSize: '0.4rem', lineHeight: 1, textShadow: '0 0 2px rgba(0,0,0,0.5)' }}>{tag.emoji}</span> : null;
               })}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
