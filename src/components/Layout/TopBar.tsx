@@ -54,7 +54,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const myEntry = leaderboard.find((e: any) => e.userId === user.id);
     const stars = myEntry ? (myEntry.total || myEntry.stars || myEntry.points || 0) : 0;
 
-    const entries = mockDb.getMoodEntries();
+    const entries = mockDb.getMoodEntries(user.id);
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -189,28 +189,34 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             animation: 'fadeIn 0.2s ease',
           }}
         >
-          <div 
+          <div
             onClick={e => e.stopPropagation()}
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-lg)',
-              padding: '2rem',
+              padding: '1.5rem',
               width: '100%',
               maxWidth: '400px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               animation: 'slideUp 0.3s ease',
             }}
           >
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexShrink: 0 }}>
               <h2 style={{ fontSize: 'var(--font-xl)', color: 'var(--color-text)', margin: 0 }}>Mein Profil</h2>
-              <button 
-                onClick={() => setShowProfile(false)} 
+              <button
+                onClick={() => setShowProfile(false)}
                 style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '0.25rem' }}
               >
                 <X size={22} />
               </button>
             </div>
+
+            {/* Scrollable Content */}
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.25rem' }}>
 
             {/* Avatar Preview */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -389,9 +395,9 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
 
             {/* Save Message */}
             {saveMessage && (
-              <div style={{ 
-                padding: '0.5rem', 
-                marginBottom: '1rem', 
+              <div style={{
+                padding: '0.5rem',
+                marginBottom: '0.75rem',
                 borderRadius: 'var(--radius-md)',
                 fontSize: 'var(--font-sm)',
                 textAlign: 'center',
@@ -402,8 +408,11 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
               </div>
             )}
 
-            {/* Save Button */}
-            <button 
+            </div>{/* End Scrollable Content */}
+
+            {/* Save Button — fixed at bottom */}
+            <div style={{ flexShrink: 0, paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
+            <button
               onClick={handleSaveProfile}
               className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center' }}
@@ -411,6 +420,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
               <Check size={18} />
               Speichern
             </button>
+            </div>
           </div>
         </div>
       )}

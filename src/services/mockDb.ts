@@ -129,6 +129,7 @@ export interface N26Settings {
 export interface MoodEntry {
   id: string; // Same as date
   date: string; // YYYY-MM-DD
+  userId: string; // Jeder Nutzer hat eigene Einträge
   mentalMood: number; // 1-5 (1 = worst, 5 = best)
   physicalMood: number; // 1-5
   tags?: string[]; // Context-Tags (z.B. "schule", "sport", "freunde")
@@ -818,23 +819,28 @@ export const mockDb = {
   },
 
   // E-Diary
-  getMoodEntries: (): MoodEntry[] => {
+  getMoodEntries: (userId?: string): MoodEntry[] => {
     const raw = get<any[]>(DB_KEYS.EDIARY, []);
     // Migration: convert old {mood} entries to new {mentalMood, physicalMood} format
-    return raw.map((e: any) => {
+    const allEntries = raw.map((e: any) => {
       if (e.mentalMood !== undefined && e.physicalMood !== undefined) {
-        return { ...e, tags: e.tags || [] } as MoodEntry;
+        return { ...e, userId: e.userId || 'Falko', tags: e.tags || [] } as MoodEntry;
       }
       // Legacy entry with single 'mood' field
       return {
         id: e.id || e.date,
         date: e.date,
+        userId: e.userId || 'Falko',
         mentalMood: e.mood || 3,
         physicalMood: e.mood || 3,
         tags: [],
         createdAt: e.createdAt || Date.now(),
       } as MoodEntry;
     });
+    if (userId) {
+      return allEntries.filter(e => e.userId === userId);
+    }
+    return allEntries;
   },
   addOrUpdateMoodEntry: (entry: Omit<MoodEntry, 'createdAt' | 'id'>) => {
     updateCollection<MoodEntry>(DB_KEYS.EDIARY, entries => {
@@ -849,17 +855,27 @@ export const mockDb = {
     });
   },
 
-  // Custom Tags (für E-Diary Kontext — Firebase-synced)
-  getCustomTags: (): TagOption[] => {
-    const tags = get<TagOption[]>(DB_KEYS.CUSTOM_TAGS, []);
-    if (tags.length > 0) return tags;
+  // Custom Tags (für E-Diary Kontext — Firebase-synced, pro Nutzer in einem Key)
+  getCustomTags: (userId: string): TagOption[] => {
+    const raw = get<any>(DB_KEYS.CUSTOM_TAGS, null);
+    // Migration: alte flache TagOption[] Struktur → neue Record<string, TagOption[]>
+    if (Array.isArray(raw)) {
+      const migrated: Record<string, TagOption[]> = {};
+      // Alte Tags dem ersten verfügbaren User zuweisen
+      migrated[userId] = raw as TagOption[];
+      set(DB_KEYS.CUSTOM_TAGS, migrated);
+      return raw as TagOption[];
+    }
+    const allTags: Record<string, TagOption[]> = raw && typeof raw === 'object' ? raw : {};
+    if (allTags[userId] && allTags[userId].length > 0) return allTags[userId];
     // Migration von altem localStorage-Key
     try {
       const oldRaw = localStorage.getItem('ediary_custom_tags');
       if (oldRaw) {
         const oldTags = JSON.parse(oldRaw);
-        if (oldTags.length > 0) {
-          set(DB_KEYS.CUSTOM_TAGS, oldTags);
+        if (Array.isArray(oldTags) && oldTags.length > 0) {
+          allTags[userId] = oldTags;
+          set(DB_KEYS.CUSTOM_TAGS, allTags);
           return oldTags;
         }
       }
@@ -875,11 +891,15 @@ export const mockDb = {
       { id: 'hobby', emoji: '🎨', label: 'Hobby / Kreativ' },
       { id: 'ruhe', emoji: '🧘', label: 'Ruhe / Entspannung' },
     ];
-    set(DB_KEYS.CUSTOM_TAGS, defaults);
+    allTags[userId] = defaults;
+    set(DB_KEYS.CUSTOM_TAGS, allTags);
     return defaults;
   },
 
-  saveCustomTags: (tags: TagOption[]) => {
-    set(DB_KEYS.CUSTOM_TAGS, tags);
+  saveCustomTags: (userId: string, tags: TagOption[]) => {
+    const raw = get<any>(DB_KEYS.CUSTOM_TAGS, null);
+    const allTags: Record<string, TagOption[]> = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+    allTags[userId] = tags;
+    set(DB_KEYS.CUSTOM_TAGS, allTags);
   },
 };

@@ -24,9 +24,7 @@ export const getNavItems = (user: User | null): NavItem[] => {
       { to: '/wallbox', icon: Zap, label: 'Wallbox' }
     ] : []),
     { to: '/rewards', icon: Star, label: 'Sterne' },
-    ...(user.isAdmin ? [
-      { to: '/e-diary', icon: Activity, label: 'E-Diary' }
-    ] : []),
+    { to: '/e-diary', icon: Activity, label: 'E-Diary' },
     { to: '/setup', icon: Settings, label: 'Setup' },
   ];
 };

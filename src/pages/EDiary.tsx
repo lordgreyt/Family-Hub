@@ -57,25 +57,26 @@ export const EDiary = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     localStorage.getItem('ediary_notifications') === 'true' && Notification.permission === 'granted'
   );
-  const [customTags, setCustomTags] = useState<TagOption[]>(mockDb.getCustomTags());
+  const [customTags, setCustomTags] = useState<TagOption[]>([]);
   const [showTagManager, setShowTagManager] = useState(false);
 
   useEffect(() => {
-    if (user && !user.isAdmin) {
-      navigate('/');
-    }
+    if (!user) return;
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
   }, [user, navigate]);
 
   const loadData = () => {
-    setEntries(mockDb.getMoodEntries());
+    if (!user) return;
+    setEntries(mockDb.getMoodEntries(user.id));
+    setCustomTags(mockDb.getCustomTags(user.id));
   };
 
   const handleMoodSelect = (mental: number, physical: number, tags: string[]) => {
     const today = new Date().toISOString().split('T')[0];
-    mockDb.addOrUpdateMoodEntry({ date: today, mentalMood: mental, physicalMood: physical, tags });
+    if (!user) return;
+    mockDb.addOrUpdateMoodEntry({ date: today, userId: user.id, mentalMood: mental, physicalMood: physical, tags });
     setToastMessage('Stimmung gespeichert!');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
@@ -83,7 +84,8 @@ export const EDiary = () => {
 
   const handleEditSave = (mental: number, physical: number, tags: string[]) => {
     if (!editDate) return;
-    mockDb.addOrUpdateMoodEntry({ date: editDate, mentalMood: mental, physicalMood: physical, tags });
+    if (!user) return;
+    mockDb.addOrUpdateMoodEntry({ date: editDate, userId: user.id, mentalMood: mental, physicalMood: physical, tags });
     setEditDate(null);
     setEditingEntry(null);
     setToastMessage('Eintrag aktualisiert!');
@@ -116,13 +118,13 @@ export const EDiary = () => {
     if (customTags.some(t => t.id === id)) return;
     const newTags = [...customTags, { id, emoji: emoji.trim(), label: label.trim() }];
     setCustomTags(newTags);
-    mockDb.saveCustomTags(newTags);
+    if (user) mockDb.saveCustomTags(user.id, newTags);
   };
 
   const handleDeleteTag = (tagId: string) => {
     const newTags = customTags.filter(t => t.id !== tagId);
     setCustomTags(newTags);
-    mockDb.saveCustomTags(newTags);
+    if (user) mockDb.saveCustomTags(user.id, newTags);
   };
 
   const handleExportImage = () => {
