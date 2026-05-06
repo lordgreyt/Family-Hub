@@ -1,27 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { APP_VERSION, isNewVersion, getCurrentChangelog, setLastSeenVersion } from '../data/changelog';
 import { Sparkles, X } from 'lucide-react';
+
+// Check at module load time so it's consistent across re-renders
+const shouldShow = isNewVersion();
 
 export const UpdateNotification = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [animate, setAnimate] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isNewVersion()) {
-      // Small delay so the UI has rendered before showing
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-        setTimeout(() => setAnimate(true), 50);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
+    if (!shouldShow) return;
+
+    // Mark version as seen immediately so we don't re-show on remounts
+    setLastSeenVersion(APP_VERSION);
+
+    timerRef.current = setTimeout(() => {
+      setIsVisible(true);
+      // Trigger animation slightly after mount for CSS transition
+      requestAnimationFrame(() => {
+        setAnimate(true);
+      });
+    }, 600);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const handleDismiss = () => {
     setAnimate(false);
     setTimeout(() => {
       setIsVisible(false);
-      setLastSeenVersion(APP_VERSION);
     }, 250);
   };
 
