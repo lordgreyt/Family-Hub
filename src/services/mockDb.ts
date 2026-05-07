@@ -239,9 +239,7 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
   })
     .catch(e => {
       console.error(`Transaction failed for ${key}:`, e);
-      // Revert optimistic update on failure — reload from server
-      localStorage.removeItem(key);
-      window.dispatchEvent(new Event('db_updated'));
+      // Let the next onValue sync restore consistency from the server
     })
     .finally(() => {
       pendingWrites.delete(key);

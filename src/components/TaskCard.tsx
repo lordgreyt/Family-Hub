@@ -82,8 +82,9 @@ export const TaskCard = ({
     onDelete?.(task);
   };
 
-  const handleToggle = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleToggle = (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
     e.stopPropagation();
+    e.preventDefault(); // prevent mobile click-after-touchend double-fire
     if (showActions) { setShowActions(false); return; }
     if (canToggle && onToggle) onToggle(task);
   };
@@ -287,10 +288,8 @@ export const TaskCard = ({
           {/* Status circle */}
           {showToggle && (
             <button
+              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
               onClick={handleToggle}
-              onTouchEnd={handleToggle}
-              onTouchStart={e => e.stopPropagation()}
-              onMouseDown={e => e.stopPropagation()}
               style={{
                 background: 'none',
                 border: 'none',
