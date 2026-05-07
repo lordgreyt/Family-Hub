@@ -577,14 +577,19 @@ export const mockDb = {
     if (!localTask) return;
 
     const newIsDone = !localTask.isDone;
-    const completedAt = newIsDone ? Date.now() : undefined;
 
     console.log(`🔄 toggleTask("${localTask.content.substring(0, 30)}"): isDone ${localTask.isDone} → ${newIsDone} | pendingWrites count: ${pendingWrites.get(DB_KEYS.TASKS) || 0}`);
 
-    updateCollection<TaskItem>(DB_KEYS.TASKS, currentTasks => 
+    updateCollection<TaskItem>(DB_KEYS.TASKS, currentTasks =>
       currentTasks.map(t => {
         if (t.id === id) {
-          return { ...t, isDone: newIsDone, completedAt };
+          const updated = { ...t, isDone: newIsDone };
+          if (newIsDone) {
+            updated.completedAt = Date.now();
+          } else {
+            delete updated.completedAt; // Firebase rejects undefined — must remove the key entirely
+          }
+          return updated;
         }
         return t;
       })
