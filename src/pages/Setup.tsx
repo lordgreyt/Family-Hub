@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import type { ThemeColor } from '../services/mockDb';
 
@@ -26,6 +26,28 @@ const THEME_COLORS: Record<ThemeColor, string> = {
   crimson: '#DC2626',
   gold: '#D97706',
 };
+
+const THEME_LABELS: Record<ThemeColor, string> = {
+  indigo: 'Indigo (Standard)',
+  rose: 'Rose',
+  emerald: 'Smaragd (Emerald)',
+  amber: 'Bernstein (Amber)',
+  cyan: 'Cyan',
+  violet: 'Violett',
+  blue: 'Blau (Blue)',
+  slate: 'Schiefergrau (Slate)',
+  teal: 'Petrol (Teal)',
+  pink: 'Pink',
+  coral: 'Koralle (Coral)',
+  lime: 'Limette (Lime)',
+  grape: 'Traube (Grape)',
+  ocean: 'Ozean (Ocean)',
+  sunset: 'Sonnenuntergang (Sunset)',
+  mint: 'Minze (Mint)',
+  crimson: 'Karminrot (Crimson)',
+  gold: 'Gold',
+};
+
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -57,6 +79,30 @@ export const Setup = () => {
   const [changePwNew, setChangePwNew] = useState('');
   const [changePwConfirm, setChangePwConfirm] = useState('');
   const [isChangingPw, setIsChangingPw] = useState(false);
+
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const colorDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showColorDropdown) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target as Node)) {
+        setShowColorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [showColorDropdown]);
+
+  const handleThemeSelect = useCallback((color: ThemeColor) => {
+    updateSettings({ themeColor: color });
+    setShowColorDropdown(false);
+  }, [updateSettings]);
 
   // Google Drive State
   const [driveConnected, setDriveConnected] = useState(isDriveConnected());
@@ -277,10 +323,6 @@ export const Setup = () => {
     }
   };
   
-  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateSettings({ themeColor: e.target.value as any });
-  };
-  
   const handleFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     updateSettings({ fontSize: e.target.value as any });
   };
@@ -297,36 +339,68 @@ export const Setup = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
             Design-Farben
           </label>
-          <select
-            value={settings.themeColor}
-            onChange={handleThemeChange}
-            className="input-field"
-            style={{
-              backgroundColor: THEME_COLORS[settings.themeColor],
-              color: 'white',
-              fontWeight: 600,
-              borderColor: THEME_COLORS[settings.themeColor],
-            }}
-          >
-            <option value="indigo" style={{ backgroundColor: '#5B3FD6', color: 'white' }}>Indigo (Standard)</option>
-            <option value="rose" style={{ backgroundColor: '#F06292', color: 'white' }}>Rose</option>
-            <option value="emerald" style={{ backgroundColor: '#43C773', color: 'white' }}>Smaragd (Emerald)</option>
-            <option value="amber" style={{ backgroundColor: '#FF9F2D', color: 'white' }}>Bernstein (Amber)</option>
-            <option value="cyan" style={{ backgroundColor: '#20BFA9', color: 'white' }}>Cyan</option>
-            <option value="violet" style={{ backgroundColor: '#6C4DE6', color: 'white' }}>Violett</option>
-            <option value="slate" style={{ backgroundColor: '#64748B', color: 'white' }}>Schiefergrau (Slate)</option>
-            <option value="teal" style={{ backgroundColor: '#0D9488', color: 'white' }}>Petrol (Teal)</option>
-            <option value="pink" style={{ backgroundColor: '#DB2777', color: 'white' }}>Pink</option>
-            <option value="blue" style={{ backgroundColor: '#4B8DFF', color: 'white' }}>Blau (Blue)</option>
-            <option value="coral" style={{ backgroundColor: '#FF6B6B', color: 'white' }}>Koralle (Coral)</option>
-            <option value="lime" style={{ backgroundColor: '#84CC16', color: 'white' }}>Limette (Lime)</option>
-            <option value="grape" style={{ backgroundColor: '#A855F7', color: 'white' }}>Traube (Grape)</option>
-            <option value="ocean" style={{ backgroundColor: '#0EA5E9', color: 'white' }}>Ozean (Ocean)</option>
-            <option value="sunset" style={{ backgroundColor: '#F97316', color: 'white' }}>Sonnenuntergang (Sunset)</option>
-            <option value="mint" style={{ backgroundColor: '#10B981', color: 'white' }}>Minze (Mint)</option>
-            <option value="crimson" style={{ backgroundColor: '#DC2626', color: 'white' }}>Karminrot (Crimson)</option>
-            <option value="gold" style={{ backgroundColor: '#D97706', color: 'white' }}>Gold</option>
-          </select>
+          <div ref={colorDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowColorDropdown(v => !v)}
+              className="input-field"
+              style={{
+                backgroundColor: THEME_COLORS[settings.themeColor],
+                color: 'white',
+                fontWeight: 600,
+                borderColor: THEME_COLORS[settings.themeColor],
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <span>{THEME_LABELS[settings.themeColor] || settings.themeColor}</span>
+              <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: showColorDropdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+            </button>
+            {showColorDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '0.25rem',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-lg)',
+                zIndex: 50,
+                maxHeight: '260px',
+                overflowY: 'auto',
+              }}>
+                {(Object.keys(THEME_COLORS) as ThemeColor[]).map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => handleThemeSelect(color)}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '0.6rem 1rem',
+                      backgroundColor: THEME_COLORS[color],
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: 'var(--font-sm)',
+                      textAlign: 'left',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.15s',
+                    }}
+                    onPointerEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                    onPointerLeave={e => (e.currentTarget.style.opacity = '1')}
+                  >
+                    {THEME_LABELS[color] || color}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ marginBottom: '1.25rem' }}>
@@ -427,8 +501,7 @@ export const Setup = () => {
                     flexShrink: 0, overflow: 'hidden',
                   }}><AvatarEmoji emoji={u.avatar} size={32} /></span>
                   <strong>{u.id}</strong>
-                  {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
-                  {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}
+                  {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: '#B8BAC2' }}>(Admin)</span>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
                   {u.id !== user!.id && u.id !== 'Falko' && !u.isAdmin && (
