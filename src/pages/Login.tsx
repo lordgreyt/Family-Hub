@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../context/AuthContext';
 import { auth } from '../services/firebase';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { mockDb } from '../services/mockDb';
 import type { User } from '../services/mockDb';
-
-const EMOJI_OPTIONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🤖', '👻', '👽', '🦄'];
+import { LOGIN_EMOJI_OPTIONS } from '../data/avatarEmojis';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -15,7 +15,7 @@ export const Login = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   // For first-time setup
-  const [selectedAvatar, setSelectedAvatar] = useState(EMOJI_OPTIONS[0]);
+  const [selectedAvatar, setSelectedAvatar] = useState(LOGIN_EMOJI_OPTIONS[0]);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [tempUser, setTempUser] = useState<User | null>(null);
 
@@ -113,20 +113,20 @@ export const Login = () => {
             
             <div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
-                {EMOJI_OPTIONS.map(emoji => (
+                {LOGIN_EMOJI_OPTIONS.map(emoji => (
                   <button
                     type="button"
                     key={emoji}
                     onClick={() => setSelectedAvatar(emoji)}
                     style={{
-                      fontSize: '2rem',
-                      padding: '0.5rem',
+                      padding: '0.4rem',
                       borderRadius: 'var(--radius-md)',
                       backgroundColor: selectedAvatar === emoji ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                      border: `1px solid ${selectedAvatar === emoji ? 'var(--color-primary)' : 'var(--color-border)'}`
+                      border: `1px solid ${selectedAvatar === emoji ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      cursor: 'pointer',
                     }}
                   >
-                    {emoji}
+                    <AvatarEmoji emoji={emoji} size={44} />
                   </button>
                 ))}
               </div>

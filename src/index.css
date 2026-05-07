@@ -242,6 +242,25 @@ a {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* Avatar emoji gentle bounce */
+@keyframes avatar-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-2px) scale(1.06); }
+  60% { transform: translateY(1px) scale(0.97); }
+}
+
+.avatar-emoji-animated {
+  display: inline-block;
+  animation: avatar-bounce 2.5s ease-in-out infinite;
+  cursor: default;
+}
+
+.avatar-emoji-animated:hover {
+  animation: none;
+  transform: scale(1.2);
+  transition: transform 0.2s ease;
+}
+
 .input-field:focus {
   outline: none;
   border-color: var(--color-primary);

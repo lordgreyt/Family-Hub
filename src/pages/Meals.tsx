@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { MealTemplate, MealPlanItem, User } from '../services/mockDb';
 import { Plus, Check, X, Calendar, Utensils, Trash2 } from 'lucide-react';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 
 export const Meals = () => {
   const { user } = useAuth();
@@ -163,7 +164,7 @@ export const Meals = () => {
               return (
                 <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                   <div>
-                    <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.8rem', marginRight: '0.2rem', verticalAlign: 'middle' }}>{reqUser.avatar}</span>} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
+                    <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => handleDeleteItem(req.id)} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -446,12 +447,11 @@ export const Meals = () => {
                     height: '42px',
                     borderRadius: '50%',
                     backgroundColor: isPending ? 'var(--color-surface-muted)' : (reqUser?.avatarColor || 'var(--color-primary)'),
-                    fontSize: '1.25rem',
                     flexShrink: 0,
-                    lineHeight: 1,
                     border: isPending ? '1.5px dashed var(--color-border)' : 'none',
+                    overflow: 'hidden',
                   }}>
-                    {template.emoji}
+                    <AvatarEmoji emoji={template.emoji} size={42} />
                   </span>
 
                   {/* Middle: dish name + status */}
@@ -466,7 +466,7 @@ export const Meals = () => {
                     </span>
                     {isPending && (
                       <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        Anfrage von <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: reqUser?.avatarColor || '#6366f1', fontSize: '0.5rem' }}>{reqUser?.avatar}</span>
+                        Anfrage von {reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={14} /></span>}
                       </span>
                     )}
                   </div>

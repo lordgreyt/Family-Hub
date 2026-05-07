@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, User } from '../services/mockDb';
 import { Plus, X, Save } from 'lucide-react';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { TaskCard } from '../components/TaskCard';
 
 export const Tasks = () => {
@@ -198,7 +199,7 @@ export const Tasks = () => {
                     transition: 'all 0.2s'
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.65rem', flexShrink: 0 }}>{u.avatar}</span> {u.id}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
                 </button>
               );
             })}
@@ -301,7 +302,7 @@ export const Tasks = () => {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.65rem', flexShrink: 0 }}>{u.avatar}</span> {u.id}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
                           </button>
                         );
                       })}

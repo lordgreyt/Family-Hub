@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Video, Lock, Unlock } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
@@ -130,7 +131,7 @@ export const Rewards = () => {
                   const u = users.find(usr => usr.id === s.childId);
                   return (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{idx === 0 ? '👑 ' : ''}{u && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', fontSize: '0.7rem', flexShrink: 0 }}>{u.avatar || '👤'}</span>} {u?.id || s.childId}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{idx === 0 ? '👑 ' : ''}{u && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}>{u.avatar ? <AvatarEmoji emoji={u.avatar} size={20} /> : '👤'}</span>} {u?.id || s.childId}</span>
                           <span style={{ fontWeight: idx === 0 ? 'bold' : 'normal', color: idx === 0 ? '#f59e0b' : 'inherit' }}>{s.score}</span>
                       </div>
                   );
@@ -293,8 +294,8 @@ export const Rewards = () => {
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                           width: '36px', height: '36px', borderRadius: '50%',
                           backgroundColor: child.avatarColor || '#6366f1',
-                          fontSize: '1.15rem', flexShrink: 0,
-                        }}>{child.avatar}</span>
+                          flexShrink: 0, overflow: 'hidden',
+                        }}><AvatarEmoji emoji={child.avatar} size={36} /></span>
                         <strong style={{ fontSize: '1.1rem' }}>{child.id}</strong>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '1.2rem', fontWeight: 'bold', color: '#f59e0b' }}>
@@ -392,7 +393,7 @@ export const Rewards = () => {
                 return (
                   <div key={req.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                     <div>
-                      <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.8rem', marginRight: '0.2rem', verticalAlign: 'middle' }}>{reqUser.avatar}</span>} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
+                      <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button onClick={() => mockDb.updateRewardRequest({ ...req, status: 'REJECTED' })} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -540,7 +541,7 @@ export const Rewards = () => {
               {/* 2nd Place */}
               {rankings[1] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', backgroundColor: rankings[1].avatarColor || '#6366f1', fontSize: '1rem' }}>{rankings[1].avatar}</span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', backgroundColor: rankings[1].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[1].avatar} size={32} /></span></div>
                   {rankings[1].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -575,7 +576,7 @@ export const Rewards = () => {
               {/* 1st Place */}
               {rankings[0] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: rankings[0].avatarColor || '#6366f1', fontSize: '1.3rem' }}>{rankings[0].avatar}</span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: rankings[0].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[0].avatar} size={40} /></span></div>
                   {rankings[0].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -610,7 +611,7 @@ export const Rewards = () => {
               {/* 3rd Place */}
               {rankings[2] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: rankings[2].avatarColor || '#6366f1', fontSize: '0.85rem' }}>{rankings[2].avatar}</span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: rankings[2].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[2].avatar} size={28} /></span></div>
                   {rankings[2].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />

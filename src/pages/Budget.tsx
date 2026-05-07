@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { BudgetItem } from '../services/mockDb';
 import { Plus, Trash2, Save, X } from 'lucide-react';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 
 export const Budget = () => {
   const { user } = useAuth();
@@ -164,7 +165,7 @@ export const Budget = () => {
               onPointerCancel={cancelPress}
             >
               <div>
-                <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>{item.title} {author && <span title={item.createdBy} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: author.avatarColor || '#6366f1', fontSize: '0.7rem', flexShrink: 0 }}>{author.avatar}</span>}</div>
+                <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>{item.title} {author && <span title={item.createdBy} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: author.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={author.avatar} size={20} /></span>}</div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{item.amount.toFixed(2)} €</div>
               </div>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>

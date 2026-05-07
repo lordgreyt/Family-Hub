@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { NoteItem } from '../services/mockDb';
 import { Plus, Trash2, X, Save } from 'lucide-react';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { RichTextEditor } from '../components/RichTextEditor';
 
 const LONG_PRESS_MS = 500;
@@ -220,11 +221,10 @@ export const Notes = () => {
                   height: '42px',
                   borderRadius: '50%',
                   backgroundColor: author?.avatarColor || 'var(--color-primary)',
-                  fontSize: '1.1rem',
                   flexShrink: 0,
-                  lineHeight: 1,
+                  overflow: 'hidden',
                 }}>
-                  {author?.avatar || '📝'}
+                  {author?.avatar ? <AvatarEmoji emoji={author.avatar} size={42} /> : '📝'}
                 </span>
 
                 {/* Content */}

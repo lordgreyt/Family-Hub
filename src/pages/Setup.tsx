@@ -3,6 +3,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -382,8 +383,8 @@ export const Setup = () => {
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     width: '32px', height: '32px', borderRadius: '50%',
                     backgroundColor: u.avatarColor || '#6366f1',
-                    fontSize: '1rem', flexShrink: 0,
-                  }}>{u.avatar}</span>
+                    flexShrink: 0, overflow: 'hidden',
+                  }}><AvatarEmoji emoji={u.avatar} size={32} /></span>
                   <strong>{u.id}</strong>
                   {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Admin)</span>}
                   {u.isChild && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', opacity: 0.8, whiteSpace: 'nowrap' }}>Kindermodus</span>}

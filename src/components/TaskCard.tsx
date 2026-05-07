@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Check, CircleDashed } from 'lucide-react';
 import type { TaskItem, User } from '../services/mockDb';
+import { AvatarEmoji } from './AvatarEmoji';
 
 interface TaskCardProps {
   task: TaskItem;
@@ -203,10 +204,11 @@ export const TaskCard = ({
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          fontSize: '1.1rem',
-          lineHeight: 1,
+          overflow: 'hidden',
         }}>
-          {assignee?.avatar || (
+          {assignee?.avatar ? (
+            <AvatarEmoji emoji={assignee.avatar} size={42} />
+          ) : (
             <CircleDashed size={20} color="#FFFFFF" strokeWidth={2} />
           )}
         </div>

@@ -3,15 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { mockDb } from '../../services/mockDb';
 import { useVictron } from '../../context/VictronContext';
 import { auth } from '../../services/firebase';
+import { AvatarEmoji } from '../AvatarEmoji';
 import { X, Camera, Check, Menu, Zap } from 'lucide-react';
-
-const AVATAR_CATEGORIES: { label: string; icon: string; emojis: string[] }[] = [
-  { label: 'Menschen', icon: '👤', emojis: ['👨', '👩', '👦', '👧', '👴', '👵', '🧑', '👶', '👱', '👲', '👳', '🧔', '👷', '💂', '🕵️', '👩‍🚀', '👩‍🍳', '👩‍🏫', '👩‍🎨', '🧑‍💻'] },
-  { label: 'Tiere', icon: '🐾', emojis: ['🐱', '🐶', '🦊', '🐻', '🐼', '🦁', '🐯', '🐰', '🐵', '🐸', '🐨', '🐮', '🐷', '🐙', '🦋', '🐢', '🦜', '🐳', '🦖', '🐉'] },
-  { label: 'Fantasy', icon: '✨', emojis: ['🤖', '👻', '👽', '🦄', '🧙‍♂️', '🧚', '🧛', '🧜‍♀️', '🧝', '🧞', '🧟', '🐲', '🦹', '🦸', '👾', '🤡', '💀', '🎃'] },
-  { label: 'Aktiv', icon: '🎯', emojis: ['⚽', '🎮', '🎸', '🎨', '🚀', '🚲', '🏄', '🎭', '🔧', '🎵', '📚', '🌍', '💡', '🎪', '🏆', '🎲', '🧩', '🪁'] },
-  { label: 'Natur', icon: '🌿', emojis: ['🌻', '🌈', '⭐', '🌙', '☀️', '🌊', '🔥', '🍀', '🌵', '🌸', '🍕', '🎂', '⚡', '💎', '🌹', '🍄', '🌴', '❄️'] },
-];
+import { AVATAR_CATEGORIES } from '../../data/avatarEmojis';
 
 const AVATAR_COLORS = [
   '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#06b6d4',
@@ -163,9 +157,9 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
               width: '28px', height: '28px', borderRadius: '50%',
               backgroundColor: user.avatarColor || AVATAR_COLORS[0],
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1rem',
+              overflow: 'hidden',
             }}>
-              {user.avatar}
+              <AvatarEmoji emoji={user.avatar} size={28} />
             </span>
             <span style={{ fontWeight: 500 }}>{user.id}</span>
           </button>
@@ -228,13 +222,13 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2.5rem',
                 position: 'relative',
                 border: `3px solid ${editAvatarColor}`,
                 marginBottom: '0.5rem',
                 transition: 'background-color 0.2s, border-color 0.2s',
+                overflow: 'hidden',
               }}>
-                {editAvatar}
+                <AvatarEmoji emoji={editAvatar} size={80} />
                 <div style={{
                   position: 'absolute',
                   bottom: '-2px',
@@ -300,8 +294,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
                     key={emoji}
                     onClick={() => setEditAvatar(emoji)}
                     style={{
-                      fontSize: '1.5rem',
-                      padding: '0.4rem',
+                      padding: '0.3rem',
                       borderRadius: 'var(--radius-md)',
                       backgroundColor: editAvatar === emoji ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
                       border: editAvatar === emoji ? '2px solid var(--color-primary)' : '2px solid transparent',
@@ -313,7 +306,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
                       aspectRatio: '1',
                     }}
                   >
-                    {emoji}
+                    <AvatarEmoji emoji={emoji} size={36} />
                   </button>
                 ))}
               </div>

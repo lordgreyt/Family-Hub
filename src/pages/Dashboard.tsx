@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { NoteItem, TaskItem, User, RewardRequest } from '../services/mockDb';
+import { AvatarEmoji } from '../components/AvatarEmoji';
 import { Filter, Star, X, Save, Trash2, Wallet, TrendingDown } from 'lucide-react';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { TaskCard } from '../components/TaskCard';
@@ -246,8 +247,8 @@ export const Dashboard = () => {
                   height: '20px',
                   borderRadius: '50%',
                   backgroundColor: u.avatarColor || 'var(--color-primary)',
-                  fontSize: '0.65rem',
-                }}>{u.avatar}</span>
+                  overflow: 'hidden',
+                }}><AvatarEmoji emoji={u.avatar} size={20} /></span>
                 {u.id}
               </button>
             ))}
@@ -407,11 +408,10 @@ export const Dashboard = () => {
                     height: '42px',
                     borderRadius: '50%',
                     backgroundColor: author?.avatarColor || 'var(--color-primary)',
-                    fontSize: '1.1rem',
                     flexShrink: 0,
-                    lineHeight: 1,
+                    overflow: 'hidden',
                   }}>
-                    {author?.avatar || '📝'}
+                    {author?.avatar ? <AvatarEmoji emoji={author.avatar} size={42} /> : '📝'}
                   </span>
 
                   {/* Content */}
