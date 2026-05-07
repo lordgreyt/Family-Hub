@@ -5,9 +5,29 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.3.0',
+    date: '2026-05-07',
+    title: 'Design Refresh & UX',
+    changes: [
+      'Neues Design-System: Warme Farbpalette, weiße Karten, weiche Schatten',
+      'TaskCards: Avatar-Kreis, Datum (Tag+Monat), Status-Kreis, Long-Press-Menü',
+      'Notizen im TaskCard-Stil (Dashboard & Notizen-Seite)',
+      'TopBar mit Systemfarbe als Hintergrund, weiße Schrift',
+      'Mahlzeiten „Nächste 7 Tage" im TaskCard-Stil',
+      'Sidebar: Kompaktere Abstände, schmaler, aktiver Punkt weiß auf Systemfarbe',
+      'Seiten nutzen jetzt volle Breite (Padding vereinheitlicht)',
+      'Einstellungen: Kleinere Eingabefelder & Dropdowns',
+      'Schriftgrößen in Editor & Eingabefeldern reduziert',
+      'Fehlende Themenfarben ergänzt: Slate, Teal, Pink',
+      'N26 Depots & Historie: Mülleimer ersetzt durch Long-Press-Menü',
+      'Bugfix: Aufgaben wurden automatisch als erledigt markiert (Race Condition)',
+      'Bugfix: Doppel-Tap auf Status-Kreis öffnete Bearbeiten-Menü',
+    ],
+  },
   {
     version: '1.2.0',
     date: '2026-05-06',
