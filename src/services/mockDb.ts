@@ -210,8 +210,20 @@ function set<T>(key: string, data: T): void {
   console.log(`Syncing ${key} to Cloud...`, data);
   firebaseSet(ref(db, key), data)
     .then(() => console.log(`Cloud sync success for ${key}`))
-    .catch(e => {
+    .catch(async (e) => {
       console.error(`Firebase write error for ${key}:`, e);
+      // Revert optimistic update — re-read actual server state
+      try {
+        const snap = await firebaseGet(ref(db, key));
+        if (snap.exists()) {
+          localStorage.setItem(key, JSON.stringify(snap.val()));
+        } else {
+          localStorage.removeItem(key);
+        }
+        window.dispatchEvent(new Event('db_updated'));
+      } catch (e2) {
+        console.error(`Failed to restore ${key} from server:`, e2);
+      }
     })
     .finally(() => {
       pendingWrites.delete(key);
@@ -237,9 +249,20 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
     const safeData = serverData || [];
     return mutator(safeData);
   })
-    .catch(e => {
+    .catch(async (e) => {
       console.error(`Transaction failed for ${key}:`, e);
-      // Let the next onValue sync restore consistency from the server
+      // Revert optimistic update — re-read actual server state
+      try {
+        const snap = await firebaseGet(ref(db, key));
+        if (snap.exists()) {
+          localStorage.setItem(key, JSON.stringify(snap.val()));
+        } else {
+          localStorage.removeItem(key);
+        }
+        window.dispatchEvent(new Event('db_updated'));
+      } catch (e2) {
+        console.error(`Failed to restore ${key} from server:`, e2);
+      }
     })
     .finally(() => {
       pendingWrites.delete(key);

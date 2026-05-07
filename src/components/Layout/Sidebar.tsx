@@ -166,11 +166,14 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             bottom: 0,
             zIndex: 10000,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'center',
             padding: '1.5rem',
+            paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(4px)',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}
         >
           <div
@@ -181,8 +184,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               padding: '1.5rem',
               width: '100%',
               maxWidth: '420px',
-              maxHeight: '80vh',
-              overflowY: 'auto',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               border: '1px solid var(--color-border)',
             }}
