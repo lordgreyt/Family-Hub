@@ -607,26 +607,24 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
       >
         {/* Top Row: Name and Balance */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{depot.name || 'Unbekannt'}</h3>
-            {recentTransactions.length > 0 && (
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', opacity: 0.6 }}>
-                {recentTransactions.length} Buch.
-              </span>
-            )}
-          </div>
-          <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>{depot.name || 'Unbekannt'}</h3>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)', flexShrink: 0 }}>
             {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
           </span>
         </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0', opacity: 0.5 }} />
 
-        {/* Bottom Row: Monthly Payment */}
+        {/* Bottom Row: Count + Monthly Payment */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-            MTL. Einzahlung
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', opacity: 0.6, minWidth: '3.5rem' }}>
+              {recentTransactions.length > 0 ? `${recentTransactions.length} Buch.` : '0 Buch.'}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+              MTL. Einzahlung
+            </span>
+          </div>
           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
             {(depot.monthlyAmount || 0).toLocaleString('de-DE')} €
           </span>
