@@ -163,6 +163,8 @@ body {
   font-size: var(--font-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Kill blue flash on tap (mobile) */
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3, h4 {
@@ -316,16 +318,13 @@ a {
   box-shadow: 0 4px 14px rgba(91, 63, 214, 0.3);
 }
 
-/* Hide scrollbar for cleaner mobile look */
+/* Hide scrollbars everywhere — keep scroll functionality */
 ::-webkit-scrollbar {
-  width: 6px;
+  display: none;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 4px;
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 /* Rich Text Editor */
