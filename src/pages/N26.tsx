@@ -103,7 +103,7 @@ export const N26 = () => {
       overflowY: 'auto'
     }}>
       {/* Content Area */}
-      <div style={{ flex: 1, padding: '1rem' }}>
+      <div style={{ flex: 1 }}>
         {activeTab === 'dashboard' && (
           <DashboardView 
             depots={depots} 
