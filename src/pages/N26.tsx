@@ -463,14 +463,16 @@ const DepotsView = ({ depots, calculateBalance, onDelete, onAdd, onEdit }: { dep
 
 const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance: number, onDelete: (id: string) => void, onEdit: () => void }) => {
   const [isPressing, setIsPressing] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const startPress = () => {
     setIsPressing(true);
     timerRef.current = setTimeout(() => {
-      onEdit();
+      setShowActions(true);
       setIsPressing(false);
-    }, 600); // 600ms long press
+    }, 500);
   };
 
   const cancelPress = () => {
@@ -478,64 +480,123 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
     if (timerRef.current) clearTimeout(timerRef.current);
   };
 
-  return (
-    <div 
-      onPointerDown={startPress}
-      onPointerUp={cancelPress}
-      onPointerLeave={cancelPress}
-      style={{ 
-        padding: '0.75rem 1.25rem', 
-        backgroundColor: 'var(--color-surface)', 
-        borderRadius: 'var(--radius-lg)', 
-        border: '1px solid',
-        borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.25rem',
-        boxShadow: 'var(--shadow-sm)',
-        position: 'relative',
-        transition: 'all 0.2s ease',
-        transform: isPressing ? 'scale(0.98)' : 'scale(1)',
-        cursor: 'pointer',
-        userSelect: 'none'
-      }}
-    >
-      {/* Top Row: Name and Balance */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{depot.name || 'Unbekannt'}</h3>
-        </div>
-        <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-          {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
-        </span>
-      </div>
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showActions) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setShowActions(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [showActions]);
 
-      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0', opacity: 0.5 }} />
-      
-      {/* Bottom Row: Monthly Payment */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-          MTL. Einzahlung
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+  const handleEdit = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setShowActions(false);
+    onEdit();
+  };
+
+  const handleDelete = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setShowActions(false);
+    if (confirm(`Depot "${depot.name}" wirklich löschen?`)) onDelete(depot.id);
+  };
+
+  return (
+    <div ref={cardRef} style={{ position: 'relative' }}>
+      {/* Action Popover */}
+      {showActions && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: '1rem',
+          marginTop: '0.25rem',
+          zIndex: 50,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: '0 8px 24px rgba(20, 25, 50, 0.15)',
+          border: '1px solid var(--color-border)',
+          overflow: 'hidden',
+          animation: 'slideDown 0.15s ease',
+          minWidth: '160px',
+        }}>
+          <button
+            onClick={handleEdit}
+            onTouchEnd={handleEdit}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              width: '100%', padding: '0.7rem 1rem',
+              border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 'var(--font-sm)', fontWeight: 500,
+              color: 'var(--color-text)',
+              borderBottom: '1px solid var(--color-border)',
+            }}
+          >
+            Bearbeiten
+          </button>
+          <button
+            onClick={handleDelete}
+            onTouchEnd={handleDelete}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              width: '100%', padding: '0.7rem 1rem',
+              border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 'var(--font-sm)', fontWeight: 500,
+              color: 'var(--color-danger)',
+            }}
+          >
+            Löschen
+          </button>
+        </div>
+      )}
+
+      <div
+        onPointerDown={startPress}
+        onPointerUp={cancelPress}
+        onPointerLeave={cancelPress}
+        onClick={() => showActions && setShowActions(false)}
+        style={{
+          padding: '0.75rem 1.25rem',
+          backgroundColor: 'var(--color-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid',
+          borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.25rem',
+          boxShadow: 'var(--shadow-sm)',
+          transition: 'all 0.2s ease',
+          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        {/* Top Row: Name and Balance */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{depot.name || 'Unbekannt'}</h3>
+          </div>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+            {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+          </span>
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0', opacity: 0.5 }} />
+
+        {/* Bottom Row: Monthly Payment */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            MTL. Einzahlung
+          </span>
           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
             {(depot.monthlyAmount || 0).toLocaleString('de-DE')} €
           </span>
-          <button 
-            onClick={(e) => { e.stopPropagation(); if(confirm(`Depot "${depot.name}" wirklich löschen?`)) onDelete(depot.id); }}
-            style={{ 
-              color: 'var(--color-danger)', 
-              opacity: 0.3, 
-              padding: '0.2rem', 
-              background: 'none', 
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              cursor: 'pointer'
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
       </div>
     </div>
@@ -612,16 +673,110 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
   );
 };
 
+const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?: Depot, onDelete: (id: string) => void }) => {
+  const [isPressing, setIsPressing] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const startPress = () => {
+    setIsPressing(true);
+    timerRef.current = setTimeout(() => {
+      setShowActions(true);
+      setIsPressing(false);
+    }, 500);
+  };
+  const cancelPress = () => {
+    setIsPressing(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  };
+  useEffect(() => {
+    if (!showActions) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) setShowActions(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [showActions]);
+
+  const handleDelete = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setShowActions(false);
+    if (confirm('Diese Buchung wirklich löschen?')) onDelete(tx.id);
+  };
+
+  return (
+    <div ref={cardRef} style={{ position: 'relative' }}>
+      {showActions && (
+        <div style={{
+          position: 'absolute', top: '100%', right: '1rem', marginTop: '0.25rem', zIndex: 50,
+          backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-md)',
+          boxShadow: '0 8px 24px rgba(20, 25, 50, 0.15)', border: '1px solid var(--color-border)',
+          overflow: 'hidden', animation: 'slideDown 0.15s ease', minWidth: '160px',
+        }}>
+          <button
+            onClick={handleDelete}
+            onTouchEnd={handleDelete}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none',
+              cursor: 'pointer', fontSize: 'var(--font-sm)', fontWeight: 500, color: 'var(--color-danger)',
+            }}
+          >
+            Löschen
+          </button>
+        </div>
+      )}
+      <div
+        onPointerDown={startPress}
+        onPointerUp={cancelPress}
+        onPointerLeave={cancelPress}
+        onClick={() => showActions && setShowActions(false)}
+        style={{
+          padding: '0.75rem 1.25rem', backgroundColor: 'var(--color-surface)',
+          borderRadius: 'var(--radius-lg)', border: '1px solid',
+          borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
+          display: 'flex', flexDirection: 'column', gap: '0.25rem',
+          boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s ease',
+          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
+          cursor: 'pointer', userSelect: 'none',
+          opacity: (tx.isAutomated || tx.note?.includes('Sparrate')) ? 0.7 : 1,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>{depot?.name || 'Unbekannt'}</span>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: tx.amount >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+            {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+          </span>
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0', opacity: 0.5 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {tx.note || 'Buchung'}
+          </span>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+            {new Date(tx.date).toLocaleDateString('de-DE')}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: number, isClosed: boolean, transactions: DepotTransaction[], depots: Depot[], onDelete: (id: string) => void }) => {
   const [isExpanded, setIsExpanded] = useState(!isClosed);
   const currentYear = new Date().getFullYear();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <button 
+      <button
         onClick={() => setIsExpanded(!isExpanded)}
-        style={{ 
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           width: '100%', padding: '0.5rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer'
         }}
       >
@@ -643,54 +798,7 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
           {transactions.map(tx => {
             const depot = depots.find(d => d.id === tx.depotId);
             return (
-              <div key={tx.id} style={{ 
-                padding: '0.75rem 1.25rem', 
-                backgroundColor: 'var(--color-surface)', 
-                borderRadius: 'var(--radius-lg)', 
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.25rem',
-                boxShadow: 'var(--shadow-sm)',
-                opacity: (tx.isAutomated || tx.note?.includes('Sparrate')) ? 0.7 : 1
-              }}>
-                {/* Top Row: Depot Name and Amount */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: '15px' }}>{depot?.name || 'Unbekannt'}</span>
-                  <span style={{ fontSize: '15px', fontWeight: 800, color: tx.amount >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                    {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
-                  </span>
-                </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0', opacity: 0.5 }} />
-                
-                {/* Bottom Row: Note and Date/Delete */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {tx.note || 'Buchung'}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                      {new Date(tx.date).toLocaleDateString('de-DE')}
-                    </span>
-                    <button 
-                      onClick={() => { if(confirm('Diese Buchung wirklich löschen?')) onDelete(tx.id); }}
-                      style={{ 
-                        color: 'var(--color-danger)', 
-                        opacity: 0.3, 
-                        padding: '0.2rem', 
-                        background: 'none', 
-                        border: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <TransactionCard key={tx.id} tx={tx} depot={depot} onDelete={onDelete} />
             );
           })}
         </div>
