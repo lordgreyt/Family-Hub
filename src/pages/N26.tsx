@@ -113,10 +113,11 @@ export const N26 = () => {
           />
         )}
         {activeTab === 'depots' && (
-          <DepotsView 
-            depots={depots} 
-            calculateBalance={calculateBalance} 
-            onDelete={(id) => mockDb.deleteDepot(id)} 
+          <DepotsView
+            depots={depots}
+            transactions={transactions}
+            calculateBalance={calculateBalance}
+            onDelete={(id) => mockDb.deleteDepot(id)}
             onAdd={() => setShowAddDepotForm(true)}
             onEdit={(depot) => setEditingDepot(depot)}
           />
@@ -363,7 +364,7 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
   );
 };
 
-const DepotsView = ({ depots, calculateBalance, onDelete, onAdd, onEdit }: { depots: Depot[], calculateBalance: (d: Depot) => number, onDelete: (id: string) => void, onAdd: () => void, onEdit: (d: Depot) => void }) => {
+const DepotsView = ({ depots, transactions, calculateBalance, onDelete, onAdd, onEdit }: { depots: Depot[], transactions: DepotTransaction[], calculateBalance: (d: Depot) => number, onDelete: (id: string) => void, onAdd: () => void, onEdit: (d: Depot) => void }) => {
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'monthly'>('name');
   const [isAsc, setIsAsc] = useState(true);
 
@@ -449,35 +450,56 @@ const DepotsView = ({ depots, calculateBalance, onDelete, onAdd, onEdit }: { dep
       </div>
 
       {sortedDepots.map(depot => (
-        <DepotCard 
-          key={depot.id} 
-          depot={depot} 
-          balance={calculateBalance(depot)} 
-          onDelete={onDelete} 
-          onEdit={() => onEdit(depot)} 
+        <DepotCard
+          key={depot.id}
+          depot={depot}
+          balance={calculateBalance(depot)}
+          transactions={transactions}
+          onDelete={onDelete}
+          onEdit={() => onEdit(depot)}
         />
       ))}
     </div>
   );
 };
 
-const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance: number, onDelete: (id: string) => void, onEdit: () => void }) => {
+const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: Depot, balance: number, transactions: DepotTransaction[], onDelete: (id: string) => void, onEdit: () => void }) => {
   const [isPressing, setIsPressing] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const wasLongPress = useRef(false);
+
+  const recentTransactions = useMemo(() => {
+    return transactions
+      .filter(t => t.depotId === depot.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+  }, [transactions, depot.id]);
 
   const startPress = () => {
+    wasLongPress.current = false;
     setIsPressing(true);
     timerRef.current = setTimeout(() => {
+      wasLongPress.current = true;
       setShowActions(true);
       setIsPressing(false);
     }, 500);
   };
 
-  const cancelPress = () => {
+  const endPress = () => {
     setIsPressing(false);
     if (timerRef.current) clearTimeout(timerRef.current);
+  };
+
+  const handleClick = () => {
+    if (wasLongPress.current) return;
+    if (showActions) {
+      setShowActions(false);
+      return;
+    }
+    setExpanded(v => !v);
   };
 
   // Close popover on outside click
@@ -506,6 +528,11 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
     e.stopPropagation();
     setShowActions(false);
     if (confirm(`Depot "${depot.name}" wirklich löschen?`)) onDelete(depot.id);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
   return (
@@ -558,15 +585,16 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
 
       <div
         onPointerDown={startPress}
-        onPointerUp={cancelPress}
-        onPointerLeave={cancelPress}
-        onClick={() => showActions && setShowActions(false)}
+        onPointerUp={endPress}
+        onPointerLeave={endPress}
+        onClick={handleClick}
         style={{
           padding: '0.75rem 1.25rem',
           backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: expanded ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
           border: '1px solid',
-          borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
+          borderColor: isPressing || expanded ? 'var(--color-primary)' : 'var(--color-border)',
+          borderBottom: expanded ? 'none' : undefined,
           display: 'flex',
           flexDirection: 'column',
           gap: '0.25rem',
@@ -581,6 +609,11 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{depot.name || 'Unbekannt'}</h3>
+            {recentTransactions.length > 0 && (
+              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', opacity: 0.6 }}>
+                {recentTransactions.length} Buch.
+              </span>
+            )}
           </div>
           <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
             {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
@@ -599,6 +632,66 @@ const DepotCard = ({ depot, balance, onDelete, onEdit }: { depot: Depot, balance
           </span>
         </div>
       </div>
+
+      {/* Expanded Transactions */}
+      {expanded && recentTransactions.length > 0 && (
+        <div style={{
+          backgroundColor: '#FAFAFB',
+          borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+          border: '1px solid var(--color-primary)',
+          borderTop: 'none',
+          overflow: 'hidden',
+          animation: 'slideDown 0.2s ease',
+        }}>
+          {recentTransactions.map((tx, i) => (
+            <div
+              key={tx.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0.55rem 1.25rem',
+                borderBottom: i < recentTransactions.length - 1 ? '1px solid var(--color-border)' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text)' }}>
+                  {tx.note || 'Buchung'}
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                  {formatDate(tx.date)}
+                  {tx.isAutomated && (
+                    <span style={{ marginLeft: '0.4rem', color: 'var(--color-primary)', fontWeight: 600 }}>Auto</span>
+                  )}
+                </span>
+              </div>
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: tx.amount >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
+              }}>
+                {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {expanded && recentTransactions.length === 0 && (
+        <div style={{
+          backgroundColor: '#FAFAFB',
+          borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+          border: '1px solid var(--color-primary)',
+          borderTop: 'none',
+          padding: '1rem',
+          textAlign: 'center',
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+          animation: 'slideDown 0.2s ease',
+        }}>
+          Noch keine Buchungen
+        </div>
+      )}
     </div>
   );
 };
