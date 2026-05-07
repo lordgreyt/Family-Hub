@@ -206,7 +206,7 @@ function set<T>(key: string, data: T): void {
   window.dispatchEvent(new Event('db_updated'));
 
   // 2. Push to Cloud — block incoming syncs until write settles
-  pendingWrites.add(key);
+  addPending(key);
   console.log(`Syncing ${key} to Cloud...`, data);
   firebaseSet(ref(db, key), data)
     .then(() => console.log(`Cloud sync success for ${key}`))
@@ -226,14 +226,25 @@ function set<T>(key: string, data: T): void {
       }
     })
     .finally(() => {
-      pendingWrites.delete(key);
+      removePending(key);
     });
 }
 
 // Track keys with in-flight Firebase writes to prevent incoming syncs from
-// overwriting optimistic local updates (e.g., toggling a task, then onValue
-// fires before the transaction commits and reverts the toggle).
-const pendingWrites = new Set<string>();
+// overwriting optimistic local updates. Ref-counted to handle concurrent writes
+// to the same key (e.g., toggleTask transaction + getTasks migration set()).
+const pendingWrites = new Map<string, number>();
+function addPending(key: string) {
+  pendingWrites.set(key, (pendingWrites.get(key) || 0) + 1);
+}
+function removePending(key: string) {
+  const count = pendingWrites.get(key) || 0;
+  if (count <= 1) {
+    pendingWrites.delete(key);
+  } else {
+    pendingWrites.set(key, count - 1);
+  }
+}
 
 // Atomic helper: Uses Firebase runTransaction to prevent race conditions from stale clients.
 function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): void {
@@ -244,20 +255,26 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
   window.dispatchEvent(new Event('db_updated'));
 
   // 2. Atomic Cloud Sync — block incoming syncs until transaction settles
-  pendingWrites.add(key);
+  addPending(key);
+  console.log(`🔄 updateCollection: starting transaction on ${key} (pendingWrites count: ${pendingWrites.get(key)})`);
   runTransaction(ref(db, key), (serverData) => {
     const safeData = serverData || [];
     return mutator(safeData);
   })
+    .then((result) => {
+      console.log(`✅ Transaction committed for ${key}`, result.snapshot.val());
+    })
     .catch(async (e) => {
-      console.error(`Transaction failed for ${key}:`, e);
+      console.error(`❌ Transaction failed for ${key}:`, e);
       // Revert optimistic update — re-read actual server state
       try {
         const snap = await firebaseGet(ref(db, key));
         if (snap.exists()) {
           localStorage.setItem(key, JSON.stringify(snap.val()));
+          console.log(`↩️ Reverted ${key} to server state after transaction failure`);
         } else {
           localStorage.removeItem(key);
+          console.log(`↩️ Removed ${key} from localStorage after transaction failure (server empty)`);
         }
         window.dispatchEvent(new Event('db_updated'));
       } catch (e2) {
@@ -265,7 +282,8 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
       }
     })
     .finally(() => {
-      pendingWrites.delete(key);
+      removePending(key);
+      console.log(`🔓 Released ${key} (pendingWrites count: ${pendingWrites.get(key) || 0})`);
     });
 }
 
@@ -315,7 +333,9 @@ export const initFirebase = async () => {
   }
 
   // 2. Attach global real-time listener to sync remote changes to local cache
+  console.log('🔌 Attaching onValue listener to Firebase...');
   onValue(rootRef, (snap) => {
+    console.log('📡 onValue fired — Firebase data received');
     const remoteData = snap.val();
     if (remoteData) {
       let changed = false;
@@ -323,11 +343,21 @@ export const initFirebase = async () => {
         const key = DB_KEYS[k as keyof typeof DB_KEYS];
         // Skip keys that have an in-flight local write — prevent overwriting
         // optimistic updates before the Firebase transaction commits
-        if (pendingWrites.has(key)) return;
+        if (pendingWrites.has(key)) {
+          console.log(`⏭️ onValue skip ${key} (pendingWrites count: ${pendingWrites.get(key)})`);
+          return;
+        }
         if (remoteData[key] !== undefined) {
           const currentLocal = localStorage.getItem(key);
           const newLocal = JSON.stringify(remoteData[key]);
           if (currentLocal !== newLocal) {
+            // Log task state changes specifically
+            if (key === DB_KEYS.TASKS) {
+              const oldTasks = currentLocal ? JSON.parse(currentLocal) : [];
+              const newTasks = JSON.parse(newLocal);
+              const doneDelta = newTasks.filter((t: any) => t.isDone).length - oldTasks.filter((t: any) => t.isDone).length;
+              console.log(`📡 onValue SYNC tasks: ${oldTasks.length}→${newTasks.length} total, done delta: ${doneDelta > 0 ? '+' : ''}${doneDelta} | pendingWrites count: ${pendingWrites.get(key) || 0}`);
+            }
             localStorage.setItem(key, newLocal);
             changed = true;
           }
@@ -540,14 +570,16 @@ export const mockDb = {
   toggleTask: (id: string, starPoints?: number) => {
     const tasks = mockDb.getTasks();
     const users = mockDb.getUsers();
-    
+
     // We get the local state to determine the toggle direction.
     // The transaction will apply this direction to whatever the server state is.
     const localTask = tasks.find(t => t.id === id);
     if (!localTask) return;
-    
+
     const newIsDone = !localTask.isDone;
     const completedAt = newIsDone ? Date.now() : undefined;
+
+    console.log(`🔄 toggleTask("${localTask.content.substring(0, 30)}"): isDone ${localTask.isDone} → ${newIsDone} | pendingWrites count: ${pendingWrites.get(DB_KEYS.TASKS) || 0}`);
 
     updateCollection<TaskItem>(DB_KEYS.TASKS, currentTasks => 
       currentTasks.map(t => {
