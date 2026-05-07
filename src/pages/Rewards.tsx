@@ -411,7 +411,6 @@ export const Rewards = () => {
 
         {wallOfFame}
         {videoRewardsSection}
-        <div style={{ height: '4rem' }}></div>
       </div>
     );
   }
@@ -848,7 +847,6 @@ export const Rewards = () => {
         </div>
       </div>
       
-      <div style={{ height: '4rem' }}></div>
     </div>
   );
 };

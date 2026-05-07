@@ -204,16 +204,24 @@ function set<T>(key: string, data: T): void {
   // 1. Optimistic Local Update
   localStorage.setItem(key, JSON.stringify(data));
   window.dispatchEvent(new Event('db_updated'));
-  
-  // 2. Push to Cloud
+
+  // 2. Push to Cloud — block incoming syncs until write settles
+  pendingWrites.add(key);
   console.log(`Syncing ${key} to Cloud...`, data);
   firebaseSet(ref(db, key), data)
     .then(() => console.log(`Cloud sync success for ${key}`))
     .catch(e => {
       console.error(`Firebase write error for ${key}:`, e);
-      // Optional: notify user of sync error
+    })
+    .finally(() => {
+      pendingWrites.delete(key);
     });
 }
+
+// Track keys with in-flight Firebase writes to prevent incoming syncs from
+// overwriting optimistic local updates (e.g., toggling a task, then onValue
+// fires before the transaction commits and reverts the toggle).
+const pendingWrites = new Set<string>();
 
 // Atomic helper: Uses Firebase runTransaction to prevent race conditions from stale clients.
 function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): void {
@@ -223,11 +231,21 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
   localStorage.setItem(key, JSON.stringify(newLocal));
   window.dispatchEvent(new Event('db_updated'));
 
-  // 2. Atomic Cloud Sync
+  // 2. Atomic Cloud Sync — block incoming syncs until transaction settles
+  pendingWrites.add(key);
   runTransaction(ref(db, key), (serverData) => {
     const safeData = serverData || [];
     return mutator(safeData);
-  }).catch(e => console.error(`Transaction failed for ${key}:`, e));
+  })
+    .catch(e => {
+      console.error(`Transaction failed for ${key}:`, e);
+      // Revert optimistic update on failure — reload from server
+      localStorage.removeItem(key);
+      window.dispatchEvent(new Event('db_updated'));
+    })
+    .finally(() => {
+      pendingWrites.delete(key);
+    });
 }
 
 let isInitialized = false;
@@ -282,6 +300,9 @@ export const initFirebase = async () => {
       let changed = false;
       Object.keys(DB_KEYS).forEach(k => {
         const key = DB_KEYS[k as keyof typeof DB_KEYS];
+        // Skip keys that have an in-flight local write — prevent overwriting
+        // optimistic updates before the Firebase transaction commits
+        if (pendingWrites.has(key)) return;
         if (remoteData[key] !== undefined) {
           const currentLocal = localStorage.getItem(key);
           const newLocal = JSON.stringify(remoteData[key]);

@@ -517,9 +517,6 @@ export const Meals = () => {
         </div>
       </div>
       
-      {/* Bottom padding for mobile nav */}
-      <div style={{ height: '4rem' }}></div>
-      
     </div>
   );
 };

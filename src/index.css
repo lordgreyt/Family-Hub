@@ -263,7 +263,7 @@ a {
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem 1.25rem 5rem 1.25rem;
+  padding: 1.25rem 1.25rem 1rem 1.25rem;
 }
 
 /* Chip / Pill filter button */
