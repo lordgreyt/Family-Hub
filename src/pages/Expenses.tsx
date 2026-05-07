@@ -62,8 +62,123 @@ export const Expenses = () => {
       }, {} as Record<string, number>);
 
     const balance = (Number(currentBudget) || 0) + (Number(totalIn) || 0) - (Number(totalOut) || 0);
-    return { totalOut, totalIn, byCategory, balance };
+    const budgetUsed = (Number(currentBudget) || 0) > 0 ? (totalOut / Number(currentBudget)) * 100 : 0;
+    return { totalOut, totalIn, byCategory, balance, budgetUsed };
   }, [monthExpenses, currentBudget]);
+
+  // --- Gamification: 3-Monats-Durchschnitt pro Kategorie ---
+  const categoryTrends = useMemo(() => {
+    const [y, m] = currentMonth.split('-').map(Number);
+    const prevMonths: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(y, m - 1, 1);
+      d.setMonth(d.getMonth() - i);
+      prevMonths.push(`${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`);
+    }
+
+    const prevExpenses = expenses.filter(e => {
+      const eMonth = e.budgetMonth || e.date.substring(0, 7);
+      return prevMonths.includes(eMonth) && e.type === 'EXPENSE';
+    });
+
+    const prevByCategory: Record<string, { total: number; months: number }> = {};
+    prevExpenses.forEach(e => {
+      if (!prevByCategory[e.category]) prevByCategory[e.category] = { total: 0, months: 0 };
+      prevByCategory[e.category].total += e.amount;
+    });
+    // Count distinct months each category appeared in
+    const catMonths = new Set<string>();
+    prevExpenses.forEach(e => {
+      const eMonth = e.budgetMonth || e.date.substring(0, 7);
+      catMonths.add(`${e.category}::${eMonth}`);
+    });
+    catMonths.forEach(key => {
+      const [cat] = key.split('::');
+      if (prevByCategory[cat]) prevByCategory[cat].months++;
+    });
+
+    const trends: { category: string; current: number; avg: number; change: number; changePct: number }[] = [];
+    Object.entries(stats.byCategory).forEach(([cat, current]) => {
+      const prev = prevByCategory[cat];
+      const avgMonths = prev?.months || 3;
+      const avg = prev ? prev.total / Math.max(avgMonths, 1) : current;
+      const change = current - avg;
+      const changePct = avg > 0 ? (change / avg) * 100 : 0;
+      trends.push({ category: cat, current, avg, change, changePct });
+    });
+
+    trends.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+    return trends;
+  }, [expenses, currentMonth, stats.byCategory]);
+
+  // --- Gamification: Erfolgsmeldung ---
+  const successMessage = useMemo(() => {
+    const messages: { text: string; emoji: string; color: string }[] = [];
+
+    // Budget-Auslastung check (based on day of month progress)
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayProgress = now.getDate() / daysInMonth;
+    const budgetProgress = stats.budgetUsed / 100;
+
+    if (stats.budgetUsed <= 50 && dayProgress > 0.5) {
+      messages.push({ text: `Erst ${Math.round(stats.budgetUsed)}% vom Budget verbraucht — und der Monat ist schon halb rum!`, emoji: '🔥', color: 'var(--color-success)' });
+    } else if (stats.budgetUsed <= 75 && dayProgress > 0.6) {
+      messages.push({ text: `Gut im Plan: ${Math.round(stats.budgetUsed)}% Budget verbraucht bei ${Math.round(dayProgress * 100)}% des Monats.`, emoji: '👍', color: 'var(--color-primary)' });
+    } else if (stats.budgetUsed >= 90 && dayProgress < 0.8) {
+      messages.push({ text: `Achtung: Schon ${Math.round(stats.budgetUsed)}% des Budgets aufgebraucht.`, emoji: '⚠️', color: 'var(--color-orange)' });
+    }
+
+    // Beste Kategorie-Trends (positive = weniger ausgegeben)
+    const bestTrend = categoryTrends.find(t => t.changePct < -10 && t.current > 0);
+    if (bestTrend) {
+      messages.push({ text: `"${bestTrend.category}": ${Math.abs(Math.round(bestTrend.changePct))}% weniger als im Schnitt!`, emoji: '📉', color: 'var(--color-success)' });
+    }
+
+    // Fallback
+    if (messages.length === 0 && stats.balance > 0) {
+      messages.push({ text: `Noch ${stats.balance.toFixed(0)}€ verfügbar diesen Monat.`, emoji: '💰', color: 'var(--color-primary)' });
+    } else if (messages.length === 0) {
+      messages.push({ text: `Weiter so — jeder Eintrag hilft, den Überblick zu behalten.`, emoji: '📊', color: 'var(--color-text-muted)' });
+    }
+
+    // Return the best (first positive) message
+    const positive = messages.find(m => m.color === 'var(--color-success)');
+    return positive || messages[0];
+  }, [stats, categoryTrends]);
+
+  // --- Gamification: Consecutive months under budget ---
+  const underBudgetStreak = useMemo(() => {
+    const [y, m] = currentMonth.split('-').map(Number);
+    const currentDate = new Date(y, m - 1, 1);
+    let streak = stats.balance >= 0 ? 0 : -1;
+    if (streak === -1) return 0;
+
+    for (let i = 0; i < 12; i++) {
+      const checkDate = new Date(currentDate);
+      checkDate.setMonth(checkDate.getMonth() - i);
+      const checkMonth = `${checkDate.getFullYear()}-${(checkDate.getMonth() + 1).toString().padStart(2, '0')}`;
+
+      const monthExps = expenses.filter(e => {
+        const eMonth = e.budgetMonth || e.date.substring(0, 7);
+        return eMonth === checkMonth;
+      });
+      const out = monthExps.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
+      const inc = monthExps.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
+      const b = budgets.find(b => b.month === checkMonth);
+      const bAmount = b ? b.amount : (budgets.length > 0 ? budgets.sort((a, b2) => b2.month.localeCompare(a.month))[0].amount : 0);
+      const bal = bAmount + inc - out;
+
+      if (bal >= 0 && i === streak) {
+        streak++;
+      } else if (bal < 0 && i === 0) {
+        return 0;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }, [expenses, budgets, currentMonth, stats.balance]);
 
   const handlePrevMonth = () => {
     const [y, m] = currentMonth.split('-').map(Number);
@@ -161,6 +276,23 @@ export const Expenses = () => {
 
   return (
     <div style={{ paddingBottom: '8rem' }}>
+      {/* Success Banner */}
+      {successMessage && (
+        <div className="glass-panel" style={{
+          marginBottom: '0.75rem',
+          padding: '0.65rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>{successMessage.emoji}</span>
+          <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-text)', flex: 1 }}>
+            {successMessage.text}
+          </span>
+        </div>
+      )}
+
       {/* Header with Navigation */}
       <div style={{ 
         display: 'flex', 
@@ -229,69 +361,93 @@ export const Expenses = () => {
         </div>
 
         <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem', marginBottom: '0.1rem', fontWeight: 500 }}>VERFÜGBAR</p>
-          
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
-            <button 
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem', marginBottom: '0.5rem', fontWeight: 500 }}>BUDGET</p>
+
+          {/* Budget Progress Ring */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+            <button
               onClick={() => setViewMode(viewMode === 'CHART' ? 'DAILY' : 'CHART')}
-              style={{ color: 'var(--color-text-muted)', padding: '0.5rem', opacity: 0.6 }}
+              style={{ color: 'var(--color-text-muted)', padding: '0.5rem', opacity: 0.6, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               <Menu size={18} />
             </button>
 
-            <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 700, color: stats.balance >= 0 ? 'var(--color-primary)' : 'var(--color-danger)' }}>
-              {stats.balance.toFixed(2)}€
-            </h2>
+            <div style={{ position: 'relative', width: '140px', height: '140px' }}>
+              <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                {/* Background circle */}
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-border)" strokeWidth="4.5" />
+                {/* Progress arc */}
+                <circle
+                  cx="18" cy="18" r="15.5" fill="none"
+                  stroke="var(--color-primary)"
+                  strokeWidth="4.5"
+                  strokeLinecap="round"
+                  strokeDasharray={`${Math.min(stats.budgetUsed, 100) * 0.974} 97.4`}
+                  style={{ transition: 'stroke-dasharray 0.6s ease' }}
+                />
+                {/* Milestone dots */}
+                {[25, 50, 75, 100].map(pct => {
+                  const angle = (pct / 100) * 2 * Math.PI - Math.PI / 2;
+                  const dotX = 18 + 15.5 * Math.cos(angle);
+                  const dotY = 18 + 15.5 * Math.sin(angle);
+                  const passed = stats.budgetUsed >= pct;
+                  return (
+                    <circle key={pct} cx={dotX} cy={dotY} r="2"
+                      fill={passed ? 'var(--color-primary)' : 'var(--color-border)'}
+                      style={{ transition: 'fill 0.4s ease' }}
+                    />
+                  );
+                })}
+              </svg>
+              {/* Center text */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{
+                  fontSize: '1.4rem', fontWeight: 800,
+                  color: 'var(--color-primary)',
+                  lineHeight: 1,
+                }}>
+                  {Math.round(stats.budgetUsed)}%
+                </span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  {stats.balance >= 0 ? `+${stats.balance.toFixed(0)}€` : `${stats.balance.toFixed(0)}€`}
+                </span>
+                {underBudgetStreak >= 3 && (
+                  <span style={{ fontSize: '0.8rem', marginTop: '1px' }}>🔥</span>
+                )}
+              </div>
+            </div>
 
-            <button 
+            <button
               onClick={() => {
                 if (viewMode === 'CHART') setViewMode('DAILY');
                 else if (viewMode === 'DAILY') setViewMode('CATEGORY');
                 else setViewMode('CHART');
               }}
-              style={{ color: 'var(--color-text-muted)', padding: '0.5rem', opacity: 0.6 }}
+              style={{ color: 'var(--color-text-muted)', padding: '0.5rem', opacity: 0.6, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               {viewMode === 'CHART' ? <Menu size={18} /> : viewMode === 'DAILY' ? <Tag size={18} /> : <PieChart size={18} />}
             </button>
           </div>
+          {underBudgetStreak >= 3 && (
+            <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.6rem', fontWeight: 600, color: 'var(--color-success)', textAlign: 'center' }}>
+              {underBudgetStreak} Monate in Folge im Plus!
+            </p>
+          )}
         </div>
       </div>
 
       {/* Dynamic View Content */}
-      <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '2rem', minHeight: '300px' }}>
+      <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
         {viewMode === 'CHART' && (
           <>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
               <TrendingDown size={18} color="var(--color-danger)" /> Ausgaben nach Kategorien
             </h3>
-            
-            <div style={{ position: 'relative', width: '180px', height: '180px', margin: '0 auto' }}>
-              {totalCategoryVal > 0 ? (
-                <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
-                  {chartData.map((data, index) => {
-                    const startPercent = cumulativePercent;
-                    const slicePercent = data.value / totalCategoryVal;
-                    const [startX, startY] = getCoordinatesForPercent(startPercent);
-                    cumulativePercent += slicePercent;
-                    const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
-                    const largeArcFlag = slicePercent > 0.5 ? 1 : 0;
-                    const pathData = [
-                      `M ${startX} ${startY}`,
-                      `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-                      `L 0 0`,
-                    ].join(' ');
-                    return <path key={index} d={pathData} fill={colors[index % colors.length]} />;
-                  })}
-                  <circle r="0.6" fill="var(--color-surface)" />
-                </svg>
-              ) : (
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: '8px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                  Keine Daten
-                </div>
-              )}
-            </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               {[...chartData].sort((a,b) => b.value - a.value).map((d, i) => (
                 <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: colors[chartData.indexOf(d) % colors.length] }} />
@@ -447,75 +603,126 @@ export const Expenses = () => {
         )}
       </div>
 
+      {/* Category Trend Arrows — Top 5 by change */}
+      {categoryTrends.filter(t => Math.abs(t.changePct) >= 5).length > 0 && (
+        <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--color-text)' }}>
+            <TrendingDown size={16} color="var(--color-primary)" /> Größte Veränderungen
+            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: '0.25rem' }}>(vs. 3-Monats-Schnitt)</span>
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {categoryTrends.filter(t => Math.abs(t.changePct) >= 5).slice(0, 5).map(t => {
+              const isDown = t.changePct < 0;
+              return (
+                <div key={t.category} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '0.45rem 0',
+                  borderBottom: '1px solid var(--color-border)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      display: 'flex', alignItems: 'center', gap: '0.15rem',
+                      fontSize: '0.75rem', fontWeight: 700,
+                      color: isDown ? 'var(--color-success)' : 'var(--color-danger)',
+                    }}>
+                      {isDown ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                      {Math.abs(Math.round(t.changePct))}%
+                    </span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--color-text)' }}>{t.category}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                      {t.current.toFixed(0)}€
+                    </span>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginLeft: '0.3rem' }}>
+                      Ø {t.avg.toFixed(0)}€
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Fixed Footer with Buttons */}
-      <div style={{ 
-        position: 'fixed', 
-        bottom: 0, 
-        left: 0, 
-        right: 0, 
-        backgroundColor: 'var(--color-surface)', 
-        padding: '1rem',
-        display: 'flex', 
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'var(--color-primary-gradient)',
+        height: '40px',
+        display: 'flex',
         justifyContent: 'center',
-        gap: '2rem',
-        borderTop: '1px solid var(--color-border)',
-        boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
+        alignItems: 'flex-end',
+        boxShadow: '0 -4px 12px rgba(91, 63, 214, 0.2)',
         zIndex: 100,
-        paddingBottom: 'calc(1rem + safe-area-inset-bottom)'
+        paddingBottom: 'calc(0.5rem + safe-area-inset-bottom)'
       }}>
-        <button 
+        <button
           onClick={handleNewMonth}
-          style={{ 
+          style={{
             position: 'absolute',
-            left: '1.5rem',
+            left: '1.25rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.25rem',
+            gap: '0.35rem',
             background: 'none',
             border: 'none',
-            color: 'var(--color-text-muted)',
+            color: 'rgba(255,255,255,0.7)',
             cursor: 'pointer',
-            opacity: 0.8
           }}>
-          <CalendarPlus size={24} />
-          <span style={{ fontSize: '0.6rem', fontWeight: 600 }}>NEUER MONAT</span>
+          <CalendarPlus size={16} />
+          <span style={{ fontSize: '0.55rem', fontWeight: 600 }}>NEUER MONAT</span>
         </button>
 
-        <button 
-          onClick={() => setShowForm({ show: true, type: 'INCOME' })}
-          style={{ 
-            width: '56px', 
-            height: '56px', 
-            borderRadius: '50%', 
-            backgroundColor: 'white', 
-            color: 'black', 
-            border: '2px solid black', 
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}>
-          <Plus size={28} />
-        </button>
-        <button 
-          onClick={() => setShowForm({ show: true, type: 'EXPENSE' })}
-          style={{ 
-            width: '56px', 
-            height: '56px', 
-            borderRadius: '50%', 
-            backgroundColor: 'white', 
-            color: 'var(--color-primary)', 
-            border: '2px solid var(--color-primary)', 
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}>
-          <Minus size={28} />
-        </button>
+        <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '1.5rem' }}>
+          <button
+            onClick={() => setShowForm({ show: true, type: 'INCOME' })}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+              border: '4px solid white',
+              boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease',
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
+            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Plus size={32} strokeWidth={3} />
+          </button>
+          <button
+            onClick={() => setShowForm({ show: true, type: 'EXPENSE' })}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+              border: '4px solid white',
+              boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease',
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
+            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Minus size={32} strokeWidth={3} />
+          </button>
+        </div>
       </div>
 
       {showForm.show && (

@@ -5,9 +5,25 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.0',
+    date: '2026-05-07',
+    title: 'Gamification & Ausgaben-Insights',
+    changes: [
+      'Erfolgs-Banner auf der Ausgabenseite mit kontextabhängigen Motivations-Nachrichten',
+      'Budget-Ring ersetzt den „Verfügbar"-Betrag — mit Meilenstein-Punkten bei 25/50/75/100%',
+      'Kategorie-Trendpfeile: Top-5-Veränderungen zum 3-Monats-Schnitt',
+      'Spar-Streak: Anzeige, wie viele Monate in Folge im Plus',
+      'N26 Depots: Aufklappen per Tap zeigt die letzten 10 Buchungen',
+      'Design-Farbauswahl: Eigenes Dropdown mit farbigen Optionen (statt nativem Select)',
+      '9 neue Themenfarben: Blau, Koralle, Limette, Traube, Ozean, Sonnenuntergang, Minze, Karminrot, Gold',
+      'Budget-Seite: Systemfarben für Unterstreichungen und Mülleimer, Avatar entfernt',
+      'Scrollbars global ausgeblendet, blauer Tap-Highlight auf Mobilgeräten entfernt',
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-05-07',
