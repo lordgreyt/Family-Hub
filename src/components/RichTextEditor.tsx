@@ -66,7 +66,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange,
         onInput={handleInput}
         onBlur={handleInput}
         className="editor-content"
-        style={{ padding: '1rem', minHeight: '150px', outline: 'none', color: 'var(--color-text)', overflowY: 'auto' }}
+        style={{ padding: '0.85rem', minHeight: '120px', outline: 'none', color: 'var(--color-text)', overflowY: 'auto', fontSize: 'var(--font-sm)' }}
         data-placeholder={placeholder}
       />
     </div>

@@ -43,7 +43,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         position: 'fixed',
         top: 0,
         left: isOpen ? 0 : '-100%',
-        width: '280px',
+        width: '240px',
         height: '100%',
         backgroundColor: 'var(--color-surface)',
         boxShadow: isOpen ? '10px 0 30px rgba(0,0,0,0.1)' : 'none',
@@ -51,11 +51,11 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         display: 'flex',
         flexDirection: 'column',
-        padding: '1.5rem',
+        padding: '1rem',
         overflow: 'hidden',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexShrink: 0 }}>
           <h2 style={{ fontSize: 'var(--font-xl)', color: 'var(--color-primary)', margin: 0 }}>Menü</h2>
           <button onClick={onClose} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
             <X size={24} />
@@ -66,10 +66,10 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         <nav style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.5rem',
+          gap: '0.3rem',
           flex: 1,
           overflowY: 'auto',
-          paddingBottom: '1rem',
+          paddingBottom: '0.5rem',
           WebkitOverflowScrolling: 'touch',
           minHeight: 0,
         }}>
@@ -81,8 +81,8 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               style={({ isActive }) => ({
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1rem',
-                padding: '0.875rem 1rem',
+                gap: '0.75rem',
+                padding: '0.6rem 0.85rem',
                 borderRadius: 'var(--radius-md)',
                 color: isActive ? 'var(--color-primary)' : 'var(--color-text)',
                 backgroundColor: isActive ? 'var(--color-primary-light)' : 'transparent',
@@ -91,7 +91,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 transition: 'all 0.2s ease',
               })}
             >
-              <Icon size={20} />
+              <Icon size={18} />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -100,13 +100,13 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         {/* Footer Info */}
         <div style={{
           marginTop: 'auto',
-          paddingTop: '1rem',
+          paddingTop: '0.75rem',
           borderTop: '1px solid var(--color-border)',
           color: 'var(--color-text-muted)',
           fontSize: 'var(--font-xs)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.5rem',
+          gap: '0.4rem',
           flexShrink: 0,
         }}>
           <div>

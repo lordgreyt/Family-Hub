@@ -357,63 +357,162 @@ export const Meals = () => {
         <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text)' }}>
           <Calendar size={20} /> Die nächsten 7 Tage
         </h3>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
           {next7Days.map((d, idx) => {
             const dateStr = formatDate(d);
             const dayItems = planItems.filter(i => i.date === dateStr);
-            const isToday = idx === 0;
 
-            return (
-              <div key={dateStr} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', paddingBottom: '1rem', borderBottom: idx < 6 ? '1px solid var(--color-border)' : 'none' }}>
-                <div style={{ minWidth: '80px' }}>
-                  <strong style={{ display: 'block', color: isToday ? 'var(--color-primary)' : 'var(--color-text)' }}>{getDayName(d)}</strong>
-                  <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+            if (dayItems.length === 0) {
+              return (
+                <div
+                  key={dateStr}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.75rem 0.85rem',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                >
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-surface-muted)',
+                    fontSize: '1.1rem',
+                    flexShrink: 0,
+                    lineHeight: 1,
+                  }}>
+                    🍽️
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 'var(--font-xs)', fontWeight: 600, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                      Noch nichts geplant
+                    </span>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.05rem',
+                    minWidth: '22px',
+                    flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: 'var(--font-base)', fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>
+                      {d.getDate()}
+                    </span>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1 }}>
+                      {d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}
+                    </span>
+                  </div>
                 </div>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {dayItems.length === 0 ? (
-                    <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: 'var(--font-sm)', padding: '0.25rem 0' }}>Noch nichts geplant</span>
-                  ) : (
-                    dayItems.map(item => {
-                      const template = templates.find(t => t.id === item.templateId);
-                      const reqUser = users.find(u => u.id === item.requestedBy);
-                      const isPending = item.status === 'PENDING';
-                      
-                      if (!template) return null;
+              );
+            }
 
-                      // Display logic
-                      const canDelete = !isChild || (isChild && isPending && item.requestedBy === user?.id);
+            return dayItems.map(item => {
+              const template = templates.find(t => t.id === item.templateId);
+              const reqUser = users.find(u => u.id === item.requestedBy);
+              const isPending = item.status === 'PENDING';
+              const canDelete = !isChild || (isChild && isPending && item.requestedBy === user?.id);
 
-                      return (
-                        <div key={item.id} style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'space-between',
-                          background: 'var(--color-surface-hover)', 
-                          padding: '0.5rem 0.75rem', 
-                          borderRadius: 'var(--radius-md)',
-                          opacity: isPending ? 0.5 : 1,
-                          border: isPending ? '1px dashed var(--color-text-muted)' : '1px solid transparent'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{template.emoji}</span>
-                            <span style={{ fontWeight: 500, color: 'var(--color-text)' }}>{template.title}</span>
-                            {isPending && reqUser && <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginLeft: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>(Anfrage von <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', fontSize: '0.6rem' }}>{reqUser.avatar}</span>)</span>}
-                          </div>
-                          
-                          {canDelete && (
-                            <button title="Löschen" onClick={() => handleDeleteItem(item.id)} style={{ color: 'var(--color-danger)', border: 'none', background: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex' }}>
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+              if (!template) return null;
+
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.75rem 0.85rem',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: 'var(--shadow-md)',
+                    opacity: isPending ? 0.55 : 1,
+                  }}
+                >
+                  {/* Left: emoji circle */}
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: isPending ? 'var(--color-surface-muted)' : (reqUser?.avatarColor || 'var(--color-primary)'),
+                    fontSize: '1.25rem',
+                    flexShrink: 0,
+                    lineHeight: 1,
+                    border: isPending ? '1.5px dashed var(--color-border)' : 'none',
+                  }}>
+                    {template.emoji}
+                  </span>
+
+                  {/* Middle: dish name + status */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{
+                      fontSize: 'var(--font-xs)',
+                      fontWeight: 700,
+                      color: 'var(--color-text)',
+                      lineHeight: 1.3,
+                    }}>
+                      {template.title}
+                    </span>
+                    {isPending && (
+                      <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        Anfrage von <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: reqUser?.avatarColor || '#6366f1', fontSize: '0.5rem' }}>{reqUser?.avatar}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Right: date + delete */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    flexShrink: 0,
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.05rem',
+                      minWidth: '22px',
+                    }}>
+                      <span style={{ fontSize: 'var(--font-base)', fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>
+                        {d.getDate()}
+                      </span>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1 }}>
+                        {d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}
+                      </span>
+                    </div>
+                    {canDelete && (
+                      <button
+                        title="Löschen"
+                        onClick={() => handleDeleteItem(item.id)}
+                        style={{
+                          color: 'var(--color-danger)',
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          display: 'flex',
+                          opacity: 0.6,
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
+              );
+            });
           })}
         </div>
       </div>

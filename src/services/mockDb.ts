@@ -46,6 +46,7 @@ export interface TaskItem {
   priority: 1 | 2 | 3;
   dueDate?: string;
   assignedTo?: string[];
+  icon?: string; // Icon-Name aus TASK_ICONS (z.B. 'AlertTriangle', 'Star', 'Heart')
   createdAt: number;
   completedAt?: number;
   createdBy: string; // User ID

@@ -109,18 +109,17 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '1rem',
-        backgroundColor: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-primary)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
+          <button
             onClick={onMenuClick}
             style={{
               padding: '0.25rem',
-              color: 'var(--color-text)',
+              color: 'white',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -129,17 +128,17 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           >
             <Menu size={24} />
           </button>
-          <h1 style={{ fontSize: 'var(--font-xl)', margin: 0, color: 'var(--color-primary)' }}>
+          <h1 style={{ fontSize: 'var(--font-xl)', margin: 0, color: 'white' }}>
             Family Hub
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {user && !user.isChild && (
-            <Zap 
-              size={18} 
-              color={victron.isConnected ? (victron.state === 2 ? 'var(--color-primary)' : 'var(--color-text)') : 'var(--color-text-muted)'} 
-              fill={victron.state === 2 ? 'var(--color-primary)' : 'none'}
-              style={{ 
+            <Zap
+              size={18}
+              color="white"
+              fill={victron.state === 2 ? 'white' : 'none'}
+              style={{
                 transition: 'all 0.3s ease',
                 opacity: victron.isConnected ? 1 : 0.4
               }}
@@ -151,12 +150,13 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              backgroundColor: 'var(--color-surface-hover)',
+              backgroundColor: 'rgba(255,255,255,0.18)',
               padding: '0.25rem 0.75rem',
               borderRadius: 'var(--radius-xl)',
               border: 'none',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
+              color: 'white',
             }}
           >
             <span style={{

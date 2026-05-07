@@ -444,7 +444,7 @@ export const Setup = () => {
                 checked={newUserIsChild} 
                 onChange={e => setNewUserIsChild(e.target.checked)} 
               />
-              Als Kinderaccount anlegen (eingeschränkte Sicht)
+              Als Kinderaccount anlegen
             </label>
 
             {createError && (

@@ -18,7 +18,6 @@ export const Notes = () => {
 
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
 
-  // Track long-press timer per note
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -54,7 +53,7 @@ export const Notes = () => {
     setContent('');
     setTitle('');
     setIsAdding(false);
-    setTimeout(() => setIsSyncing(false), 1500); // Visual feedback
+    setTimeout(() => setIsSyncing(false), 1500);
   };
 
   const handleDelete = (id: string) => {
@@ -73,7 +72,7 @@ export const Notes = () => {
     setEditingNote(null);
   };
 
-  // Long-press handlers
+  // Long-press → edit
   const startPress = (note: NoteItem) => {
     pressTimer.current = setTimeout(() => {
       setEditingNote({ ...note });
@@ -90,6 +89,7 @@ export const Notes = () => {
   return (
     <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
 
+      {/* Tab-Umschalter */}
       {!user?.isChild && (
         <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--color-surface)', padding: '0.5rem', borderRadius: 'var(--radius-lg)' }}>
           <button
@@ -109,13 +109,17 @@ export const Notes = () => {
         </div>
       )}
 
+      {/* Add form or button */}
       {isAdding ? (
-        <form onSubmit={handleAdd} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ color: 'var(--color-primary-dark)' }}>Neue Notiz {!user?.isChild && `(${activeTab === 'SHARED' ? 'Gemeinsam' : 'Privat'})`}</h3>
+        <form onSubmit={handleAdd} className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <h3 style={{ fontSize: 'var(--font-base)', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+            Neue Notiz {!user?.isChild && `(${activeTab === 'SHARED' ? 'Gemeinsam' : 'Privat'})`}
+          </h3>
           <input
             type="text"
             placeholder="Überschrift (optional)"
             className="input-field"
+            style={{ fontSize: 'var(--font-sm)' }}
             value={title}
             onChange={e => setTitle(e.target.value)}
           />
@@ -126,7 +130,7 @@ export const Notes = () => {
           />
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="button" onClick={() => setIsAdding(false)} className="btn btn-secondary" style={{ flex: 1 }}>Abbrechen</button>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Speichern</button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={!content.trim()}>Speichern</button>
           </div>
         </form>
       ) : (
@@ -135,14 +139,15 @@ export const Notes = () => {
         </button>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, overflowY: 'auto' }}>
+      {/* Notizen-Liste */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1, overflowY: 'auto' }}>
         {displayedNotes.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', marginTop: '2rem' }}>Keine Notizen vorhanden.</p>
         ) : (
           displayedNotes.map(note => {
             const author = mockDb.getUsers().find(u => u.id === note.createdBy);
 
-            // Edit mode (triggered by long press)
+            // Edit mode (long press)
             if (editingNote?.id === note.id) {
               return (
                 <form
@@ -164,30 +169,18 @@ export const Notes = () => {
                     initialValue={editingNote.content}
                     onChange={val => setEditingNote({ ...editingNote, content: val })}
                   />
-
-                  {/* Footer with meta info in edit mode */}
-                  <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {activeTab === 'SHARED' && (
-                      <>
-                        <span style={{ fontWeight: 500 }}>{author?.id || note.createdBy}</span>
-                        <span>&bull;</span>
-                      </>
-                    )}
-                    <span>{new Date(note.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                  </div>
-
                   <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={handleCancelEdit} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+                    <button type="button" onClick={handleCancelEdit} className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-sm)' }}>
                       <X size={16} /> Abbrechen
                     </button>
-                    <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                    <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-sm)' }}>
                       <Save size={16} /> Speichern
                     </button>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(note.id)}
-                    style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)', alignSelf: 'flex-start' }}
+                    style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--font-sm)', alignSelf: 'flex-start', fontWeight: 500 }}
                   >
                     <Trash2 size={16} /> Löschen
                   </button>
@@ -195,12 +188,21 @@ export const Notes = () => {
               );
             }
 
-            // Normal view — no icons, no footer
+            // Normal view — TaskCard style
             return (
               <div
                 key={note.id}
-                className="glass-panel"
-                style={{ padding: '0.75rem 1.25rem 0.5rem 1.25rem', userSelect: 'none', cursor: 'default' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.75rem 0.85rem',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: 'var(--shadow-md)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
                 onMouseDown={() => startPress(note)}
                 onMouseUp={cancelPress}
                 onMouseLeave={cancelPress}
@@ -209,16 +211,45 @@ export const Notes = () => {
                 onTouchMove={cancelPress}
                 onContextMenu={e => e.preventDefault()}
               >
-                {note.title && (
-                  <div style={{ fontWeight: 700, fontSize: 'var(--font-lg)', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
-                    {note.title}
-                  </div>
-                )}
-                <div
-                  className="rich-text-content"
-                  style={{ color: 'var(--color-text)', overflowWrap: 'break-word' }}
-                  dangerouslySetInnerHTML={{ __html: note.content }}
-                />
+                {/* Author avatar */}
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: author?.avatarColor || 'var(--color-primary)',
+                  fontSize: '1.1rem',
+                  flexShrink: 0,
+                  lineHeight: 1,
+                }}>
+                  {author?.avatar || '📝'}
+                </span>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {note.title && (
+                    <span style={{
+                      fontSize: 'var(--font-xs)',
+                      fontWeight: 700,
+                      color: 'var(--color-text)',
+                      lineHeight: 1.3,
+                    }}>
+                      {note.title}
+                    </span>
+                  )}
+                  <div
+                    className="rich-text-content"
+                    style={{
+                      color: 'var(--color-text-muted)',
+                      fontSize: 'var(--font-xs)',
+                      lineHeight: 1.4,
+                      overflowWrap: 'break-word',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: note.content }}
+                  />
+                </div>
               </div>
             );
           })
