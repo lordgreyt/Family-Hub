@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { BudgetItem } from '../services/mockDb';
 import { Plus, Trash2, Save, X } from 'lucide-react';
-import { AvatarEmoji } from '../components/AvatarEmoji';
 
 export const Budget = () => {
   const { user } = useAuth();
@@ -97,14 +96,14 @@ export const Budget = () => {
 
   const renderList = (list: BudgetItem[], title: string, total: number, color: string, isExpense = false) => (
     <div style={{ flex: 1, minWidth: '280px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: `2px solid ${color}`, paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '2px solid var(--color-primary)', paddingBottom: '0.5rem' }}>
         <h3 style={{ color: 'var(--color-text)' }}>{title}</h3>
-        <strong style={{ color }}>{total.toFixed(2)} €</strong>
+        <strong style={{ color: 'var(--color-primary)' }}>{total.toFixed(2)} €</strong>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {isExpense && fixedDepotAmount > 0 && (
           <div className="glass-panel" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface-hover)' }}>
-            <div>
+            <div style={{ paddingLeft: '0.5rem' }}>
               <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 N26 Sparplan <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-primary)' }}>(Auto)</span>
               </div>
@@ -116,7 +115,6 @@ export const Budget = () => {
           </div>
         )}
         {list.map(item => {
-          const author = mockDb.getUsers().find(u => u.id === item.createdBy);
           const isEditing = editingItem?.id === item.id;
 
           if (isEditing) {
@@ -164,11 +162,11 @@ export const Budget = () => {
               onPointerLeave={cancelPress}
               onPointerCancel={cancelPress}
             >
-              <div>
-                <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>{item.title} {author && <span title={item.createdBy} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: author.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={author.avatar} size={20} /></span>}</div>
+              <div style={{ paddingLeft: '0.5rem' }}>
+                <div style={{ fontWeight: 500 }}>{item.title}</div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>{item.amount.toFixed(2)} €</div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} style={{ color: 'var(--color-danger)', padding: '0.5rem', background: 'none', border: 'none' }}>
+              <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} style={{ color: 'var(--color-primary)', padding: '0.5rem', background: 'none', border: 'none' }}>
                 <Trash2 size={18} />
               </button>
             </div>

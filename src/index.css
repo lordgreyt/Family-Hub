@@ -129,6 +129,70 @@
   --color-primary-transparent: rgba(219, 39, 119, 0.08);
 }
 
+[data-theme='coral'] {
+  --color-primary: #FF6B6B;
+  --color-primary-light: #FF8E8E;
+  --color-primary-dark: #E55A5A;
+  --color-primary-gradient: linear-gradient(135deg, #FF8E8E, #FF6B6B);
+  --color-primary-transparent: rgba(255, 107, 107, 0.08);
+}
+
+[data-theme='lime'] {
+  --color-primary: #84CC16;
+  --color-primary-light: #A3D94E;
+  --color-primary-dark: #6BA30F;
+  --color-primary-gradient: linear-gradient(135deg, #A3D94E, #84CC16);
+  --color-primary-transparent: rgba(132, 204, 22, 0.08);
+}
+
+[data-theme='grape'] {
+  --color-primary: #A855F7;
+  --color-primary-light: #C084FC;
+  --color-primary-dark: #9333EA;
+  --color-primary-gradient: linear-gradient(135deg, #C084FC, #A855F7);
+  --color-primary-transparent: rgba(168, 85, 247, 0.08);
+}
+
+[data-theme='ocean'] {
+  --color-primary: #0EA5E9;
+  --color-primary-light: #38BDF8;
+  --color-primary-dark: #0284C7;
+  --color-primary-gradient: linear-gradient(135deg, #38BDF8, #0EA5E9);
+  --color-primary-transparent: rgba(14, 165, 233, 0.08);
+}
+
+[data-theme='sunset'] {
+  --color-primary: #F97316;
+  --color-primary-light: #FB923C;
+  --color-primary-dark: #EA580C;
+  --color-primary-gradient: linear-gradient(135deg, #FB923C, #F97316);
+  --color-primary-transparent: rgba(249, 115, 22, 0.08);
+}
+
+[data-theme='mint'] {
+  --color-primary: #10B981;
+  --color-primary-light: #34D399;
+  --color-primary-dark: #059669;
+  --color-primary-gradient: linear-gradient(135deg, #34D399, #10B981);
+  --color-primary-transparent: rgba(16, 185, 129, 0.08);
+}
+
+[data-theme='crimson'] {
+  --color-primary: #DC2626;
+  --color-primary-light: #EF4444;
+  --color-primary-dark: #B91C1C;
+  --color-primary-gradient: linear-gradient(135deg, #EF4444, #DC2626);
+  --color-primary-transparent: rgba(220, 38, 38, 0.08);
+}
+
+[data-theme='gold'] {
+  --color-primary: #D97706;
+  --color-primary-light: #E5980B;
+  --color-primary-dark: #B45309;
+  --color-primary-gradient: linear-gradient(135deg, #E5980B, #D97706);
+  --color-primary-transparent: rgba(217, 119, 6, 0.08);
+}
+
 [data-font-size='large'] {
   --font-xs: 0.875rem;
   --font-sm: 1rem;

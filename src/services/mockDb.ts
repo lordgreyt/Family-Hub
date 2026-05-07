@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
 import { ref, set as firebaseSet, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
 
-export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink';
+export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
 
 // Types

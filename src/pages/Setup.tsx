@@ -4,6 +4,28 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
+import type { ThemeColor } from '../services/mockDb';
+
+const THEME_COLORS: Record<ThemeColor, string> = {
+  indigo: '#5B3FD6',
+  rose: '#F06292',
+  emerald: '#43C773',
+  amber: '#FF9F2D',
+  cyan: '#20BFA9',
+  violet: '#6C4DE6',
+  blue: '#4B8DFF',
+  slate: '#64748B',
+  teal: '#0D9488',
+  pink: '#DB2777',
+  coral: '#FF6B6B',
+  lime: '#84CC16',
+  grape: '#A855F7',
+  ocean: '#0EA5E9',
+  sunset: '#F97316',
+  mint: '#10B981',
+  crimson: '#DC2626',
+  gold: '#D97706',
+};
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -275,16 +297,35 @@ export const Setup = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
             Design-Farben
           </label>
-          <select value={settings.themeColor} onChange={handleThemeChange} className="input-field">
-            <option value="indigo">Indigo (Standard)</option>
-            <option value="rose">Rose</option>
-            <option value="emerald">Smaragd (Emerald)</option>
-            <option value="amber">Bernstein (Amber)</option>
-            <option value="cyan">Cyan</option>
-            <option value="violet">Violett</option>
-            <option value="slate">Schiefergrau (Slate)</option>
-            <option value="teal">Petrol (Teal)</option>
-            <option value="pink">Pink</option>
+          <select
+            value={settings.themeColor}
+            onChange={handleThemeChange}
+            className="input-field"
+            style={{
+              backgroundColor: THEME_COLORS[settings.themeColor],
+              color: 'white',
+              fontWeight: 600,
+              borderColor: THEME_COLORS[settings.themeColor],
+            }}
+          >
+            <option value="indigo" style={{ backgroundColor: '#5B3FD6', color: 'white' }}>Indigo (Standard)</option>
+            <option value="rose" style={{ backgroundColor: '#F06292', color: 'white' }}>Rose</option>
+            <option value="emerald" style={{ backgroundColor: '#43C773', color: 'white' }}>Smaragd (Emerald)</option>
+            <option value="amber" style={{ backgroundColor: '#FF9F2D', color: 'white' }}>Bernstein (Amber)</option>
+            <option value="cyan" style={{ backgroundColor: '#20BFA9', color: 'white' }}>Cyan</option>
+            <option value="violet" style={{ backgroundColor: '#6C4DE6', color: 'white' }}>Violett</option>
+            <option value="slate" style={{ backgroundColor: '#64748B', color: 'white' }}>Schiefergrau (Slate)</option>
+            <option value="teal" style={{ backgroundColor: '#0D9488', color: 'white' }}>Petrol (Teal)</option>
+            <option value="pink" style={{ backgroundColor: '#DB2777', color: 'white' }}>Pink</option>
+            <option value="blue" style={{ backgroundColor: '#4B8DFF', color: 'white' }}>Blau (Blue)</option>
+            <option value="coral" style={{ backgroundColor: '#FF6B6B', color: 'white' }}>Koralle (Coral)</option>
+            <option value="lime" style={{ backgroundColor: '#84CC16', color: 'white' }}>Limette (Lime)</option>
+            <option value="grape" style={{ backgroundColor: '#A855F7', color: 'white' }}>Traube (Grape)</option>
+            <option value="ocean" style={{ backgroundColor: '#0EA5E9', color: 'white' }}>Ozean (Ocean)</option>
+            <option value="sunset" style={{ backgroundColor: '#F97316', color: 'white' }}>Sonnenuntergang (Sunset)</option>
+            <option value="mint" style={{ backgroundColor: '#10B981', color: 'white' }}>Minze (Mint)</option>
+            <option value="crimson" style={{ backgroundColor: '#DC2626', color: 'white' }}>Karminrot (Crimson)</option>
+            <option value="gold" style={{ backgroundColor: '#D97706', color: 'white' }}>Gold</option>
           </select>
         </div>
 
