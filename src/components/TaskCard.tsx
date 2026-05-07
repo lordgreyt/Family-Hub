@@ -289,6 +289,8 @@ export const TaskCard = ({
             <button
               onClick={handleToggle}
               onTouchEnd={handleToggle}
+              onTouchStart={e => e.stopPropagation()}
+              onMouseDown={e => e.stopPropagation()}
               style={{
                 background: 'none',
                 border: 'none',

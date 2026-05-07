@@ -229,8 +229,6 @@ export const EDiary = () => {
       display: 'flex',
       flexDirection: 'column',
       gap: '1.5rem',
-      padding: '1rem',
-      paddingBottom: '90px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Gefühle-Tagebuch</h1>

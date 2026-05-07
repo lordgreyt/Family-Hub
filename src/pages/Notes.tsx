@@ -87,7 +87,7 @@ export const Notes = () => {
   };
 
   return (
-    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
 
       {/* Tab-Umschalter */}
       {!user?.isChild && (

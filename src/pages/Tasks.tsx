@@ -112,7 +112,7 @@ export const Tasks = () => {
   };
 
   return (
-    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
 
       {/* Tab-Umschalter */}
       <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--color-surface)', padding: '0.5rem', borderRadius: 'var(--radius-lg)' }}>

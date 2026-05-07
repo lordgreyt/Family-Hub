@@ -47,7 +47,7 @@ export const Wallbox = () => {
   const status = getStatusText();
 
   return (
-    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       
       {/* Header / Status Bar */}
       <div className="glass-panel" style={{ 

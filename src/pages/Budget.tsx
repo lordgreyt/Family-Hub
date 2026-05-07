@@ -178,7 +178,7 @@ export const Budget = () => {
   );
 
   return (
-    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       
       <div className="glass-panel" style={{ 
         padding: '1rem', // Reduzierte Höhe
