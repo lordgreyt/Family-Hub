@@ -7,6 +7,7 @@ import { AvatarEmoji } from '../components/AvatarEmoji';
 import { Filter, Star, X, Save, Trash2, Wallet, TrendingDown } from 'lucide-react';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { TaskCard } from '../components/TaskCard';
+import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 
 const LONG_PRESS_MS = 500;
 
@@ -48,13 +49,17 @@ export const Dashboard = () => {
       });
 
       setUpcomingTasks(tasks);
-      setUsers(mockDb.getUsers());
+      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
 
       try {
         const currentMonthStr = new Date().toISOString().slice(0, 7);
         const allExpenses = mockDb.getExpenses() || [];
-        const monthlyExpenses = allExpenses.filter(e => e && e.date && e.date.startsWith(currentMonthStr) && e.type === 'EXPENSE');
+        const monthlyExpenses = allExpenses.filter(e => {
+          if (!e || e.type !== 'EXPENSE') return false;
+          const eMonth = e.budgetMonth || e.date?.substring(0, 7);
+          return eMonth === currentMonthStr;
+        });
         const total = monthlyExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
         const byCat = monthlyExpenses.reduce((acc, e) => {
@@ -77,7 +82,7 @@ export const Dashboard = () => {
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
-  }, [user]);
+  }, [user, settings.designMode]);
 
   const startPress = (note: NoteItem) => {
     pressTimer.current = setTimeout(() => {
@@ -112,11 +117,196 @@ export const Dashboard = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
+      {/* Begrüßung */}
+      <div style={{ padding: '0.5rem 0' }}>
+        {(() => {
+          const name = user?.id || '';
+          const openers = [
+            'Hallo {name},',
+            'Hey {name},',
+            'Moin {name},',
+            'Guten Morgen {name},',
+            'Na {name},',
+            'Gude {name},',
+            'Schön dass du da bist, {name}!',
+            'Willkommen zurück, {name}!',
+            'Ah, {name} ist da!',
+            'Servus {name},',
+            'Grüß dich {name},',
+            'Tag {name},',
+            'Guten Tag {name},',
+            'Hi {name},',
+            'Hallöchen {name},',
+            'Na du, {name}!',
+            'Ei guck, {name}!',
+            'Willkommen {name},',
+            '{name}, schön dich zu sehen!',
+            'Hallo liebe/r {name},',
+            'Moinsen {name},',
+            'Grüß Gott {name},',
+            'Tach {name},',
+            'Juten Tach {name},',
+            'Glück auf {name},',
+            'Mahlzeit {name},',
+            'Huhu {name},',
+            'Na wer ist denn da? {name}!',
+            '{name}, du bist ja schon wach!',
+            'Da ist ja {name}!',
+            '{name}! Schön, dich zu sehen!',
+            'Gude Laune, {name}?',
+            'Moin Moin {name},',
+            '{name}, bereit für heute?',
+            'Schau an, {name}!',
+            '{name}, willkommen im neuen Tag!',
+            'Los geht\'s {name},',
+            'Aufgepasst, {name} ist hier!',
+            'Ganz entspannt, {name} —',
+            'Hau rein {name},',
+            'Ahoi {name},',
+            'Ey {name},',
+            'Na endlich, {name}!',
+            '{name}, da bist du ja endlich!',
+            'Grias di {name},',
+          ];
+          const slogans = [
+            'wie geht\'s dir heute?',
+            'hab einen wundervollen Tag!',
+            'auf in einen neuen Tag!',
+            'bereit für neue Abenteuer?',
+            'gut geschlafen?',
+            'lass uns was bewegen heute!',
+            'die Welt wartet auf dich!',
+            'heute wird ein guter Tag!',
+            'schön dich zu sehen!',
+            'Zeit für Großes!',
+            'wie läuft\'s bei dir?',
+            'du rockst das heute!',
+            'lass es uns angehen!',
+            'jeden Tag ein bisschen besser!',
+            'alles im Griff heute?',
+            'genieß den Moment!',
+            'mach was Schönes heute!',
+            'heute ist dein Tag!',
+            'viel Energie für heute!',
+            'was steht heute an?',
+            'immer schön lächeln!',
+            'bleib wie du bist!',
+            'das schaffst du locker!',
+            'kleine Schritte, große Ziele!',
+            'auf geht\'s!',
+            'wir haben viel vor heute!',
+            'einfach mal durchatmen!',
+            'Familie ist das Wichtigste!',
+            'zusammen sind wir stark!',
+            'heute nur das Beste!',
+            'bist du startklar?',
+            'heute zählt jeder Moment!',
+            'schön dass wir zusammen sind!',
+            'was gibt\'s Neues?',
+            'genug geschlummert?',
+            'alles fit im Schritt?',
+            'Sonne im Herzen?',
+            'Kaffee schon intus?',
+            'bereit zum Durchstarten?',
+            'heute läuft\'s rund!',
+            'Kopf hoch, Brust raus!',
+            'gute Vibes nur heute!',
+            'ein Tag voller Chancen!',
+            'Zeit für deine Ziele!',
+            'einfach mal lächeln!',
+          ];
+          const motivations = [
+            'Denk immer daran: Jeder Tag ist eine neue Chance, etwas Großartiges zu erreichen.',
+            'Du bist stärker als du denkst und schaffst mehr als du glaubst.',
+            'Das Leben ist zu kurz für schlechte Laune — genieße jeden Augenblick.',
+            'Was du heute tust, entscheidet darüber, wer du morgen bist.',
+            'Erfolg kommt nicht von allein, aber jeder kleine Schritt zählt.',
+            'Umgeben von Familie ist man nie allein — gemeinsam schaffen wir alles.',
+            'Deine positive Energie heute steckt alle anderen an!',
+            'Manchmal sind die kleinsten Dinge die, die am meisten zählen.',
+            'Glaube an dich selbst und der Rest ergibt sich von allein.',
+            'Jeder Tag bringt neue Möglichkeiten — nutze sie!',
+            'Wer lächelt, lebt länger — und schöner!',
+            'Du musst nicht perfekt sein, du musst nur du selbst sein.',
+            'Der beste Zeitpunkt für einen Neuanfang ist immer jetzt.',
+            'Kleine Fortschritte sind besser als gar keine Fortschritte.',
+            'Deine Familie liebt dich genau so wie du bist.',
+            'Heute ist der erste Tag vom Rest deines Lebens — mach was draus!',
+            'Ein Lächeln kostet nichts, aber es gibt so viel zurück.',
+            'Lass dich nicht von Kleinigkeiten runterziehen — du bist größer als das.',
+            'Am Ende zählt nicht was du hattest, sondern wen du geliebt hast.',
+            'Wenn du an dich glaubst, gibt es keine Grenzen.',
+            'Träume nicht dein Leben, sondern lebe deine Träume!',
+            'Fehler sind keine Niederlagen, sie sind Lektionen auf dem Weg zum Erfolg.',
+            'Manchmal musst du loslassen, um zu wachsen.',
+            'Wer nie aufgibt, hat schon halb gewonnen.',
+            'Das Glück kommt zu denen, die an sich glauben.',
+            'Heute kannst du alles schaffen, was du dir vornimmst.',
+            'Mut bedeutet nicht keine Angst zu haben, sondern trotz Angst weiterzumachen.',
+            'Das Geheimnis des Erfolgs ist, den ersten Schritt zu tun.',
+            'Es sind die Begegnungen mit Menschen, die das Leben lebenswert machen.',
+            'Dein Lächeln heute könnte genau das sein, was jemand anderes braucht.',
+            'Bleib neugierig und lerne jeden Tag etwas Neues.',
+            'Der Unterschied zwischen gut und schlecht liegt oft nur in deiner Einstellung.',
+            'Geh deinen eigenen Weg — er ist der einzig richtige für dich.',
+            'Jeder Tag ist ein leeres Blatt — schreib eine schöne Geschichte.',
+            'Nimm dir heute einen Moment Zeit, um dankbar zu sein für das was du hast.',
+            'Die besten Dinge im Leben passieren außerhalb deiner Komfortzone.',
+            'Du bist genau da wo du sein sollst — vertrau dem Weg.',
+            'Das Gute an einem neuen Tag: du kannst ihn gestalten wie du willst.',
+            'Mach heute etwas, wofür dir dein zukünftiges Ich danken wird.',
+            'Manchmal reicht eine Umarmung mehr als tausend Worte.',
+            'Ziele sind Träume mit einer Deadline — also leg los!',
+            'Zusammen lachen, zusammen weinen, zusammen leben — das ist Familie.',
+            'Denk positiv und positive Dinge werden passieren.',
+            'Der Weg ist das Ziel — also genieß die Reise!',
+            'Was du heute denkst, bestimmt was du morgen fühlst.',
+            'Jeder Sonnenaufgang ist eine Einladung zum Neustart.',
+            'Deine beste Zeit ist jetzt — nicht gestern und nicht morgen.',
+            'Auch aus Steinen die dir im Weg liegen, kannst du etwas Schönes bauen.',
+            'Ein freundliches Wort kann den ganzen Tag eines Menschen verändern.',
+            'Wer kämpft kann verlieren, wer nicht kämpft hat schon verloren.',
+          ];
+          const o = openers[Math.floor(Math.random() * openers.length)].replace('{name}', name);
+          const s = slogans[Math.floor(Math.random() * slogans.length)];
+          const m = motivations[Math.floor(Math.random() * motivations.length)];
+          return (
+            <>
+              <p style={{ margin: 0, fontSize: 'var(--font-lg)', fontWeight: 700, color: 'var(--color-primary-dark)', lineHeight: 1.4 }}>
+                {o}
+              </p>
+              <p style={{
+                margin: 0,
+                fontSize: 'var(--font-base)',
+                fontWeight: 500,
+                color: 'var(--color-text-muted)',
+                lineHeight: 1.4,
+                paddingLeft: '2rem',
+              }}>
+                {s}
+              </p>
+              <p style={{
+                margin: '0.3rem 0 0 0',
+                fontSize: 'var(--font-sm)',
+                fontWeight: 400,
+                color: 'var(--color-text-muted)',
+                lineHeight: 1.5,
+                paddingLeft: '2rem',
+                opacity: 0.85,
+                fontStyle: 'italic',
+              }}>
+                {m}
+              </p>
+            </>
+          );
+        })()}
+      </div>
+
       {/* Offene Belohnungs-Anfragen — nur für Eltern */}
       {!user?.isChild && rewardRequests.length > 0 && (
         <div style={{
-          background: 'linear-gradient(135deg, #FFF7ED, #FFFBEB)',
-          border: '1px solid #FCD34D',
+          background: 'var(--color-primary-transparent)',
+          border: '1px solid var(--color-primary-light)',
           borderRadius: 'var(--radius-lg)',
           padding: '1rem 1.25rem',
           display: 'flex',
@@ -125,7 +315,7 @@ export const Dashboard = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
-              backgroundColor: '#FEF3C7',
+              backgroundColor: 'var(--color-primary-transparent)',
               borderRadius: '50%',
               width: '40px',
               height: '40px',
@@ -133,10 +323,10 @@ export const Dashboard = () => {
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <Star size={20} fill="#F59E0B" color="#F59E0B" />
+              <Star size={20} fill="var(--color-primary)" color="var(--color-primary)" />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: 'var(--font-sm)', fontWeight: 600, color: '#92400E' }}>
+              <p style={{ margin: 0, fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-primary-light)' }}>
                 {rewardRequests.length} offene {rewardRequests.length === 1 ? 'Anfrage' : 'Anfragen'}
               </p>
               <p style={{ margin: '0.1rem 0 0 0', fontSize: 'var(--font-xs)', color: '#A16207' }}>
@@ -233,7 +423,10 @@ export const Dashboard = () => {
               <Filter size={12} />
               Alle
             </button>
-            {users.map(u => (
+            {users.map(u => {
+                const uNeon = getNeonColor(u.id);
+                const uIsNeon = settings.designMode === 'neon';
+                return (
               <button
                 key={u.id}
                 onClick={() => setTaskAssigneeFilter(u.id)}
@@ -246,12 +439,14 @@ export const Dashboard = () => {
                   width: '20px',
                   height: '20px',
                   borderRadius: '50%',
-                  backgroundColor: u.avatarColor || 'var(--color-primary)',
+                  background: u.avatarColor || 'var(--color-primary)',
                   overflow: 'hidden',
+                  boxShadow: uIsNeon ? `0 0 6px ${uNeon.color}88, 0 0 14px ${uNeon.color2}44` : 'none',
                 }}><AvatarEmoji emoji={u.avatar} size={20} /></span>
                 {u.id}
               </button>
-            ))}
+                );
+            })}
           </div>
 
           {/* Task Cards */}
@@ -263,15 +458,20 @@ export const Dashboard = () => {
                 (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))
               )
               .map(task => {
-                const assigneeId = task.assignedTo?.[0] || task.createdBy;
-                const assignee = users.find(u => u.id === assigneeId);
+                const taskAssignees = task.assignedTo?.length
+                  ? users.filter(u => task.assignedTo!.includes(u.id))
+                  : [];
+                const isNeon = settings.designMode === 'neon';
+                const ncs = isNeon ? getNeonCardStyle(task.id) : undefined;
                 return (
                   <TaskCard
                     key={task.id}
                     task={task}
-                    assignee={assignee}
+                    assignees={taskAssignees.length > 0 ? taskAssignees : undefined}
                     showToggle
                     canToggle={!user?.isChild}
+                    neonCardStyle={ncs}
+                    neonBorder={ncs ? ncs.color1 : undefined}
                     onToggle={handleToggleTask}
                   />
                 );
@@ -309,7 +509,7 @@ export const Dashboard = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {recentNotes.map(note => {
-              const author = mockDb.getUsers().find(u => u.id === note.createdBy);
+              const author = users.find(u => u.id === note.createdBy);
               const isExpanded = expandedNotes.has(note.id);
 
               if (editingNote?.id === note.id) {
@@ -369,7 +569,10 @@ export const Dashboard = () => {
                 );
               }
 
-              return (
+              return (() => {
+                const isNeon = settings.designMode === 'neon';
+                const ncs = isNeon ? getNeonCardStyle(note.id) : null;
+                return (
                 <div
                   key={note.id}
                   style={{
@@ -378,11 +581,20 @@ export const Dashboard = () => {
                     gap: '0.65rem',
                     width: '100%',
                     padding: '0.65rem 0.85rem',
-                    backgroundColor: '#FFFFFF',
                     borderRadius: 'var(--radius-lg)',
-                    boxShadow: 'var(--shadow-md)',
                     cursor: 'pointer',
                     userSelect: 'none',
+                    ...(ncs ? {
+                      backgroundImage: ncs.backgroundImage,
+                      backgroundOrigin: ncs.backgroundOrigin,
+                      backgroundClip: ncs.backgroundClip,
+                      border: ncs.border,
+                      boxShadow: ncs.boxShadow,
+                    } : {
+                      background: 'var(--color-surface)',
+                      boxShadow: 'var(--shadow-md)',
+                      border: '1px solid var(--color-border)',
+                    }),
                   }}
                   onMouseDown={() => startPress(note)}
                   onMouseUp={e => {
@@ -407,9 +619,10 @@ export const Dashboard = () => {
                     width: '42px',
                     height: '42px',
                     borderRadius: '50%',
-                    backgroundColor: author?.avatarColor || 'var(--color-primary)',
+                    background: author?.avatarColor || 'var(--color-primary)',
                     flexShrink: 0,
                     overflow: 'hidden',
+                    boxShadow: ncs ? `0 0 10px ${ncs.color1}88, 0 0 22px ${ncs.color2}44` : 'none',
                   }}>
                     {author?.avatar ? <AvatarEmoji emoji={author.avatar} size={42} /> : '📝'}
                   </span>
@@ -443,7 +656,8 @@ export const Dashboard = () => {
                     />
                   </div>
                 </div>
-              );
+                );
+              })();
             })}
           </div>
         )}

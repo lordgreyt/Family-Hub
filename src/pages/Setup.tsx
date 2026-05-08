@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
+import { getNeonColor } from '../utils/neon';
 import type { ThemeColor } from '../services/mockDb';
 
 const THEME_COLORS: Record<ThemeColor, string> = {
@@ -65,7 +66,7 @@ export const Setup = () => {
   
   const navItems = getNavItems(user);
   
-  const [dbUsers, setDbUsers] = useState(mockDb.getUsers());
+  const [dbUsers, setDbUsers] = useState(() => mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
 
   const [newUserId, setNewUserId] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -121,10 +122,10 @@ export const Setup = () => {
   const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
-    const load = () => setDbUsers(mockDb.getUsers());
+    const load = () => setDbUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, []);
+  }, [settings.designMode]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +415,50 @@ export const Setup = () => {
           </select>
         </div>
 
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
+            Design
+          </label>
+          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+            <button
+              type="button"
+              onClick={() => updateSettings({ designMode: 'classic' })}
+              style={{
+                flex: 1,
+                padding: '0.55rem 0.85rem',
+                fontSize: 'var(--font-sm)',
+                fontWeight: 600,
+                textAlign: 'center',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: settings.designMode === 'classic' ? 'var(--color-primary)' : 'var(--color-surface)',
+                color: settings.designMode === 'classic' ? 'white' : 'var(--color-text-muted)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              Klassisch
+            </button>
+            <button
+              type="button"
+              onClick={() => updateSettings({ designMode: 'neon' })}
+              style={{
+                flex: 1,
+                padding: '0.55rem 0.85rem',
+                fontSize: 'var(--font-sm)',
+                fontWeight: 600,
+                textAlign: 'center',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: settings.designMode === 'neon' ? 'var(--color-primary)' : 'var(--color-surface)',
+                color: settings.designMode === 'neon' ? 'white' : 'var(--color-text-muted)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              Neon
+            </button>
+          </div>
+        </div>
+
         {(user?.isAdmin || user?.id === 'Falko') && (
           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)', fontSize: 'var(--font-sm)', fontWeight: 600 }}>
@@ -491,14 +536,18 @@ export const Setup = () => {
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-            {dbUsers.map(u => (
+            {dbUsers.map(u => {
+                const uGlow = getNeonColor(u.id);
+                const uNeon = settings.designMode === 'neon';
+                return (
               <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     width: '32px', height: '32px', borderRadius: '50%',
-                    backgroundColor: u.avatarColor || '#6366f1',
+                    background: u.avatarColor || '#6366f1',
                     flexShrink: 0, overflow: 'hidden',
+                    boxShadow: uNeon ? `0 0 7px ${uGlow.color}88, 0 0 16px ${uGlow.color2}44` : 'none',
                   }}><AvatarEmoji emoji={u.avatar} size={32} /></span>
                   <strong>{u.id}</strong>
                   {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: '#B8BAC2' }}>(Admin)</span>}
@@ -520,7 +569,8 @@ export const Setup = () => {
                   )}
                 </div>
               </div>
-            ))}
+                );
+            })}
           </div>
 
           <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

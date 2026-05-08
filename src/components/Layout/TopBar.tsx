@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { mockDb } from '../../services/mockDb';
 import { useVictron } from '../../context/VictronContext';
 import { auth } from '../../services/firebase';
 import { AvatarEmoji } from '../AvatarEmoji';
+import { getNeonColor } from '../../utils/neon';
 import { X, Camera, Check, Menu, Zap } from 'lucide-react';
 import { AVATAR_CATEGORIES } from '../../data/avatarEmojis';
 
@@ -15,11 +17,13 @@ const AVATAR_COLORS = [
 
 export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { user, updateUser } = useAuth();
+  const { settings } = useSettings();
   const { state: victron } = useVictron();
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editAvatarColor, setEditAvatarColor] = useState(AVATAR_COLORS[0]);
+  const [editAvatarColorNeon, setEditAvatarColorNeon] = useState('linear-gradient(135deg, #00D9FF, #7A3CFF)');
   const [avatarCategory, setAvatarCategory] = useState(0);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -28,6 +32,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
       setEditName(user.id);
       setEditAvatar(user.avatar);
       setEditAvatarColor(user.avatarColor || AVATAR_COLORS[0]);
+      setEditAvatarColorNeon(user.avatarColorNeon || 'linear-gradient(135deg, #00D9FF, #7A3CFF)');
       setSaveMessage('');
     }
   }, [showProfile, user]);
@@ -71,7 +76,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const currentDbUser = mockDb.getUsers().find(u => u.id === user.id);
     if (!currentDbUser) return;
 
-    const updatedUser = { ...currentDbUser, id: editName.trim(), avatar: editAvatar, avatarColor: editAvatarColor };
+    const updatedUser = { ...currentDbUser, id: editName.trim(), avatar: editAvatar, avatarColor: editAvatarColor, avatarColorNeon: editAvatarColorNeon };
     
     // If name changed, we need to delete old and add new (since id is the key)
     if (editName.trim() !== user.id) {
@@ -155,9 +160,12 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           >
             <span style={{
               width: '28px', height: '28px', borderRadius: '50%',
-              backgroundColor: user.avatarColor || AVATAR_COLORS[0],
+              background: settings.designMode === 'neon'
+                ? (user.avatarColorNeon || getNeonColor(user.id).color)
+                : (user.avatarColor || AVATAR_COLORS[0]),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               overflow: 'hidden',
+              boxShadow: settings.designMode === 'neon' ? `0 0 8px ${getNeonColor(user.id).color}88, 0 0 18px ${getNeonColor(user.id).color2}44` : 'none',
             }}>
               <AvatarEmoji emoji={user.avatar} size={28} />
             </span>
@@ -313,9 +321,9 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             </div>
 
             {/* Avatar Color Picker */}
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Avatar-Farbe
+                Avatar-Farbe (Klassisch)
               </label>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 {AVATAR_COLORS.map(clr => (
@@ -332,6 +340,43 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
                     }}
                   />
                 ))}
+              </div>
+            </div>
+
+            {/* Avatar Color Picker Neon (Gradients) */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                Avatar-Farbe (Neon)
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {(() => {
+                  const NEON_GRADIENTS = [
+                    { value: 'linear-gradient(135deg, #00D9FF, #7A3CFF)', label: 'Cyan-Violett' },
+                    { value: 'linear-gradient(135deg, #FF2BD6, #FF66E3)', label: 'Magenta-Pink' },
+                    { value: 'linear-gradient(135deg, #B6FF3D, #39FF88)', label: 'Lime-Grün' },
+                    { value: 'linear-gradient(135deg, #FF9F1C, #FF2BD6)', label: 'Amber-Magenta' },
+                    { value: 'linear-gradient(135deg, #168BFF, #00D9FF)', label: 'Blau-Cyan' },
+                  ];
+                  return NEON_GRADIENTS.map(g => {
+                    const isSelected = editAvatarColorNeon === g.value;
+                    return (
+                      <button
+                        key={g.label}
+                        onClick={() => setEditAvatarColorNeon(g.value)}
+                        title={g.label}
+                        style={{
+                          width: '36px', height: '36px', borderRadius: '50%',
+                          background: g.value,
+                          border: isSelected ? '3px solid var(--color-text)' : '2px solid transparent',
+                          cursor: 'pointer', transition: 'transform 0.1s',
+                          transform: isSelected ? 'scale(1.15)' : 'scale(1)',
+                          outline: 'none',
+                          boxShadow: isSelected ? '0 0 8px rgba(255,255,255,0.3)' : 'none',
+                        }}
+                      />
+                    );
+                  });
+                })()}
               </div>
             </div>
 

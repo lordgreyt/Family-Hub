@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockDb } from '../services/mockDb';
-import type { ThemeColor, FontSize } from '../services/mockDb';
+import type { ThemeColor, FontSize, DesignMode } from '../services/mockDb';
 import { useAuth } from './AuthContext';
 
 interface AppSettings {
   themeColor: ThemeColor;
   fontSize: FontSize;
+  designMode: DesignMode;
   prioPoints: Record<number, number>;
   videoCostPerMinute: number;
   youtubeApiKey?: string;
@@ -19,6 +20,7 @@ interface SettingsContextType {
 const defaultSettings: AppSettings = {
   themeColor: 'indigo',
   fontSize: 'base',
+  designMode: 'classic',
   prioPoints: { 1: 5, 2: 10, 3: 15 },
   videoCostPerMinute: 2,
   youtubeApiKey: '',
@@ -50,15 +52,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => window.removeEventListener('db_updated', handleDbUpdate);
   }, []);
 
-  const [localUserConfig, setLocalUserConfig] = useState<{themeColor?: ThemeColor, fontSize?: FontSize}>({});
+  const [localUserConfig, setLocalUserConfig] = useState<{themeColor?: ThemeColor, fontSize?: FontSize, designMode?: DesignMode}>({});
 
   useEffect(() => {
     if (user) {
       const savedTheme = localStorage.getItem(`local_theme_${user.id}`) as ThemeColor;
       const savedFont = localStorage.getItem(`local_font_${user.id}`) as FontSize;
+      const savedDesign = localStorage.getItem(`local_design_${user.id}`) as DesignMode;
       setLocalUserConfig({
         themeColor: savedTheme || undefined,
-        fontSize: savedFont || undefined
+        fontSize: savedFont || undefined,
+        designMode: savedDesign || undefined,
       });
     } else {
       setLocalUserConfig({});
@@ -68,6 +72,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Determine active display settings
   const activeTheme = localUserConfig.themeColor || user?.themeColor || settings.themeColor;
   const activeFontSize = localUserConfig.fontSize || user?.fontSize || settings.fontSize;
+  const activeDesignMode = localUserConfig.designMode || settings.designMode;
 
   useEffect(() => {
     mockDb.saveAppSettings(settings);
@@ -77,12 +82,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Apply the active settings to the DOM
     document.documentElement.setAttribute('data-theme', activeTheme);
     document.documentElement.setAttribute('data-font-size', activeFontSize);
-  }, [activeTheme, activeFontSize]);
+    document.documentElement.setAttribute('data-design', activeDesignMode);
+  }, [activeTheme, activeFontSize, activeDesignMode]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    // If we are updating theme or font size AND a user is logged in, 
+    // If we are updating theme, font size, or design mode AND a user is logged in,
     // we save it LOCALLY to the device, not to Firebase, to prevent sync overrides.
-    if (user && (newSettings.themeColor || newSettings.fontSize)) {
+    if (user && (newSettings.themeColor || newSettings.fontSize || newSettings.designMode)) {
       setLocalUserConfig(prev => {
         const next = { ...prev };
         if (newSettings.themeColor) {
@@ -93,6 +99,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem(`local_font_${user.id}`, newSettings.fontSize);
           next.fontSize = newSettings.fontSize;
         }
+        if (newSettings.designMode) {
+          localStorage.setItem(`local_design_${user.id}`, newSettings.designMode);
+          next.designMode = newSettings.designMode;
+        }
         return next;
       });
     } else {
@@ -101,13 +111,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <SettingsContext.Provider value={{ 
-      settings: { 
-        ...settings, 
-        themeColor: activeTheme, 
-        fontSize: activeFontSize 
-      }, 
-      updateSettings 
+    <SettingsContext.Provider value={{
+      settings: {
+        ...settings,
+        themeColor: activeTheme,
+        fontSize: activeFontSize,
+        designMode: activeDesignMode,
+      },
+      updateSettings
     }}>
       {children}
     </SettingsContext.Provider>

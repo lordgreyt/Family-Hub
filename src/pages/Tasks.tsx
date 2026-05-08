@@ -6,6 +6,7 @@ import type { TaskItem, User } from '../services/mockDb';
 import { Plus, X, Save } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { TaskCard } from '../components/TaskCard';
+import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 
 export const Tasks = () => {
   const { user } = useAuth();
@@ -23,12 +24,12 @@ export const Tasks = () => {
   useEffect(() => {
     const load = () => {
       setTasks(mockDb.getTasks());
-      setUsers(mockDb.getUsers());
+      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
     };
     load();
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, []);
+  }, [settings.designMode]);
 
   const isChild = user?.isChild;
   const assignableUsers = users.filter(u => isChild ? (u.id === user.id || u.isChild) : true);
@@ -176,6 +177,8 @@ export const Tasks = () => {
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', width: '100%', padding: '0.25rem 0' }}>
             {assignableUsers.map(u => {
               const isSelected = assignedTo.includes(u.id);
+              const uGlow = getNeonColor(u.id);
+              const uNeon = settings.designMode === 'neon';
               return (
                 <button
                   key={u.id}
@@ -199,7 +202,7 @@ export const Tasks = () => {
                     transition: 'all 0.2s'
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden', boxShadow: uNeon ? `0 0 6px ${uGlow.color}88, 0 0 14px ${uGlow.color2}44` : 'none' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
                 </button>
               );
             })}
@@ -278,6 +281,8 @@ export const Tasks = () => {
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', width: '100%', padding: '0.25rem 0' }}>
                       {assignableUsers.map(u => {
                         const isSelected = editingTask.assignedTo?.includes(u.id);
+                        const uGlow = getNeonColor(u.id);
+                        const uNeon = settings.designMode === 'neon';
                         return (
                           <button
                             key={u.id}
@@ -302,7 +307,7 @@ export const Tasks = () => {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden', boxShadow: uNeon ? `0 0 6px ${uGlow.color}88, 0 0 14px ${uGlow.color2}44` : 'none' }}><AvatarEmoji emoji={u.avatar} size={18} /></span> {u.id}
                           </button>
                         );
                       })}
@@ -329,15 +334,20 @@ export const Tasks = () => {
 
             return (
               (() => {
-                const assigneeId = task.assignedTo?.[0] || task.createdBy;
-                const assignee = users.find(u => u.id === assigneeId);
+                const taskAssignees = task.assignedTo?.length
+                  ? users.filter(u => task.assignedTo!.includes(u.id))
+                  : [];
+                const isNeon = settings.designMode === 'neon';
+                const ncs = isNeon ? getNeonCardStyle(task.id) : undefined;
                 return (
                   <TaskCard
                     key={task.id}
                     task={task}
-                    assignee={assignee}
+                    assignees={taskAssignees.length > 0 ? taskAssignees : undefined}
                     showToggle
                     canToggle={!isChild}
+                    neonCardStyle={ncs}
+                    neonBorder={ncs ? ncs.color1 : undefined}
                     onToggle={handleToggle}
                     onEdit={isChild ? undefined : handleStartEdit}
                     onDelete={isChild ? undefined : handleDelete}

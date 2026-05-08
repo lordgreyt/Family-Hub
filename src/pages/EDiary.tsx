@@ -231,7 +231,7 @@ export const EDiary = () => {
       gap: '1.5rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Gefühle-Tagebuch</h1>
+        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Stimmungskalender</h1>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={() => setShowTagManager(true)}

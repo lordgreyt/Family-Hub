@@ -350,12 +350,12 @@ export const Expenses = () => {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <div style={{ padding: '0.4rem', backgroundColor: 'var(--color-primary)', borderRadius: 'var(--radius-md)', color: 'white', border: 'none' }}>
+          <div style={{ padding: '0.4rem', backgroundColor: 'var(--color-primary)', borderRadius: 'var(--radius-md)', border: 'none' }}>
             <p style={{ margin: 0, fontSize: '0.6rem', color: 'white', fontWeight: 700, opacity: 0.9 }}>AUSGABEN</p>
             <p style={{ margin: '0', fontSize: '0.9rem', fontWeight: 700 }}>-{stats.totalOut.toFixed(2)}€</p>
           </div>
-          <div style={{ padding: '0.4rem', backgroundColor: 'white', borderRadius: 'var(--radius-md)', border: '1px solid black', color: 'black' }}>
-            <p style={{ margin: 0, fontSize: '0.6rem', color: 'black', fontWeight: 700, opacity: 0.7 }}>EINNAHMEN</p>
+          <div style={{ padding: '0.4rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
+            <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--color-text-muted)', fontWeight: 700, opacity: 0.7 }}>EINNAHMEN</p>
             <p style={{ margin: '0', fontSize: '0.9rem', fontWeight: 700 }}>+{stats.totalIn.toFixed(2)}€</p>
           </div>
         </div>
@@ -656,7 +656,7 @@ export const Expenses = () => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-end',
-        boxShadow: '0 -4px 12px rgba(91, 63, 214, 0.2)',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.4)',
         zIndex: 100,
         paddingBottom: 'calc(0.5rem + safe-area-inset-bottom)'
       }}>
@@ -688,7 +688,7 @@ export const Expenses = () => {
               borderRadius: '50%',
               backgroundColor: 'var(--color-primary)',
               color: 'white',
-              border: '4px solid white',
+              border: '4px solid var(--color-background)',
               boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
               display: 'flex',
               alignItems: 'center',
@@ -709,7 +709,7 @@ export const Expenses = () => {
               borderRadius: '50%',
               backgroundColor: 'var(--color-primary)',
               color: 'white',
-              border: '4px solid white',
+              border: '4px solid var(--color-background)',
               boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
               display: 'flex',
               alignItems: 'center',

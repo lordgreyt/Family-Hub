@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, RewardRequest, ScoreEntry, User } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
+import { getNeonColor } from '../utils/neon';
 import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Video, Lock, Unlock } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
@@ -97,14 +98,14 @@ export const Rewards = () => {
       setTasks(mockDb.getTasks());
       setRequests(mockDb.getRewardRequests());
       setLeaderboard(mockDb.getLeaderboard());
-      setUsers(mockDb.getUsers());
+      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
       setUnlockedVideos(mockDb.getUnlockedVideos());
       setDynamicVideos(mockDb.getCustomVideos());
     };
     load();
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, []);
+  }, [settings.designMode]);
 
   if (!user) return null;
 
@@ -129,9 +130,11 @@ export const Rewards = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               {scores.map((s, idx) => {
                   const u = users.find(usr => usr.id === s.childId);
+                  const uGlow = u ? getNeonColor(u.id) : null;
+                  const uNeon = settings.designMode === 'neon';
                   return (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-sm)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{idx === 0 ? '👑 ' : ''}{u && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}>{u.avatar ? <AvatarEmoji emoji={u.avatar} size={20} /> : '👤'}</span>} {u?.id || s.childId}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{idx === 0 ? '👑 ' : ''}{u && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: u.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden', boxShadow: uNeon && uGlow ? `0 0 6px ${uGlow.color}88, 0 0 14px ${uGlow.color2}44` : 'none' }}>{u.avatar ? <AvatarEmoji emoji={u.avatar} size={20} /> : '👤'}</span>} {u?.id || s.childId}</span>
                           <span style={{ fontWeight: idx === 0 ? 'bold' : 'normal', color: idx === 0 ? '#f59e0b' : 'inherit' }}>{s.score}</span>
                       </div>
                   );
@@ -285,7 +288,9 @@ export const Rewards = () => {
                 const childBalance = requests
                   .filter(r => r.childId === child.id && r.status !== 'REJECTED')
                   .reduce((sum, r) => sum - r.stars, 0);
-                
+                const cGlow = getNeonColor(child.id);
+                const cNeon = settings.designMode === 'neon';
+
                 return (
                   <div key={child.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -293,8 +298,9 @@ export const Rewards = () => {
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                           width: '36px', height: '36px', borderRadius: '50%',
-                          backgroundColor: child.avatarColor || '#6366f1',
+                          background: child.avatarColor || '#6366f1',
                           flexShrink: 0, overflow: 'hidden',
+                          boxShadow: cNeon ? `0 0 8px ${cGlow.color}88, 0 0 18px ${cGlow.color2}44` : 'none',
                         }}><AvatarEmoji emoji={child.avatar} size={36} /></span>
                         <strong style={{ fontSize: '1.1rem' }}>{child.id}</strong>
                       </div>
@@ -390,10 +396,12 @@ export const Rewards = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {pendingRequests.map(req => {
                 const reqUser = users.find(u => u.id === req.childId);
+                const reqGlow = reqUser ? getNeonColor(reqUser.id) : null;
+                const reqNeon = settings.designMode === 'neon';
                 return (
                   <div key={req.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                     <div>
-                      <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
+                      <strong>{reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden', boxShadow: reqNeon && reqGlow ? `0 0 6px ${reqGlow.color}88, 0 0 14px ${reqGlow.color2}44` : 'none' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>} {reqUser?.id}</strong> möchte <strong>{req.stars} Sterne</strong> einlösen.
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button onClick={() => mockDb.updateRewardRequest({ ...req, status: 'REJECTED' })} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -534,6 +542,11 @@ export const Rewards = () => {
           return Math.max(30, (balance / maxBalance) * 90);
         };
 
+        const isNeon = settings.designMode === 'neon';
+        const g0 = getNeonColor(rankings[0]?.id || '0');
+        const g1 = getNeonColor(rankings[1]?.id || '1');
+        const g2 = getNeonColor(rankings[2]?.id || '2');
+
         return (
           <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: 'var(--color-text-muted)' }}>Siegertreppchen</h3>
@@ -541,7 +554,7 @@ export const Rewards = () => {
               {/* 2nd Place */}
               {rankings[1] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', backgroundColor: rankings[1].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[1].avatar} size={32} /></span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: rankings[1].avatarColor || '#6366f1', overflow: 'hidden', boxShadow: isNeon ? `0 0 8px ${g1.color}88, 0 0 18px ${g1.color2}44` : 'none' }}><AvatarEmoji emoji={rankings[1].avatar} size={32} /></span></div>
                   {rankings[1].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -576,7 +589,7 @@ export const Rewards = () => {
               {/* 1st Place */}
               {rankings[0] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: rankings[0].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[0].avatar} size={40} /></span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: rankings[0].avatarColor || '#6366f1', overflow: 'hidden', boxShadow: isNeon ? `0 0 10px ${g0.color}88, 0 0 24px ${g0.color2}44` : 'none' }}><AvatarEmoji emoji={rankings[0].avatar} size={40} /></span></div>
                   {rankings[0].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />
@@ -611,7 +624,7 @@ export const Rewards = () => {
               {/* 3rd Place */}
               {rankings[2] && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: rankings[2].avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={rankings[2].avatar} size={28} /></span></div>
+                  <div style={{ marginBottom: '0.2rem' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', background: rankings[2].avatarColor || '#6366f1', overflow: 'hidden', boxShadow: isNeon ? `0 0 6px ${g2.color}88, 0 0 14px ${g2.color2}44` : 'none' }}><AvatarEmoji emoji={rankings[2].avatar} size={28} /></span></div>
                   {rankings[2].balance <= 0 && (
                     <span style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.1rem', marginBottom: '0.2rem', color: 'var(--color-text-muted)' }}>
                       0 <Star size={10} fill="currentColor" />

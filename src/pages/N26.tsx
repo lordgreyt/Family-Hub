@@ -545,9 +545,9 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
           right: '1rem',
           marginTop: '0.25rem',
           zIndex: 50,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-md)',
-          boxShadow: '0 8px 24px rgba(20, 25, 50, 0.15)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)',
           overflow: 'hidden',
           animation: 'slideDown 0.15s ease',
@@ -805,8 +805,8 @@ const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?
       {showActions && (
         <div style={{
           position: 'absolute', top: '100%', right: '1rem', marginTop: '0.25rem', zIndex: 50,
-          backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-md)',
-          boxShadow: '0 8px 24px rgba(20, 25, 50, 0.15)', border: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-lg)', border: '1px solid var(--color-border)',
           overflow: 'hidden', animation: 'slideDown 0.15s ease', minWidth: '160px',
         }}>
           <button

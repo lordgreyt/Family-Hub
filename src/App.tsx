@@ -23,6 +23,7 @@ import { initNotificationService } from './services/notificationService';
 
 
 import './index.css';
+import './styles/neon.css';
 
 function App() {
 

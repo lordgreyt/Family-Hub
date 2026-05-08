@@ -4,13 +4,15 @@ import { ref, set as firebaseSet, onValue, get as firebaseGet, runTransaction } 
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
+export type DesignMode = 'classic' | 'neon';
 
 // Types
 export interface User {
   id: string; // The user's typed alias (e.g. "Markus")
   uid?: string; // Firebase Authentication UID
   avatar: string; // Emoji
-  avatarColor?: string; // Hintergrundfarbe für den Avatar-Kreis
+  avatarColor?: string; // Hintergrundfarbe für den Avatar-Kreis (klassisch)
+  avatarColorNeon?: string; // Hintergrundfarbe für den Avatar-Kreis (Neon-Modus)
   isAdmin?: boolean;
   isSetupComplete?: boolean;
   isChild?: boolean;

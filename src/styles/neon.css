@@ -1,0 +1,511 @@
+/* ============================================
+   NEON DARK THEME — Family Hub v1.4.0
+   Activated via [data-design="neon"]
+   ============================================ */
+
+/* ── Global scrollbar & selection ── */
+[data-design="neon"] ::selection {
+  background: rgba(0, 217, 255, 0.25);
+  color: #FFFFFF;
+}
+
+/* ════════════════════════════════════════════
+   BASE CSS VARIABLES
+   ════════════════════════════════════════════ */
+[data-design="neon"] {
+  /* ── Background ── */
+  --color-background: #050914;
+  --color-surface: #0D1324;
+  --color-surface-hover: #11182B;
+  --color-surface-muted: #0A1020;
+
+  /* ── Text ── */
+  --color-text: #F5F7FF;
+  --color-text-muted: #A8B0C5;
+  --color-text-tertiary: #6F7890;
+
+  /* ── Borders ── */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.16);
+
+  /* ── Shadows — dark with subtle glow ── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.50);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 14px 40px rgba(0, 0, 0, 0.60);
+
+  /* ── Radii — slightly more technical ── */
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+
+  /* ── Semantic ── */
+  --color-success: #39FF88;
+  --color-danger: #FF3B5C;
+}
+
+/* ── Theme color overrides for neon mode ── */
+[data-design="neon"][data-theme="indigo"],
+[data-design="neon"] {
+  --color-primary: #7A3CFF;
+  --color-primary-light: #9B6BFF;
+  --color-primary-dark: #5C2AD4;
+  --color-primary-gradient: linear-gradient(135deg, #00D9FF, #7A3CFF);
+  --color-primary-transparent: rgba(122, 60, 255, 0.12);
+}
+
+[data-design="neon"][data-theme="rose"] {
+  --color-primary: #FF2BD6;
+  --color-primary-light: #FF66E3;
+  --color-primary-dark: #D41FAF;
+  --color-primary-gradient: linear-gradient(135deg, #FF2BD6, #FF66E3);
+  --color-primary-transparent: rgba(255, 43, 214, 0.12);
+}
+
+[data-design="neon"][data-theme="emerald"] {
+  --color-primary: #39FF88;
+  --color-primary-light: #66FFA8;
+  --color-primary-dark: #1FD46A;
+  --color-primary-gradient: linear-gradient(135deg, #39FF88, #00D9FF);
+  --color-primary-transparent: rgba(57, 255, 136, 0.12);
+}
+
+[data-design="neon"][data-theme="amber"] {
+  --color-primary: #FF9F1C;
+  --color-primary-light: #FFBB55;
+  --color-primary-dark: #D47C00;
+  --color-primary-gradient: linear-gradient(135deg, #FFD84D, #FF9F1C);
+  --color-primary-transparent: rgba(255, 159, 28, 0.12);
+}
+
+[data-design="neon"][data-theme="cyan"] {
+  --color-primary: #00D9FF;
+  --color-primary-light: #4DE8FF;
+  --color-primary-dark: #00A8D4;
+  --color-primary-gradient: linear-gradient(135deg, #00D9FF, #168BFF);
+  --color-primary-transparent: rgba(0, 217, 255, 0.12);
+}
+
+[data-design="neon"][data-theme="violet"] {
+  --color-primary: #8A3FFC;
+  --color-primary-light: #A670FF;
+  --color-primary-dark: #6C2AD4;
+  --color-primary-gradient: linear-gradient(135deg, #A670FF, #8A3FFC);
+  --color-primary-transparent: rgba(138, 63, 252, 0.12);
+}
+
+[data-design="neon"][data-theme="blue"] {
+  --color-primary: #168BFF;
+  --color-primary-light: #4DA8FF;
+  --color-primary-dark: #0066D4;
+  --color-primary-gradient: linear-gradient(135deg, #4DA8FF, #168BFF);
+  --color-primary-transparent: rgba(22, 139, 255, 0.12);
+}
+
+[data-design="neon"][data-theme="slate"] {
+  --color-primary: #6F7890;
+  --color-primary-light: #9BA5B8;
+  --color-primary-dark: #4E5668;
+  --color-primary-gradient: linear-gradient(135deg, #9BA5B8, #6F7890);
+  --color-primary-transparent: rgba(111, 120, 144, 0.12);
+}
+
+[data-design="neon"][data-theme="teal"] {
+  --color-primary: #00D9FF;
+  --color-primary-light: #4DE8FF;
+  --color-primary-dark: #0099AA;
+  --color-primary-gradient: linear-gradient(135deg, #4DE8FF, #00D9FF);
+  --color-primary-transparent: rgba(0, 217, 255, 0.12);
+}
+
+[data-design="neon"][data-theme="pink"] {
+  --color-primary: #FF2BD6;
+  --color-primary-light: #FF66E3;
+  --color-primary-dark: #D41FAF;
+  --color-primary-gradient: linear-gradient(135deg, #FF66E3, #FF2BD6);
+  --color-primary-transparent: rgba(255, 43, 214, 0.12);
+}
+
+[data-design="neon"][data-theme="coral"] {
+  --color-primary: #FF3B5C;
+  --color-primary-light: #FF6B80;
+  --color-primary-dark: #D42A45;
+  --color-primary-gradient: linear-gradient(135deg, #FF6B80, #FF3B5C);
+  --color-primary-transparent: rgba(255, 59, 92, 0.12);
+}
+
+[data-design="neon"][data-theme="lime"] {
+  --color-primary: #B6FF3D;
+  --color-primary-light: #CFFF6B;
+  --color-primary-dark: #8AD400;
+  --color-primary-gradient: linear-gradient(135deg, #CFFF6B, #B6FF3D);
+  --color-primary-transparent: rgba(182, 255, 61, 0.12);
+}
+
+[data-design="neon"][data-theme="grape"] {
+  --color-primary: #A855F7;
+  --color-primary-light: #C084FC;
+  --color-primary-dark: #7E22CE;
+  --color-primary-gradient: linear-gradient(135deg, #C084FC, #A855F7);
+  --color-primary-transparent: rgba(168, 85, 247, 0.12);
+}
+
+[data-design="neon"][data-theme="ocean"] {
+  --color-primary: #168BFF;
+  --color-primary-light: #38BDF8;
+  --color-primary-dark: #0369A1;
+  --color-primary-gradient: linear-gradient(135deg, #38BDF8, #168BFF);
+  --color-primary-transparent: rgba(22, 139, 255, 0.12);
+}
+
+[data-design="neon"][data-theme="sunset"] {
+  --color-primary: #FF9F1C;
+  --color-primary-light: #FB923C;
+  --color-primary-dark: #EA580C;
+  --color-primary-gradient: linear-gradient(135deg, #FB923C, #FF9F1C);
+  --color-primary-transparent: rgba(255, 159, 28, 0.12);
+}
+
+[data-design="neon"][data-theme="mint"] {
+  --color-primary: #39FF88;
+  --color-primary-light: #34D399;
+  --color-primary-dark: #059669;
+  --color-primary-gradient: linear-gradient(135deg, #34D399, #39FF88);
+  --color-primary-transparent: rgba(57, 255, 136, 0.12);
+}
+
+[data-design="neon"][data-theme="crimson"] {
+  --color-primary: #FF3B5C;
+  --color-primary-light: #EF4444;
+  --color-primary-dark: #B91C1C;
+  --color-primary-gradient: linear-gradient(135deg, #EF4444, #FF3B5C);
+  --color-primary-transparent: rgba(255, 59, 92, 0.12);
+}
+
+[data-design="neon"][data-theme="gold"] {
+  --color-primary: #FFD84D;
+  --color-primary-light: #FFD84D;
+  --color-primary-dark: #D4A000;
+  --color-primary-gradient: linear-gradient(135deg, #FFD84D, #FF9F1C);
+  --color-primary-transparent: rgba(255, 216, 77, 0.12);
+}
+
+/* ════════════════════════════════════════════
+   BODY & GLOBAL
+   ════════════════════════════════════════════ */
+[data-design="neon"] body {
+  background-color: var(--color-background);
+  font-family: 'Space Grotesk', 'Inter', 'Manrope', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+[data-design="neon"] #root {
+  background-color: var(--color-background);
+}
+
+[data-design="neon"] .app-content {
+  background-color: var(--color-background);
+}
+
+/* ════════════════════════════════════════════
+   TOPBAR / HEADER
+   ════════════════════════════════════════════ */
+[data-design="neon"] header {
+  background: rgba(10, 16, 32, 0.92) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-design="neon"] header h1 {
+  background: linear-gradient(135deg, #00D9FF, #7A3CFF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+[data-design="neon"] header button[style*="rgba(255,255,255,0.18)"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ════════════════════════════════════════════
+   SIDEBAR
+   ════════════════════════════════════════════ */
+[data-design="neon"] aside {
+  background: rgba(10, 16, 32, 0.96) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-design="neon"] aside h2 {
+  color: #00D9FF !important;
+}
+
+[data-design="neon"] aside a[style*="color: white"] {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(122, 60, 255, 0.15)) !important;
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.1);
+}
+
+/* ════════════════════════════════════════════
+   GLASS PANELS (forms, sections, cards)
+   ════════════════════════════════════════════ */
+[data-design="neon"] .glass-panel {
+  background: rgba(13, 19, 36, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ════════════════════════════════════════════
+   BUTTONS
+   ════════════════════════════════════════════ */
+[data-design="neon"] .btn-primary {
+  background: linear-gradient(135deg, #00D9FF, #7A3CFF, #FF2BD6);
+  color: #FFFFFF;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.25),
+              0 0 32px rgba(255, 43, 214, 0.15);
+  border: none;
+}
+
+[data-design="neon"] .btn-primary:hover {
+  box-shadow: 0 0 28px rgba(0, 217, 255, 0.35),
+              0 0 40px rgba(255, 43, 214, 0.25);
+  transform: translateY(-1px);
+}
+
+[data-design="neon"] .btn-primary:active {
+  transform: translateY(0);
+}
+
+[data-design="neon"] .btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  color: #A8B0C5;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+[data-design="neon"] .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #F5F7FF;
+}
+
+[data-design="neon"] .btn {
+  color: var(--color-text);
+}
+
+/* ════════════════════════════════════════════
+   INPUT FIELDS
+   ════════════════════════════════════════════ */
+[data-design="neon"] .input-field {
+  background: rgba(8, 12, 24, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: #F5F7FF;
+  border-radius: var(--radius-md);
+}
+
+[data-design="neon"] .input-field:focus {
+  border-color: rgba(0, 217, 255, 0.65);
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.20);
+  outline: none;
+}
+
+[data-design="neon"] .input-field::placeholder {
+  color: #6F7890;
+}
+
+[data-design="neon"] select.input-field,
+[data-design="neon"] input[type="date"].input-field {
+  color-scheme: dark;
+}
+
+[data-design="neon"] input[type="date"].input-field::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+/* ════════════════════════════════════════════
+   CHIPS / PILL FILTERS
+   ════════════════════════════════════════════ */
+[data-design="neon"] .chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #A8B0C5;
+}
+
+[data-design="neon"] .chip:hover {
+  border-color: rgba(0, 217, 255, 0.35);
+  color: #00D9FF;
+}
+
+[data-design="neon"] .chip-active {
+  background: rgba(0, 217, 255, 0.12);
+  border: 1px solid rgba(0, 217, 255, 0.50);
+  color: #FFFFFF;
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.20);
+}
+
+[data-design="neon"] .chip-active:hover {
+  color: #FFFFFF;
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.30);
+}
+
+/* ════════════════════════════════════════════
+   TOOLBAR / RICH TEXT EDITOR
+   ════════════════════════════════════════════ */
+[data-design="neon"] .toolbar-btn {
+  color: #A8B0C5;
+}
+
+[data-design="neon"] .toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-primary-light);
+}
+
+/* ════════════════════════════════════════════
+   TASK CARDS (inline-style overrides)
+   ════════════════════════════════════════════ */
+[data-design="neon"] [class*="glass-panel"]:not(.glass-panel),
+[data-design="neon"] div[style*="backgroundColor: var(--color-surface)"],
+[data-design="neon"] div[style*="background-color: var(--color-surface)"] {
+  /* Cards already use CSS var — just add neon border on hover via parent */
+}
+
+[data-design="neon"] .app-content div[style*="minHeight: 64px"] {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ════════════════════════════════════════════
+   MODALS & POPOVERS
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="position: fixed"][style*="rgba(0,0,0,0.5)"] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-design="neon"] div[style*="backdrop-filter"] {
+  backdrop-filter: blur(12px) !important;
+}
+
+[data-design="neon"] input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
+/* ════════════════════════════════════════════
+   HEADINGS
+   ════════════════════════════════════════════ */
+[data-design="neon"] h1, [data-design="neon"] h2, [data-design="neon"] h3, [data-design="neon"] h4 {
+  color: #F5F7FF;
+}
+
+/* ════════════════════════════════════════════
+   TAB / SEGMENT CONTROLS
+   ════════════════════════════════════════════ */
+[data-design="neon"] .app-content > div > div[style*="background: var(--color-surface)"]:first-child {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ════════════════════════════════════════════
+   EXPENSES PAGE SPECIFIC
+   ════════════════════════════════════════════ */
+[data-design="neon"] footer,
+[data-design="neon"] div[style*="position: sticky"][style*="bottom: 0"],
+[data-design="neon"] div[style*="position: fixed"][style*="bottom: 0"][style*="height: 40px"] {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(122, 60, 255, 0.3)) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-design="neon"] div[style*="bottom: 20px"][style*="left: 50%"] button {
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.3), 0 0 32px rgba(255, 43, 214, 0.2) !important;
+}
+
+/* ════════════════════════════════════════════
+   PROFILE MODAL
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="max-width: 400px"][style*="background-color: var(--color-surface)"] {
+  background: rgba(13, 19, 36, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 217, 255, 0.05);
+}
+
+/* ════════════════════════════════════════════
+   SETUP / SETTINGS PAGE
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="background-color: rgba(16, 185, 129, 0.1)"] {
+  background-color: rgba(57, 255, 136, 0.08) !important;
+  border-color: rgba(57, 255, 136, 0.2) !important;
+}
+
+[data-design="neon"] div[style*="background-color: rgba(16, 185, 129, 0.08)"] {
+  background-color: rgba(57, 255, 136, 0.06) !important;
+  border-color: rgba(57, 255, 136, 0.15) !important;
+}
+
+/* ════════════════════════════════════════════
+   N26 DEPOT CARDS
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="background-color: #FAFAFB"] {
+  background-color: rgba(8, 12, 24, 0.5) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ════════════════════════════════════════════
+   BUDGET PAGE
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="border-bottom: 2px solid var(--color-primary)"] {
+  border-bottom-color: var(--color-primary-light) !important;
+}
+
+/* ════════════════════════════════════════════
+   CALENDAR / DATE PICKER (E-Diary)
+   ════════════════════════════════════════════ */
+[data-design="neon"] .react-calendar {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-design="neon"] .react-calendar__tile {
+  color: var(--color-text) !important;
+}
+
+[data-design="neon"] .react-calendar__tile--active {
+  background: var(--color-primary) !important;
+}
+
+/* ════════════════════════════════════════════
+   COLOR DROPDOWN & THEME PICKER
+   ════════════════════════════════════════════ */
+[data-design="neon"] div[style*="position: absolute"][style*="z-index: 50"],
+[data-design="neon"] div[style*="zIndex: 50"] {
+  background: rgba(13, 19, 36, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ════════════════════════════════════════════
+   CHANGELOG & VERSION DISPLAY
+   ════════════════════════════════════════════ */
+[data-design="neon"] .sidebar-version-btn {
+  color: var(--color-text-tertiary) !important;
+}
+
+/* ════════════════════════════════════════════
+   LOADING STATES
+   ════════════════════════════════════════════ */
+[data-design="neon"] p[style*="text-align: center"][style*="color: var(--color-text-muted)"] {
+  color: var(--color-text-tertiary) !important;
+}
+
+/* ════════════════════════════════════════════
+   AVATAR BOUNCE — keep as-is
+   ════════════════════════════════════════════ */

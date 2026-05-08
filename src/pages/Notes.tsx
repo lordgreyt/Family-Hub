@@ -1,17 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
-import type { NoteItem } from '../services/mockDb';
+import type { NoteItem, User } from '../services/mockDb';
 import { Plus, Trash2, X, Save } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 
 const LONG_PRESS_MS = 500;
 
 export const Notes = () => {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'SHARED' | 'PRIVATE'>('SHARED');
   const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [content, setContent] = useState('');
@@ -22,11 +26,14 @@ export const Notes = () => {
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const load = () => setNotes(mockDb.getNotes());
+    const load = () => {
+      setNotes(mockDb.getNotes());
+      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+    };
     load();
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, []);
+  }, [settings.designMode]);
 
   useEffect(() => {
     if (user?.isChild) {
@@ -146,7 +153,7 @@ export const Notes = () => {
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', marginTop: '2rem' }}>Keine Notizen vorhanden.</p>
         ) : (
           displayedNotes.map(note => {
-            const author = mockDb.getUsers().find(u => u.id === note.createdBy);
+            const author = users.find(u => u.id === note.createdBy);
 
             // Edit mode (long press)
             if (editingNote?.id === note.id) {
@@ -190,7 +197,10 @@ export const Notes = () => {
             }
 
             // Normal view — TaskCard style
-            return (
+            return (() => {
+              const isNeon = settings.designMode === 'neon';
+              const ncs = isNeon ? getNeonCardStyle(note.id) : null;
+              return (
               <div
                 key={note.id}
                 style={{
@@ -198,11 +208,20 @@ export const Notes = () => {
                   alignItems: 'center',
                   gap: '0.65rem',
                   padding: '0.75rem 0.85rem',
-                  backgroundColor: '#FFFFFF',
                   borderRadius: 'var(--radius-lg)',
-                  boxShadow: 'var(--shadow-md)',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  ...(ncs ? {
+                    backgroundImage: ncs.backgroundImage,
+                    backgroundOrigin: ncs.backgroundOrigin,
+                    backgroundClip: ncs.backgroundClip,
+                    border: ncs.border,
+                    boxShadow: ncs.boxShadow,
+                  } : {
+                    background: 'var(--color-surface)',
+                    boxShadow: 'var(--shadow-md)',
+                    border: '1px solid var(--color-border)',
+                  }),
                 }}
                 onMouseDown={() => startPress(note)}
                 onMouseUp={cancelPress}
@@ -220,9 +239,10 @@ export const Notes = () => {
                   width: '42px',
                   height: '42px',
                   borderRadius: '50%',
-                  backgroundColor: author?.avatarColor || 'var(--color-primary)',
+                  background: author?.avatarColor || 'var(--color-primary)',
                   flexShrink: 0,
                   overflow: 'hidden',
+                  boxShadow: ncs ? `0 0 10px ${ncs.color1}88, 0 0 22px ${ncs.color2}44` : 'none',
                 }}>
                   {author?.avatar ? <AvatarEmoji emoji={author.avatar} size={42} /> : '📝'}
                 </span>
@@ -251,7 +271,8 @@ export const Notes = () => {
                   />
                 </div>
               </div>
-            );
+              );
+            })();
           })
         )}
       </div>

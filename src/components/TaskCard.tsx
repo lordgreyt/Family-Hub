@@ -3,14 +3,32 @@ import { Check, CircleDashed } from 'lucide-react';
 import type { TaskItem, User } from '../services/mockDb';
 import { AvatarEmoji } from './AvatarEmoji';
 
+export interface NeonCardStyle {
+  color1: string;
+  color2: string;
+  backgroundImage: string;
+  backgroundOrigin: 'border-box';
+  backgroundClip: string;
+  border: string;
+  boxShadow: string;
+}
+
 interface TaskCardProps {
   task: TaskItem;
-  /** The user this task is assigned to (for avatar display). If multiple, shows first. Falls back to creator. */
-  assignee?: User;
+  /** All users this task is assigned to (for stacked avatar display). Falls back to creator if empty. */
+  assignees?: User[];
   /** Whether to show the done/undone toggle button on the right */
   showToggle?: boolean;
   /** Whether the user can toggle */
   canToggle?: boolean;
+  /** Neon border color for the card outline */
+  neonBorder?: string;
+  /** Neon box-shadow for multi-color glow */
+  neonShadow?: string;
+  /** Neon background gradient for directional glow */
+  neonBg?: string;
+  /** Gradient-border neon card style (takes precedence over individual neon props) */
+  neonCardStyle?: NeonCardStyle;
   onToggle?: (task: TaskItem) => void;
   onEdit?: (task: TaskItem) => void;
   onDelete?: (task: TaskItem) => void;
@@ -20,9 +38,13 @@ const LONG_PRESS_MS = 500;
 
 export const TaskCard = ({
   task,
-  assignee,
+  assignees,
   showToggle = false,
   canToggle = false,
+  neonBorder,
+  neonShadow,
+  neonBg,
+  neonCardStyle,
   onToggle,
   onEdit,
   onDelete,
@@ -100,9 +122,9 @@ export const TaskCard = ({
           right: '1rem',
           marginTop: '0.25rem',
           zIndex: 50,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-md)',
-          boxShadow: '0 8px 24px rgba(20, 25, 50, 0.15)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)',
           overflow: 'hidden',
           animation: 'slideDown 0.15s ease',
@@ -185,31 +207,80 @@ export const TaskCard = ({
           width: '100%',
           minHeight: '64px',
           padding: '0.65rem 0.85rem',
-          backgroundColor: '#FFFFFF',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-md)',
           cursor: hasActions ? 'pointer' : 'default',
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           opacity: task.isDone ? 0.6 : 1,
           userSelect: 'none',
+          // Gradient-border neon card style (new)
+          ...(neonCardStyle ? {
+            backgroundImage: neonCardStyle.backgroundImage,
+            backgroundOrigin: neonCardStyle.backgroundOrigin,
+            backgroundClip: neonCardStyle.backgroundClip,
+            border: neonCardStyle.border,
+            boxShadow: neonCardStyle.boxShadow,
+          } : {
+            // Legacy neon props
+            background: neonBg || 'var(--color-surface)',
+            boxShadow: neonShadow || 'var(--shadow-md)',
+            border: neonBorder ? `1px solid ${neonBorder}` : '1px solid var(--color-border)',
+          }),
         }}
       >
-        {/* Left: User avatar circle */}
+        {/* Left: Stacked user avatars */}
         <div style={{
-          width: '42px',
-          height: '42px',
-          borderRadius: '50%',
-          backgroundColor: assignee?.avatarColor || 'var(--color-text-tertiary)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
           flexShrink: 0,
-          overflow: 'hidden',
+          minWidth: assignees && assignees.length > 1 ? `${28 + (assignees.length - 1) * 16}px` : '42px',
         }}>
-          {assignee?.avatar ? (
-            <AvatarEmoji emoji={assignee.avatar} size={42} />
+          {assignees && assignees.length > 0 ? (
+            assignees.slice(0, 3).map((u, i) => (
+              <div key={u.id} style={{
+                width: assignees.length === 1 ? '42px' : '28px',
+                height: assignees.length === 1 ? '42px' : '28px',
+                borderRadius: '50%',
+                background: u.avatarColor || 'var(--color-text-tertiary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                marginLeft: i > 0 ? '-10px' : 0,
+                border: assignees.length > 1 ? '2px solid var(--color-surface)' : 'none',
+                zIndex: assignees.length - i,
+                boxShadow: neonBorder ? `0 0 8px ${neonBorder}66, 0 0 18px ${neonBorder}22` : 'none',
+              }}>
+                {u.avatar ? (
+                  <AvatarEmoji emoji={u.avatar} size={assignees.length === 1 ? 42 : 28} />
+                ) : (
+                  <CircleDashed size={assignees.length === 1 ? 20 : 14} color="#FFFFFF" strokeWidth={2} />
+                )}
+              </div>
+            ))
           ) : (
-            <CircleDashed size={20} color="#FFFFFF" strokeWidth={2} />
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-text-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              overflow: 'hidden',
+            }}>
+              <CircleDashed size={20} color="#FFFFFF" strokeWidth={2} />
+            </div>
+          )}
+          {assignees && assignees.length > 3 && (
+            <span style={{
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              color: 'var(--color-text-muted)',
+              marginLeft: '4px',
+            }}>
+              +{assignees.length - 3}
+            </span>
           )}
         </div>
 
@@ -231,14 +302,14 @@ export const TaskCard = ({
           }}>
             {task.content}
           </span>
-          {/* Show name if assigned */}
-          {assignee && (
+          {/* Show names if assigned */}
+          {assignees && assignees.length > 0 && (
             <span style={{
               fontSize: 'var(--font-xs)',
               fontWeight: 500,
               color: 'var(--color-text-muted)',
             }}>
-              {assignee.id}
+              {assignees.map(u => u.id).join(', ')}
             </span>
           )}
         </div>
