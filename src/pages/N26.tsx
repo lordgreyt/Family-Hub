@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, Landmark, History, Settings, 
+import { useSettings } from '../context/SettingsContext';
+import {
+  LayoutDashboard, Landmark, History, Settings,
   Plus, Trash2, X, Delete, ArrowRight, Calendar, FileText, ChevronRight,
   TrendingDown, TrendingUp, PieChart as PieChartIcon
 } from 'lucide-react';
 import { mockDb } from '../services/mockDb';
 import type { Depot, DepotTransaction, ExpenseItem } from '../services/mockDb';
+import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 
 type Tab = 'dashboard' | 'depots' | 'historie' | 'settings';
 
@@ -248,6 +250,19 @@ export const N26 = () => {
 // --- Sub-Views ---
 
 const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { depots: Depot[], calculateBalance: (d: Depot) => number, surplus: number | null, transactions: DepotTransaction[] }) => {
+  const { settings } = useSettings();
+  const isNeon = settings.designMode === 'neon';
+  /** Returns neon style overrides matching the Meals card effect — or null in classic mode */
+  const neonStyle = (key: string) => {
+    if (!isNeon) return null;
+    const g = getNeonColor(key);
+    return {
+      background: g.background,
+      border: `1px solid ${g.borderColor}33`,
+      boxShadow: g.boxShadow,
+    } as const;
+  };
+
   const totalBalance = depots.reduce((sum, d) => sum + (calculateBalance(d) || 0), 0);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -304,10 +319,11 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
             {totalBalance.toLocaleString('de-DE', { minimumFractionDigits: 0 })}€
           </div>
         </div>
-        <div className="glass-panel" style={{ 
-          flex: 1, minWidth: 0, padding: '1.25rem', 
+        <div className="glass-panel" style={{
+          flex: 1, minWidth: 0, padding: '1.25rem',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' 
+          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+          ...(neonStyle('n26-dash-surplus') || {}),
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--color-primary)', fontSize: 'var(--font-xs)', fontWeight: 600, marginBottom: '0.4rem' }}>
             {surplus !== null && surplus >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />} ÜBERSCHUSS
@@ -320,7 +336,7 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
 
       {/* Charts Row */}
       <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', ...(neonStyle('n26-dash-einzahlung') || {}) }}>
           <h3 style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Monatl. Einzahlung</h3>
           <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginBottom: '0.5rem' }}>
             <span>{depots.reduce((s, d) => s + (d.monthlyAmount || 0), 0).toLocaleString('de-DE')}€</span>
@@ -330,7 +346,7 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
             <PieChart data={depotData} size={110} />
           </div>
         </div>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', ...(neonStyle('n26-dash-buchungen') || {}) }}>
           <h3 style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Buchungen (Ausgaben)</h3>
           <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-danger)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginBottom: '0.5rem' }}>
             <span>{Math.abs(monthTransactions.reduce((s, t) => s + t.amount, 0)).toLocaleString('de-DE')}€</span>
@@ -346,7 +362,7 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
       <DepotBalanceChart depots={depots} calculateBalance={calculateBalance} />
 
       {/* Monthly Expenses Chart */}
-      <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+      <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', ...(neonStyle('n26-dash-ausgaben') || {}) }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausgaben Übersicht</h3>
@@ -464,12 +480,14 @@ const DepotsView = ({ depots, transactions, calculateBalance, onDelete, onAdd, o
 };
 
 const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: Depot, balance: number, transactions: DepotTransaction[], onDelete: (id: string) => void, onEdit: () => void }) => {
+  const { settings } = useSettings();
   const [isPressing, setIsPressing] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const wasLongPress = useRef(false);
+  const ncs = settings.designMode === 'neon' ? getNeonCardStyle(depot.id) : null;
 
   const recentTransactions = useMemo(() => {
     return transactions
@@ -588,7 +606,23 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
         onPointerUp={endPress}
         onPointerLeave={endPress}
         onClick={handleClick}
-        style={{
+        style={ncs ? {
+          padding: '0.75rem 1.25rem',
+          borderRadius: expanded ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
+          borderBottom: expanded ? 'none' : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.25rem',
+          transition: 'all 0.2s ease',
+          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
+          cursor: 'pointer',
+          userSelect: 'none',
+          backgroundImage: ncs.backgroundImage,
+          backgroundOrigin: ncs.backgroundOrigin,
+          backgroundClip: ncs.backgroundClip,
+          border: isPressing || expanded ? `2px solid var(--color-primary)` : ncs.border,
+          boxShadow: ncs.boxShadow,
+        } : {
           padding: '0.75rem 1.25rem',
           backgroundColor: 'var(--color-surface)',
           borderRadius: expanded ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
@@ -765,10 +799,12 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
 };
 
 const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?: Depot, onDelete: (id: string) => void }) => {
+  const { settings } = useSettings();
   const [isPressing, setIsPressing] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const ncs = settings.designMode === 'neon' ? getNeonCardStyle(tx.id) : null;
 
   const startPress = () => {
     setIsPressing(true);
@@ -827,7 +863,20 @@ const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?
         onPointerUp={cancelPress}
         onPointerLeave={cancelPress}
         onClick={() => showActions && setShowActions(false)}
-        style={{
+        style={ncs ? {
+          padding: '0.75rem 1.25rem',
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex', flexDirection: 'column', gap: '0.25rem',
+          transition: 'all 0.2s ease',
+          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
+          cursor: 'pointer', userSelect: 'none',
+          opacity: (tx.isAutomated || tx.note?.includes('Sparrate')) ? 0.7 : 1,
+          backgroundImage: ncs.backgroundImage,
+          backgroundOrigin: ncs.backgroundOrigin,
+          backgroundClip: ncs.backgroundClip,
+          border: isPressing ? `2px solid var(--color-primary)` : ncs.border,
+          boxShadow: isPressing ? `0 0 8px var(--color-primary)66, 0 0 16px var(--color-primary)33` : ncs.boxShadow,
+        } : {
           padding: '0.75rem 1.25rem', backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-lg)', border: '1px solid',
           borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
@@ -899,8 +948,10 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
 };
 
 const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) => {
+  const { settings: appSettings } = useSettings();
   const [settings, setSettings] = useState(mockDb.getN26Settings());
   const [isManualBookingLoading, setIsManualBookingLoading] = useState(false);
+  const ncs = appSettings.designMode === 'neon' ? getNeonCardStyle('n26-settings-btn') : null;
 
   const lastBookingDate = useMemo(() => {
     const routineTxs = transactions.filter(t => t.note?.includes('Sparrate'));
@@ -979,14 +1030,21 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
       {/* Manual Actions Card */}
       <div className="glass-panel" style={{ padding: '1.5rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '16px', fontWeight: 700 }}>Manuelle Aktionen</h3>
-        <button 
+        <button
           onClick={handleManualBooking}
           disabled={isManualBookingLoading}
-          style={{ 
+          style={ncs ? {
+            width: '100%', padding: '1rem', borderRadius: 'var(--radius-md)', border: '2px solid transparent',
+            color: 'white', fontWeight: 700, fontSize: '14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            cursor: 'pointer', opacity: isManualBookingLoading ? 0.7 : 1,
+            backgroundImage: `linear-gradient(135deg, ${ncs.color1}, ${ncs.color2})`,
+            boxShadow: `0 0 8px ${ncs.color1}66, 0 0 20px ${ncs.color2}33`,
+          } : {
             width: '100%', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none',
             backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 700, fontSize: '14px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            cursor: 'pointer', opacity: isManualBookingLoading ? 0.7 : 1
+            cursor: 'pointer', opacity: isManualBookingLoading ? 0.7 : 1,
           }}
         >
           <History size={18} /> {isManualBookingLoading ? 'Buche...' : 'Monatliche Raten jetzt buchen'}
@@ -1405,7 +1463,10 @@ const BarChart = ({ data }: { data: { label: string, value: number }[] }) => {
 };
 
 const DepotBalanceChart = ({ depots, calculateBalance }: { depots: Depot[], calculateBalance: (d: Depot) => number }) => {
+  const { settings } = useSettings();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const isNeon = settings.designMode === 'neon';
+  const ng = isNeon ? getNeonColor('n26-depot-chart') : null;
   
   const balanceData = useMemo(() => {
     return depots.map(d => ({
@@ -1419,7 +1480,7 @@ const DepotBalanceChart = ({ depots, calculateBalance }: { depots: Depot[], calc
   const selectedDepot = balanceData.find(d => d.id === selectedId);
 
   return (
-    <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+    <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', ...(ng ? { background: ng.background, border: `1px solid ${ng.borderColor}33`, boxShadow: ng.boxShadow } : {}) }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Depotübersicht</h3>
