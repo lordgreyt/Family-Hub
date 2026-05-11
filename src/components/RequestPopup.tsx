@@ -35,10 +35,12 @@ export const RequestPopup = () => {
 
   const allRequests = useMemo(() => {
     return [
-      ...mealRequests.map(r => ({ ...r, type: 'meal' as const })),
+      ...mealRequests
+        .filter(r => templates.some(t => t.id === r.templateId))
+        .map(r => ({ ...r, type: 'meal' as const })),
       ...starRequests.map(r => ({ ...r, type: 'star' as const }))
     ].sort((a, b) => b.createdAt - a.createdAt);
-  }, [mealRequests, starRequests]);
+  }, [mealRequests, starRequests, templates]);
 
   if (!user || user.isChild || !dataLoaded || allRequests.length === 0 || isHidden) return null;
 
