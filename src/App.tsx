@@ -16,6 +16,7 @@ import { Expenses } from './pages/Expenses';
 import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
+import { Pantry } from './pages/Pantry';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
 import { initNotificationService } from './services/notificationService';
@@ -51,6 +52,7 @@ function App() {
               <Route path="/n26" element={<N26 />} />
               <Route path="/wallbox" element={<Wallbox />} />
               <Route path="/e-diary" element={<EDiary />} />
+              <Route path="/pantry" element={<Pantry />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

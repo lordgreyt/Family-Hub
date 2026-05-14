@@ -139,6 +139,35 @@ export interface MoodEntry {
   createdAt: number;
 }
 
+export interface PantryItem {
+  id: string;
+  name: string;
+  emoji: string;
+  quantity: number;
+  minQuantity: number;
+  unit: string;
+  category: string;
+  expiryDate?: string; // YYYY-MM-DD
+  barcode?: string;
+  imageUrl?: string;
+  notes?: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  emoji: string;
+  quantity: number;
+  unit: string;
+  isDone: boolean;
+  category: string;
+  notes?: string;
+  createdAt: number;
+  createdBy: string;
+}
+
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -189,6 +218,8 @@ export const DB_KEYS = {
   VICTRON_SETTINGS: 'family_hub_victron_settings',
   EDIARY: 'family_hub_ediary',
   CUSTOM_TAGS: 'family_hub_custom_tags',
+  PANTRY_ITEMS: 'family_hub_pantry_items',
+  SHOPPING_LIST: 'family_hub_shopping_list',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -983,5 +1014,37 @@ export const mockDb = {
     const allTags: Record<string, TagOption[]> = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
     allTags[userId] = tags;
     set(DB_KEYS.CUSTOM_TAGS, allTags);
+  },
+
+  // Pantry (Vorratsscahrank)
+  getPantryItems: (): PantryItem[] => get(DB_KEYS.PANTRY_ITEMS, []),
+  addPantryItem: (item: Omit<PantryItem, 'id' | 'createdAt'>) => {
+    const newItem: PantryItem = { ...item, id: uuidv4(), createdAt: Date.now() };
+    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => [newItem, ...items]);
+  },
+  updatePantryItem: (updatedItem: PantryItem) => {
+    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+  },
+  deletePantryItem: (id: string) => {
+    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => items.filter(i => i.id !== id));
+  },
+
+  // Shopping List (Einkaufsliste)
+  getShoppingItems: (): ShoppingItem[] => get(DB_KEYS.SHOPPING_LIST, []),
+  addShoppingItem: (item: Omit<ShoppingItem, 'id' | 'createdAt' | 'isDone'>) => {
+    const newItem: ShoppingItem = { ...item, id: uuidv4(), createdAt: Date.now(), isDone: false };
+    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => [newItem, ...items]);
+  },
+  updateShoppingItem: (updatedItem: ShoppingItem) => {
+    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+  },
+  toggleShoppingItem: (id: string) => {
+    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.map(i => i.id === id ? { ...i, isDone: !i.isDone } : i));
+  },
+  deleteShoppingItem: (id: string) => {
+    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => i.id !== id));
+  },
+  deleteCompletedShoppingItems: () => {
+    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => !i.isDone));
   },
 };
