@@ -146,6 +146,40 @@ function normalize(raw: AnyRecord) {
     .filter((child) => child.id)
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 
+  const childById = new Map(children.map((child) => [child.id, child]));
+  const allTasks = tasks
+    .map((task) => {
+      const assignedRaw = task.assignedTo || task.assigned_to;
+      const assignedIds = Array.isArray(assignedRaw)
+        ? assignedRaw.map(String)
+        : assignedRaw
+          ? [String(assignedRaw)]
+          : [];
+      const priority = Number(task.priority || 1);
+      const completedAt = parseDate(task.completedAt || task.completed_at);
+      const createdAt = parseDate(task.createdAt || task.created_at);
+      const isDone = Boolean(task.isDone || task.is_done);
+      return {
+        id: String(task.id || ''),
+        content: String(task.content || task.title || 'Aufgabe'),
+        priority,
+        stars: points[priority] || 0,
+        dueDate: task.dueDate || task.due_date || '',
+        is_done: isDone,
+        is_shared: Boolean(task.isShared || task.is_shared),
+        assigned_to: assignedIds,
+        assigned_names: assignedIds.map((id) => childById.get(id)?.name || id).filter(Boolean),
+        createdBy: task.createdBy || task.created_by || '',
+        created_at: createdAt?.toISOString() || '',
+        completed_at: completedAt?.toISOString() || '',
+      };
+    })
+    .filter((task) => task.id || task.content)
+    .sort((a, b) => {
+      if (a.is_done !== b.is_done) return a.is_done ? 1 : -1;
+      return String(a.dueDate || '9999-99-99').localeCompare(String(b.dueDate || '9999-99-99')) || Number(b.priority || 0) - Number(a.priority || 0);
+    });
+  const openTasksTotal = allTasks.filter((task) => !task.is_done).length;
   const pendingRequests = rewards.filter((reward) => reward.status === 'PENDING').length;
 
   return {
@@ -153,10 +187,13 @@ function normalize(raw: AnyRecord) {
     source: 'vercel-firebase-admin',
     updated_at: now.toISOString(),
     children,
+    tasks: allTasks,
     pending_requests: pendingRequests,
     summary: {
       children: children.length,
-      open_tasks: children.reduce((sum, child) => sum + child.tasks_open, 0),
+      tasks: allTasks.length,
+      open_tasks: openTasksTotal,
+      done_tasks: allTasks.length - openTasksTotal,
       stars: children.reduce((sum, child) => sum + child.stars, 0),
       pending_requests: pendingRequests,
     },
