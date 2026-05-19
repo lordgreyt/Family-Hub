@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
-import { ref, set as firebaseSet, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
+import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/database';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
@@ -254,7 +254,7 @@ function set<T>(key: string, data: T): void {
   // 2. Push to Cloud — block incoming syncs until write settles
   addPending(key);
   console.log(`Syncing ${key} to Cloud...`, data);
-  firebaseSet(ref(db, key), data)
+  firebaseSet(ref(db, key), stripUndefined(data))
     .then(() => console.log(`Cloud sync success for ${key}`))
     .catch(async (e) => {
       console.error(`Firebase write error for ${key}:`, e);
@@ -292,6 +292,19 @@ function removePending(key: string) {
   }
 }
 
+// Firebase RTDB rejects undefined values — strip them recursively before any write
+function stripUndefined(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(stripUndefined);
+  if (obj && typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) result[key] = stripUndefined(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
 // Atomic helper: Uses Firebase runTransaction to prevent race conditions from stale clients.
 function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): void {
   // 1. Optimistic Local Update
@@ -300,27 +313,24 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
   localStorage.setItem(key, JSON.stringify(newLocal));
   window.dispatchEvent(new Event('db_updated'));
 
-  // 2. Atomic Cloud Sync — block incoming syncs until transaction settles
+  // 2. Cloud Sync — use firebaseSet (runTransaction can hang on non-existent paths)
   addPending(key);
-  console.log(`🔄 updateCollection: starting transaction on ${key} (pendingWrites count: ${pendingWrites.get(key)})`);
-  runTransaction(ref(db, key), (serverData) => {
-    const safeData = serverData || [];
-    return mutator(safeData);
-  })
-    .then((result) => {
-      console.log(`✅ Transaction committed for ${key}`, result.snapshot.val());
+  console.log(`🔄 updateCollection: writing to ${key} (pendingWrites count: ${pendingWrites.get(key)})`);
+  firebaseSet(ref(db, key), stripUndefined(newLocal))
+    .then(() => {
+      console.log(`✅ Write committed for ${key}`);
     })
     .catch(async (e) => {
-      console.error(`❌ Transaction failed for ${key}:`, e);
+      console.error(`❌ Write failed for ${key}:`, e);
       // Revert optimistic update — re-read actual server state
       try {
         const snap = await firebaseGet(ref(db, key));
         if (snap.exists()) {
           localStorage.setItem(key, JSON.stringify(snap.val()));
-          console.log(`↩️ Reverted ${key} to server state after transaction failure`);
+          console.log(`↩️ Reverted ${key} to server state after write failure`);
         } else {
           localStorage.removeItem(key);
-          console.log(`↩️ Removed ${key} from localStorage after transaction failure (server empty)`);
+          console.log(`↩️ Removed ${key} from localStorage after write failure (server empty)`);
         }
         window.dispatchEvent(new Event('db_updated'));
       } catch (e2) {
