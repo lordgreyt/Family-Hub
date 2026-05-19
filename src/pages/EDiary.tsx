@@ -222,7 +222,7 @@ export const EDiary = () => {
     }, 'image/png');
   };
 
-  if (!user || !user.isAdmin) return null;
+  if (!user) return null;
 
   return (
     <div style={{

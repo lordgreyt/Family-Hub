@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Family Hub Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface-hover: #1c1c2a;
+    --border: #2a2a3a;
+    --text: #e8e8f0;
+    --text-muted: #8888a0;
+    --primary: #6366f1;
+    --danger: #ef4444;
+    --orange: #f59e0b;
+    --green: #22c55e;
+    --cyan: #00d9ff;
+    --magenta: #ff2bd6;
+    --lime: #b6ff3d;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(12px, 3vw, 24px);
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  h1 {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .time {
+    font-size: clamp(0.85rem, 3vw, 1rem);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .status-dot.offline { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .status-dot.loading { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+
+  /* Refreshed indicator */
+  .refreshed {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .refreshed.visible { opacity: 0.7; }
+
+  /* Child cards */
+  .children-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    gap: 16px;
+  }
+
+  .child-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: clamp(14px, 3vw, 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .child-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--glow-color, var(--primary)), transparent);
+  }
+
+  .child-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .child-avatar {
+    width: clamp(44px, 8vw, 52px);
+    height: clamp(44px, 8vw, 52px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.3rem, 5vw, 1.6rem);
+    flex-shrink: 0;
+    box-shadow: 0 0 12px var(--glow-color, var(--primary));
+  }
+  .child-name {
+    font-size: clamp(1.1rem, 4vw, 1.35rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  /* Stars badge */
+  .stars-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    font-weight: 700;
+    font-size: 0.95rem;
+    align-self: flex-start;
+  }
+  .stars-badge svg { color: #f59e0b; }
+
+  /* Section label */
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .done-row {
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+
+  /* Stars section */
+  .section-header {
+    font-size: clamp(0.7rem, 2.5vw, 0.8rem);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .stars-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .star-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 100px;
+    flex: 1;
+    box-shadow: 0 0 12px var(--glow, var(--primary))14;
+  }
+  .star-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+  }
+  .star-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .star-value {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #f59e0b;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Tasks list */
+  .tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface-hover);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  .task-row.overdue {
+    background: rgba(239,68,68,0.08);
+    border-left: 3px solid var(--danger);
+    padding-left: 9px;
+  }
+  .task-row:hover { background: var(--border); }
+  .task-check {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+  .task-content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .task-assignees {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .task-assignee {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .task-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+  }
+  .task-due {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .task-due.due-overdue {
+    color: var(--danger);
+    font-weight: 700;
+  }
+  .task-badge {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  /* Scrollbar */
+  .tasks-list::-webkit-scrollbar { width: 4px; }
+  .tasks-list::-webkit-scrollbar-track { background: transparent; }
+  .tasks-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Family Hub</h1>
+    <div class="header-right">
+      <span class="refreshed" id="refreshed">Aktualisiert</span>
+      <span class="time" id="clock">--:--</span>
+      <div class="status-dot" id="status" title="Verbindungsstatus"></div>
+    </div>
+  </header>
+
+  <!-- Sternestand Kinder -->
+  <section id="stars-section"></section>
+
+  <!-- Alle Aufgaben -->
+  <section id="tasks-section"></section>
+
+  <footer>Family Hub Dashboard &middot; Auto-refresh alle 30s</footer>
+</div>
+
+<script>
+/* ─── CONFIG ─── */
+// ─── API Modus (Vercel) — vom Agenten gesetzt ───
+const API_URL = '__FAMILY_HUB_API_URL__';   // z.B. 'https://meine-app.vercel.app/api/home-assistant/family-status'
+const API_TOKEN = '__FAMILY_HUB_API_TOKEN__'; // Bearer-Token
+
+// ─── Fallback: Firebase REST direkt (nur wenn API_URL nicht gesetzt) ───
+const FIREBASE_DB = 'https://familyhub-a588b-default-rtdb.europe-west1.firebasedatabase.app';
+const USERS_PATH  = 'family_hub_users';
+const TASKS_PATH  = 'family_hub_tasks';
+const REWARDS_PATH = 'family_hub_rewards';
+const REFRESH_MS  = 30_000;
+
+const USE_API = API_URL && !API_URL.startsWith('__');
+
+/* ─── STATE ─── */
+let users   = [];
+let tasks   = [];
+let rewards = [];
+
+/* ─── HELPERS ─── */
+function firebaseToArray(data) {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  const arr = Object.values(data);
+  return arr.filter(Boolean);
+}
+
+function fetchJSON(path) {
+  return fetch(`${FIREBASE_DB}/${path}.json`)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status} from ${path}`);
+      return r.json();
+    })
+    .then(d => firebaseToArray(d));
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('status');
+  dot.className = 'status-dot ' + state;
+}
+
+function flashRefreshed() {
+  const el = document.getElementById('refreshed');
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2000);
+}
+
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ─── DATA COMPUTATION ─── */
+function getUser(id) { return users.find(u => u.id === id); }
+function getAvatar(id) {
+  const u = getUser(id);
+  return u ? (u.avatar || '👤') : '👤';
+}
+
+let lastSeenChildId = null;
+function childColor(id) {
+  const PALETTE = [
+    { bg: '#6366f1', glow: '#818cf8' },
+    { bg: '#22c55e', glow: '#4ade80' },
+    { bg: '#f59e0b', glow: '#fbbf24' },
+    { bg: '#ec4899', glow: '#f472b6' },
+  ];
+  if (!lastSeenChildId || lastSeenChildId === id) {
+    // rotate for each unique child
+    const idx = users.filter(u => u.isChild).findIndex(u => u.id === id);
+    return PALETTE[idx % PALETTE.length] || PALETTE[0];
+  }
+  return PALETTE[0];
+}
+
+function childStars(childId) {
+  return rewards
+    .filter(r => r.status === 'APPROVED' && r.childId === childId)
+    .reduce((sum, r) => sum + (r.stars || 0), 0);
+  // negative = earned, positive = spent
+}
+
+function openTasks() {
+  return tasks
+    .filter(t => !t.isDone)
+    .sort((a, b) => {
+      // priority descending first, then due date ascending
+      if ((b.priority||1) !== (a.priority||1)) return (b.priority||1) - (a.priority||1);
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return b.createdAt - a.createdAt;
+    });
+}
+
+function taskAssignees(task) {
+  if (!task.assignedTo || task.assignedTo.length === 0) {
+    return task.isShared ? null : [getUser(task.createdBy)].filter(Boolean); // null = everyone
+  }
+  return task.assignedTo.map(id => getUser(id)).filter(Boolean);
+}
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(dateStr);
+  const diff = Math.round((d - now) / 86400000);
+  if (diff < 0) return 'überfällig';
+  if (diff === 0) return 'heute';
+  if (diff === 1) return 'morgen';
+  return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
+function prioLabel(p) {
+  if (p === 3) return '!!!';
+  if (p === 2) return '!!';
+  return '!';
+}
+function prioColor(p) {
+  if (p === 3) return 'var(--danger)';
+  if (p === 2) return 'var(--orange)';
+  return 'var(--cyan)';
+}
+
+/* ─── RENDER ─── */
+function render() {
+  const children = users.filter(u => u && u.isChild);
+
+  /* ── Sterne ── */
+  const starsEl = document.getElementById('stars-section');
+  if (children.length === 0) {
+    starsEl.innerHTML = '';
+  } else {
+    starsEl.innerHTML = `
+      <div class="section-header">Sterne</div>
+      <div class="stars-row">
+        ${children.map(child => {
+          const stars = childStars(child.id);
+          const c = childColor(child.id);
+          return `
+            <div class="star-card" style="--glow: ${c.glow}">
+              <div class="star-avatar" style="background:${c.bg};box-shadow:0 0 10px ${c.glow}88">${child.avatar || '👤'}</div>
+              <div class="star-name">${escapeHtml(child.id)}</div>
+              <div class="star-value">★ ${Math.abs(stars)}</div>
+            </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  /* ── Aufgaben ── */
+  const tasksEl = document.getElementById('tasks-section');
+  const all = openTasks();
+
+  tasksEl.innerHTML = `
+    <div class="section-header">Alle Aufgaben (${all.length})</div>
+    <div class="tasks-list">
+      ${all.length === 0
+        ? '<div class="empty-state">Keine offenen Aufgaben — alles erledigt!</div>'
+        : all.map(t => {
+            const assignees = taskAssignees(t);
+            const dueStr = formatDueDate(t.dueDate);
+            const isOverdue = dueStr === 'überfällig';
+
+            let assigneeHtml = '';
+            if (assignees === null) {
+              // unassigned shared → everyone
+              assigneeHtml = '<span style="font-size:0.7rem;color:var(--text-muted)">Alle</span>';
+            } else if (assignees.length === 0) {
+              assigneeHtml = '';
+            } else {
+              assigneeHtml = assignees.map(u => {
+                const c = childColor(u.id);
+                return `<span class="task-assignee"><span class="task-avatar" style="background:${c.bg}">${u.avatar || '👤'}</span> <span class="task-assignee-name">${escapeHtml(u.id)}</span></span>`;
+              }).join('');
+            }
+
+            return `
+              <div class="task-row ${isOverdue ? 'overdue' : ''}">
+                <span class="task-prio" style="color:${prioColor(t.priority)};font-weight:800;font-size:0.7rem;width:22px;flex-shrink:0;text-align:center">${prioLabel(t.priority)}</span>
+                <span class="task-content">${escapeHtml(t.content)}</span>
+                <span class="task-assignees">${assigneeHtml}</span>
+                ${dueStr ? `<span class="task-due ${isOverdue ? 'due-overdue' : ''}">${dueStr}</span>` : ''}
+                ${!t.isShared ? '<span class="task-badge">privat</span>' : ''}
+              </div>`;
+          }).join('')
+      }
+    </div>`;
+}
+
+/* ─── DATA LOAD ─── */
+async function loadData() {
+  setStatus('loading');
+
+  if (USE_API) {
+    try {
+      const resp = await fetch(API_URL, {
+        headers: API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {},
+      });
+      if (!resp.ok) throw new Error(`API ${resp.status}`);
+      const data = await resp.json();
+      users = data.users || [];
+      tasks = data.tasks || [];
+      rewards = data.rewards || [];
+      setStatus('');
+    } catch (err) {
+      console.error('API error:', err);
+      setStatus('offline');
+    }
+  } else {
+    const errors = [];
+    try {
+      const results = await Promise.all([
+        fetchJSON(USERS_PATH).catch(e => { errors.push('Users: ' + e.message); return []; }),
+        fetchJSON(TASKS_PATH).catch(e => { errors.push('Tasks: ' + e.message); return []; }),
+        fetchJSON(REWARDS_PATH).catch(e => { errors.push('Rewards: ' + e.message); return []; }),
+      ]);
+      [users, tasks, rewards] = results;
+      setStatus(errors.length > 0 ? 'offline' : '');
+    } catch (err) {
+      console.error('Load error:', err);
+      setStatus('offline');
+    }
+  }
+
+  flashRefreshed();
+  render();
+}
+
+/* ─── INIT ─── */
+updateClock();
+setInterval(updateClock, 10_000);
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
