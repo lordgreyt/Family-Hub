@@ -327,9 +327,6 @@ module.exports = async function handler(req, res) {
       family_hub_settings: settings.val() || {},
     });
 
-    // Debug: expose raw reminders for troubleshooting
-    result._raw_reminders = remindersVal;
-
     return res.status(200).json(result);
   } catch (err) {
     console.error('Firebase fetch error:', err);
