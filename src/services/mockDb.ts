@@ -341,7 +341,7 @@ export const initFirebase = async () => {
   isInitialized = true;
 
   const rootRef = ref(db, '/');
-  
+
   // 1. Check if Firebase is empty. If yes, upload local data!
   try {
     const snapshot = await firebaseGet(rootRef);
@@ -415,7 +415,7 @@ export const initFirebase = async () => {
       }
     }
   });
-  
+
   // 3. One-time migration: Convert completed tasks to RewardRequests
   const migrationKey = 'migration_tasks_to_rewards_v2';
   if (!localStorage.getItem(migrationKey)) {
@@ -425,7 +425,7 @@ export const initFirebase = async () => {
     let newRewards = [...rewards];
     let changed = false;
 
-    // We need prio points. Since we don't have settings context here, 
+    // We need prio points. Since we don't have settings context here,
     // we try to get them from localStorage or use defaults.
     const settingsRaw = localStorage.getItem('family_hub_settings');
     const settings = settingsRaw ? JSON.parse(settingsRaw) : { prioPoints: { 1: 5, 2: 10, 3: 20 } };
@@ -434,7 +434,7 @@ export const initFirebase = async () => {
 
     tasks.filter(t => t.isDone).forEach(task => {
       // Find children who should get points for this task
-      const eligibleChildren = users.filter(u => 
+      const eligibleChildren = users.filter(u =>
         u.isChild && (task.assignedTo?.includes(u.id) || (task.isShared && (!task.assignedTo || task.assignedTo.length === 0)))
       );
 
@@ -470,19 +470,19 @@ export const mockDb = {
     // 1. Save to the specific profiles/[uid] path
     const profileRef = ref(db, `${DB_KEYS.PROFILES}/${uid}`);
     await firebaseSet(profileRef, profileData);
-    
+
     // 2. Also ensure it's in our main users list for legacy compatibility and easy listing
     const users = mockDb.getUsers();
     const existing = users.find(u => u.uid === uid || u.id === profileData.id);
-    
+
     if (existing) {
       mockDb.updateUser({ ...existing, ...profileData, uid });
     } else {
-      mockDb.addUser({ 
-        id: profileData.id || 'Unknown', 
-        avatar: profileData.avatar || '❓', 
-        ...profileData, 
-        uid 
+      mockDb.addUser({
+        id: profileData.id || 'Unknown',
+        avatar: profileData.avatar || '❓',
+        ...profileData,
+        uid
       } as User);
     }
   },
@@ -492,7 +492,7 @@ export const mockDb = {
     const data = get<User[]>(DB_KEYS.USERS, INITIAL_USERS) || [];
     // Migration: ensure UIDs are present if cloud/local state was already populated
     const needsMigration = data.some(u => u && ((u.id === 'Falko' && !u.uid) || u.id === 'Markus' || u.id === 'Sarah'));
-    
+
     if (needsMigration) {
        console.log("Applying user migration to link UIDs...");
        const migrated = data.map(u => {
@@ -502,17 +502,17 @@ export const mockDb = {
          if (u.id === 'Lennart' || u.id === 'Markus') return { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: u.avatar || '👦', isSetupComplete: true, isChild: true };
          return u;
        }).filter(u => u && u.id !== 'Markus' && u.id !== 'Sarah' && u.id !== 'Anja' && u.id !== 'Lennart');
-       
+
        // Re-add precisely mapped users to avoid duplicates during migration
        const finalUsers = [
          migrated.find(u => u && u.id === 'Falko') || INITIAL_USERS[0],
          { id: 'Anja', uid: 'zaKMNvN3UFTnFRE2VT8EmioWfGk1', avatar: '👩', isSetupComplete: true },
          { id: 'Lennart', uid: 'kyWmQqGiwuRLXc0B0ZJtfWFITNB3', avatar: '👦', isSetupComplete: true, isChild: true },
        ];
-       
+
        return finalUsers;
     }
-    
+
     return data;
   },
   addUser: (user: User) => {
@@ -643,7 +643,7 @@ export const mockDb = {
 
     // Handle Stars
     if (newIsDone && starPoints !== undefined) {
-      const eligibleChildren = users.filter(u => 
+      const eligibleChildren = users.filter(u =>
         u.isChild && (localTask.assignedTo?.includes(u.id) || (localTask.isShared && (!localTask.assignedTo || localTask.assignedTo.length === 0)))
       );
 
@@ -659,18 +659,18 @@ export const mockDb = {
       });
     } else if (!newIsDone) {
       // Remove stars if task is un-completed
-      updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => 
+      updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards =>
         rewards.filter(r => r.taskId !== id)
       );
     }
   },
   updateTask: (updatedTask: TaskItem) => {
-    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks => 
+    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks =>
       tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
     );
   },
   deleteTask: (id: string) => {
-    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks => 
+    updateCollection<TaskItem>(DB_KEYS.TASKS, tasks =>
       tasks.filter(task => task.id !== id)
     );
   },
@@ -718,10 +718,10 @@ export const mockDb = {
     // We check duplicates inside the mutator
     updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => {
       if (req.id && rewards.some(r => r.id === req.id)) return rewards;
-      return [...rewards, { 
-        id: req.id || uuidv4(), 
-        ...req, 
-        createdAt: Date.now() 
+      return [...rewards, {
+        id: req.id || uuidv4(),
+        ...req,
+        createdAt: Date.now()
       } as RewardRequest];
     });
   },
@@ -732,7 +732,7 @@ export const mockDb = {
   // Videos
   getUnlockedVideos: (): string[] => get(DB_KEYS.UNLOCKED_VIDEOS, []),
   unlockVideo: (videoId: string) => {
-    updateCollection<string>(DB_KEYS.UNLOCKED_VIDEOS, current => 
+    updateCollection<string>(DB_KEYS.UNLOCKED_VIDEOS, current =>
       current.includes(videoId) ? current : [...current, videoId]
     );
   },
@@ -835,7 +835,7 @@ export const mockDb = {
   },
   executeMonthlyBookings: (date: string, isAutomated: boolean = false) => {
     const depots = mockDb.getDepots();
-    
+
     const newTxs: DepotTransaction[] = depots.map(depot => ({
       id: uuidv4(),
       depotId: depot.id,
@@ -847,7 +847,7 @@ export const mockDb = {
     })).filter(t => t.amount !== 0);
 
     updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => [...newTxs, ...txs]);
-    
+
     if (isAutomated) {
       const settings = mockDb.getN26Settings();
       mockDb.saveN26Settings({
@@ -1029,8 +1029,11 @@ export const mockDb = {
     set(DB_KEYS.CUSTOM_TAGS, allTags);
   },
 
-  // Pantry (Vorratsscahrank)
-  getPantryItems: (): PantryItem[] => get(DB_KEYS.PANTRY_ITEMS, []),
+  // Pantry (Vorratsschrank)
+  getPantryItems: (): PantryItem[] => {
+    const data: any = get(DB_KEYS.PANTRY_ITEMS, []);
+    return Array.isArray(data) ? data : Object.values(data || {});
+  },
   addPantryItem: (item: Omit<PantryItem, 'id' | 'createdAt'>) => {
     const newItem: PantryItem = { ...item, id: uuidv4(), createdAt: Date.now() };
     updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => [newItem, ...items]);
@@ -1043,7 +1046,10 @@ export const mockDb = {
   },
 
   // Shopping List (Einkaufsliste)
-  getShoppingItems: (): ShoppingItem[] => get(DB_KEYS.SHOPPING_LIST, []),
+  getShoppingItems: (): ShoppingItem[] => {
+    const data: any = get(DB_KEYS.SHOPPING_LIST, []);
+    return Array.isArray(data) ? data : Object.values(data || {});
+  },
   addShoppingItem: (item: Omit<ShoppingItem, 'id' | 'createdAt' | 'isDone'>) => {
     const newItem: ShoppingItem = { ...item, id: uuidv4(), createdAt: Date.now(), isDone: false };
     updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => [newItem, ...items]);
@@ -1062,7 +1068,10 @@ export const mockDb = {
   },
 
   // Reminders (Denk dran)
-  getReminders: (): Reminder[] => get(DB_KEYS.REMINDERS, []),
+  getReminders: (): Reminder[] => {
+    const data: any = get(DB_KEYS.REMINDERS, []);
+    return Array.isArray(data) ? data : Object.values(data || {});
+  },
   addReminder: (item: Omit<Reminder, 'id' | 'createdAt'>) => {
     const newItem: Reminder = { ...item, id: uuidv4(), createdAt: Date.now() };
     updateCollection<Reminder>(DB_KEYS.REMINDERS, items => [newItem, ...items]);
