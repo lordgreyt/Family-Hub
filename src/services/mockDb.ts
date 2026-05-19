@@ -334,10 +334,19 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
 }
 
 let isInitialized = false;
+let rootUnsubscribe: (() => void) | null = null;
 
 // Global initialization function to wire up Firebase Cloud Sync
-export const initFirebase = async () => {
-  if (isInitialized) return;
+export const initFirebase = async (force = false) => {
+  if (isInitialized && !force) return;
+
+  // Clean up old listener (handles HMR and force re-init)
+  if (rootUnsubscribe) {
+    console.log('🔌 Detaching old onValue listener (HMR/force reinit)');
+    rootUnsubscribe();
+    rootUnsubscribe = null;
+  }
+
   isInitialized = true;
 
   const rootRef = ref(db, '/');
@@ -380,10 +389,11 @@ export const initFirebase = async () => {
 
   // 2. Attach global real-time listener to sync remote changes to local cache
   console.log('🔌 Attaching onValue listener to Firebase...');
-  onValue(rootRef, (snap) => {
-    console.log('📡 onValue fired — Firebase data received');
+  rootUnsubscribe = onValue(rootRef, (snap) => {
     const remoteData = snap.val();
     if (remoteData) {
+      const remoteKeys = Object.keys(remoteData);
+      console.log('📡 onValue fired — Firebase keys:', remoteKeys.join(', '));
       let changed = false;
       Object.keys(DB_KEYS).forEach(k => {
         const key = DB_KEYS[k as keyof typeof DB_KEYS];
@@ -404,6 +414,14 @@ export const initFirebase = async () => {
               const doneDelta = newTasks.filter((t: any) => t.isDone).length - oldTasks.filter((t: any) => t.isDone).length;
               console.log(`📡 onValue SYNC tasks: ${oldTasks.length}→${newTasks.length} total, done delta: ${doneDelta > 0 ? '+' : ''}${doneDelta} | pendingWrites count: ${pendingWrites.get(key) || 0}`);
             }
+            // Log reminder syncs for debugging
+            if (key === DB_KEYS.REMINDERS) {
+              const oldReminders = currentLocal ? JSON.parse(currentLocal) : [];
+              const newReminders = JSON.parse(newLocal);
+              const oldCount = Array.isArray(oldReminders) ? oldReminders.length : Object.keys(oldReminders || {}).length;
+              const newCount = Array.isArray(newReminders) ? newReminders.length : Object.keys(newReminders || {}).length;
+              console.log(`📡 onValue SYNC reminders: ${oldCount}→${newCount} | format: ${Array.isArray(newReminders) ? 'array' : 'object'} | pendingWrites: ${pendingWrites.get(key) || 0}`);
+            }
             localStorage.setItem(key, newLocal);
             changed = true;
           }
@@ -412,6 +430,10 @@ export const initFirebase = async () => {
       // Give React a heads up that data has changed underneath it
       if (changed) {
         window.dispatchEvent(new Event('db_updated'));
+      }
+      // Warn if reminders key is missing from Firebase (sync will never work without it)
+      if (remoteData[DB_KEYS.REMINDERS] === undefined) {
+        console.warn('⚠️ family_hub_reminders NOT found in Firebase snapshot. Phone writes may not be reaching Firebase, or Firebase rules are blocking the key.');
       }
     }
   });
@@ -1070,7 +1092,9 @@ export const mockDb = {
   // Reminders (Denk dran)
   getReminders: (): Reminder[] => {
     const data: any = get(DB_KEYS.REMINDERS, []);
-    return Array.isArray(data) ? data : Object.values(data || {});
+    const result = Array.isArray(data) ? data : Object.values(data || {});
+    console.log(`🔔 getReminders: ${result.length} items, source format: ${Array.isArray(data) ? 'array' : typeof data === 'object' && data !== null ? 'object' : 'empty'}, localStorage key present: ${localStorage.getItem(DB_KEYS.REMINDERS) !== null}`);
+    return result;
   },
   addReminder: (item: Omit<Reminder, 'id' | 'createdAt'>) => {
     const newItem: Reminder = { ...item, id: uuidv4(), createdAt: Date.now() };
@@ -1083,3 +1107,11 @@ export const mockDb = {
     updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.filter(i => i.id !== id));
   },
 };
+
+// HMR safety: re-attach Firebase listener with fresh DB_KEYS on hot reload
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.log('🔥 HMR: mockDb.ts updated, re-initializing Firebase listener...');
+    initFirebase(true);
+  });
+}

@@ -216,7 +216,9 @@ export const DenkDran = () => {
   useEffect(() => {
     if (!user || user.isChild) return;
     const load = () => {
-      setReminders(mockDb.getReminders());
+      const reminders = mockDb.getReminders();
+      console.log(`🔔 DenkDran load: ${reminders.length} reminders loaded`);
+      setReminders(reminders);
       setUsers(mockDb.getUsers().map(u => ({
         ...u,
         avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor,
