@@ -146,6 +146,7 @@ export interface Reminder {
   dayOfWeek: number; // 0=So, 1=Mo, ..., 6=Sa → always set (derived from date for one-time)
   date?: string;     // YYYY-MM-DD for one-time; undefined for recurring
   isRecurring: boolean;
+  recurrence?: 'weekly' | 'biweekly' | 'monthly-first' | 'monthly-last'; // only for recurring; undefined = wöchentlich
   createdAt: number;
   createdBy: string;
 }

@@ -29,10 +29,17 @@ function sameDay(a: Date, b: Date): boolean {
 }
 
 // ─── Edit-Modal ───
+const RECURRENCE_LABELS: Record<string, string> = {
+  weekly: 'Jede Woche',
+  biweekly: 'Alle 2 Wochen',
+  'monthly-first': '1. im Monat',
+  'monthly-last': 'Letzter im Monat',
+};
+
 interface EditModalProps {
-  form: { text: string; childId: string; isRecurring: boolean; dayOfWeek: number; date: string };
+  form: { text: string; childId: string; isRecurring: boolean; recurrence: string; dayOfWeek: number; date: string };
   onChange: (f: EditModalProps['form']) => void;
-  onSave: () => void;
+  onSave: (keepOpen: boolean) => void;
   onClose: () => void;
   children: User[];
 }
@@ -99,12 +106,25 @@ const EditModal = ({ form, onChange, onSave, onClose, children }: EditModalProps
             />
           </div>
 
-          {/* Recurring toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Recurring toggle + type */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', userSelect: 'none' }}>
               <input type="checkbox" checked={form.isRecurring} onChange={e => update({ isRecurring: e.target.checked })} />
-              Wiederholt sich jede Woche
+              Wiederholt sich
             </label>
+            {form.isRecurring && (
+              <select
+                className="input-field"
+                value={form.recurrence}
+                onChange={e => update({ recurrence: e.target.value })}
+                style={{ fontSize: 'var(--font-sm)', width: '100%' }}
+              >
+                <option value="weekly">{RECURRENCE_LABELS.weekly}</option>
+                <option value="biweekly">{RECURRENCE_LABELS.biweekly}</option>
+                <option value="monthly-first">{RECURRENCE_LABELS['monthly-first']}</option>
+                <option value="monthly-last">{RECURRENCE_LABELS['monthly-last']}</option>
+              </select>
+            )}
           </div>
 
           {/* Day of week */}
@@ -187,7 +207,7 @@ export const DenkDran = () => {
   // Edit state
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ text: '', childId: '', isRecurring: true, dayOfWeek: 1, date: '' });
+  const [editForm, setEditForm] = useState({ text: '', childId: '', isRecurring: true, recurrence: 'weekly' as Reminder['recurrence'], dayOfWeek: 1, date: '' });
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<Reminder | null>(null);
@@ -223,15 +243,38 @@ export const DenkDran = () => {
 
   // Build lookup: day index (0-6) → reminders for that day
   const remindersByDay = useMemo(() => {
+    /** Week number since epoch (for biweekly parity check) */
+    const weekNum = (d: Date) => Math.floor((d.getTime() - new Date('2023-01-02').getTime()) / (7 * 86400000));
+
     const map: Record<string, Reminder[]> = {};
     for (let i = 0; i < 7; i++) {
       const d = weekDays[i];
       const key = formatDate(d);
-      const dow = d.getDay(); // 0-6
+      const dow = d.getDay();
+      const dayOfMonth = d.getDate();
+      const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const wn = weekNum(d);
 
       const matching = reminders.filter(r => {
-        if (r.isRecurring) return r.dayOfWeek === dow;
-        return r.date === key;
+        if (!r.isRecurring) return r.date === key;
+        if (r.dayOfWeek !== dow) return false;
+
+        const rec = r.recurrence || 'weekly';
+        switch (rec) {
+          case 'weekly':
+            return true;
+          case 'biweekly':
+            // Show in weeks with same parity as the reminder's creation week
+            return (wn - weekNum(new Date(r.createdAt))) % 2 === 0;
+          case 'monthly-first':
+            // First occurrence: day between 1st and 7th
+            return dayOfMonth <= 7;
+          case 'monthly-last':
+            // Last occurrence: day in the last 7 days of the month
+            return dayOfMonth > daysInMonth - 7;
+          default:
+            return true;
+        }
       });
 
       map[key] = matching;
@@ -256,7 +299,7 @@ export const DenkDran = () => {
 
   // Open add modal for a specific day
   const openAdd = (dayIndex: number, dateStr: string) => {
-    setEditForm({ text: '', childId: children[0]?.id || '', isRecurring: false, dayOfWeek: dayIndex, date: dateStr });
+    setEditForm({ text: '', childId: children[0]?.id || '', isRecurring: false, recurrence: 'weekly', dayOfWeek: dayIndex, date: dateStr });
     setEditingId(null);
     setShowModal(true);
   };
@@ -267,6 +310,7 @@ export const DenkDran = () => {
       text: r.text,
       childId: r.childId,
       isRecurring: r.isRecurring,
+      recurrence: r.recurrence || 'weekly',
       dayOfWeek: r.dayOfWeek,
       date: r.date || '',
     });
@@ -286,6 +330,7 @@ export const DenkDran = () => {
         text: editForm.text.trim(),
         childId: editForm.childId,
         isRecurring: editForm.isRecurring,
+        recurrence: editForm.isRecurring ? editForm.recurrence : undefined,
         dayOfWeek: editForm.isRecurring ? editForm.dayOfWeek : new Date(editForm.date + 'T00:00').getDay(),
         date: editForm.isRecurring ? undefined : editForm.date,
       });
@@ -296,13 +341,13 @@ export const DenkDran = () => {
         text: editForm.text.trim(),
         childId: editForm.childId,
         isRecurring: editForm.isRecurring,
+        recurrence: editForm.isRecurring ? editForm.recurrence : undefined,
         dayOfWeek: editForm.isRecurring ? editForm.dayOfWeek : new Date(editForm.date + 'T00:00').getDay(),
         date: editForm.isRecurring ? undefined : editForm.date,
         createdBy: user.id,
       });
 
       if (keepOpen) {
-        // Text leeren, Kind und Datum beibehalten für schnelles Weiter-Hinzufügen
         setEditForm(f => ({ ...f, text: '' }));
       } else {
         setShowModal(false);
@@ -459,7 +504,9 @@ export const DenkDran = () => {
                           {r.text}
                         </span>
                         {r.isRecurring ? (
-                          <RefreshCw size={12} style={{ color: '#6366f1', flexShrink: 0, opacity: 0.6 }} />
+                          <span style={{ fontSize: '0.6rem', color: '#6366f1', fontWeight: 700, flexShrink: 0, opacity: 0.7 }}>
+                            {RECURRENCE_LABELS[r.recurrence || 'weekly']}
+                          </span>
                         ) : (
                           <Calendar size={12} style={{ color: '#f59e0b', flexShrink: 0, opacity: 0.6 }} />
                         )}
