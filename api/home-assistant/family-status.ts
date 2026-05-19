@@ -61,13 +61,83 @@ function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function localIsoDay(date: Date): string {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function asStringList(value: any): string[] {
+  if (Array.isArray(value)) return value.flatMap((item) => asStringList(item));
+  if (value && typeof value === 'object') {
+    if (typeof value.text === 'string') return [value.text];
+    if (typeof value.content === 'string') return [value.content];
+    if (typeof value.title === 'string') return [value.title];
+    if (typeof value.label === 'string') return [value.label];
+    return Object.values(value).flatMap((item) => asStringList(item));
+  }
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+}
+
+function normalizeReminderGroups(rawReminders: any, today: string, children: { id: string; name: string; avatar: any }[]) {
+  const childAliases = new Map<string, { id: string; name: string; avatar: any }>();
+  for (const child of children) {
+    for (const value of [child.id, child.name]) {
+      const key = String(value || '').trim().toLowerCase();
+      if (key) childAliases.set(key, child);
+    }
+  }
+
+  const dateBucket = rawReminders?.[today] || rawReminders?.today || rawReminders?.[today.replaceAll('-', '')] || {};
+  const byChild: Record<string, string[]> = {};
+
+  const add = (childKey: any, value: any) => {
+    const key = String(childKey || '').trim();
+    if (!key) return;
+    const child = childAliases.get(key.toLowerCase());
+    const childId = child?.id || key;
+    const items = asStringList(value);
+    if (!items.length) return;
+    byChild[childId] = [...(byChild[childId] || []), ...items];
+  };
+
+  if (Array.isArray(dateBucket)) {
+    for (const item of dateBucket) add(item?.childId || item?.child_id || item?.child || item?.name, item?.items || item?.entries || item?.reminders || item?.text || item?.content || item);
+  } else if (dateBucket && typeof dateBucket === 'object') {
+    for (const [childKey, value] of Object.entries(dateBucket)) add(childKey, value);
+  }
+
+  // Also support child-first structures: family_hub_reminders/{childId}/{YYYY-MM-DD}.
+  if (rawReminders && typeof rawReminders === 'object' && !Array.isArray(rawReminders)) {
+    for (const [childKey, value] of Object.entries(rawReminders)) {
+      if (childKey === today || childKey === 'today') continue;
+      const bucket = (value as AnyRecord)?.[today] || (value as AnyRecord)?.[today.replaceAll('-', '')];
+      if (bucket) add(childKey, bucket);
+    }
+  }
+
+  return children.map((child) => ({
+    child_id: child.id,
+    name: child.name,
+    avatar: child.avatar || '⭐',
+    entries: Array.from(new Set((byChild[child.id] || []).map((x) => String(x).trim()).filter(Boolean))),
+  }));
+}
+
 function normalize(raw: AnyRecord) {
   const now = new Date();
-  const today = isoDay(now);
+  const today = localIsoDay(now);
   const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   const users = asList(raw.family_hub_users || raw.users || raw.children);
   const tasks = asList(raw.family_hub_tasks || raw.tasks);
   const rewards = asList(raw.family_hub_rewards || raw.rewards || raw.requests);
+  const rawReminders = raw.family_hub_reminders || raw.reminders || {};
   const settings = raw.family_hub_settings || raw.settings || {};
   const points = priorityPoints(settings);
 
@@ -180,6 +250,8 @@ function normalize(raw: AnyRecord) {
       return String(a.dueDate || '9999-99-99').localeCompare(String(b.dueDate || '9999-99-99')) || Number(b.priority || 0) - Number(a.priority || 0);
     });
   const openTasksTotal = allTasks.filter((task) => !task.is_done).length;
+  const todayReminders = normalizeReminderGroups(rawReminders, today, children);
+  const reminderCount = todayReminders.reduce((sum, child) => sum + child.entries.length, 0);
   const pendingRequests = rewards.filter((reward) => reward.status === 'PENDING').length;
 
   return {
@@ -188,6 +260,8 @@ function normalize(raw: AnyRecord) {
     updated_at: now.toISOString(),
     children,
     tasks: allTasks,
+    reminders_today: todayReminders,
+    reminders: { today, children: todayReminders, count: reminderCount },
     pending_requests: pendingRequests,
     summary: {
       children: children.length,
@@ -196,6 +270,7 @@ function normalize(raw: AnyRecord) {
       done_tasks: allTasks.length - openTasksTotal,
       stars: children.reduce((sum, child) => sum + child.stars, 0),
       pending_requests: pendingRequests,
+      reminders_today: reminderCount,
     },
   };
 }
@@ -216,10 +291,11 @@ export default async function handler(req: any, res: any) {
   try {
     initFirebase();
     const db = getDatabase();
-    const [users, tasks, rewards, settings] = await Promise.all([
+    const [users, tasks, rewards, reminders, settings] = await Promise.all([
       db.ref('family_hub_users').get(),
       db.ref('family_hub_tasks').get(),
       db.ref('family_hub_rewards').get(),
+      db.ref('family_hub_reminders').get(),
       db.ref('family_hub_settings').get(),
     ]);
 
@@ -227,6 +303,7 @@ export default async function handler(req: any, res: any) {
       family_hub_users: users.val() || {},
       family_hub_tasks: tasks.val() || {},
       family_hub_rewards: rewards.val() || {},
+      family_hub_reminders: reminders.val() || {},
       family_hub_settings: settings.val() || {},
     }));
   } catch (error: any) {
