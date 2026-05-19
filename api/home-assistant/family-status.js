@@ -317,13 +317,20 @@ module.exports = async function handler(req, res) {
       db.ref('family_hub_settings').get(),
     ]);
 
-    return res.status(200).json(normalize({
+    const remindersVal = reminders.val();
+
+    const result = normalize({
       family_hub_users: users.val() || {},
       family_hub_tasks: tasks.val() || {},
       family_hub_rewards: rewards.val() || {},
-      family_hub_reminders: reminders.val() || {},
+      family_hub_reminders: remindersVal || {},
       family_hub_settings: settings.val() || {},
-    }));
+    });
+
+    // Debug: expose raw reminders for troubleshooting
+    result._raw_reminders = remindersVal;
+
+    return res.status(200).json(result);
   } catch (err) {
     console.error('Firebase fetch error:', err);
     return res.status(500).json({ error: (err && err.message) || 'Internal server error' });
