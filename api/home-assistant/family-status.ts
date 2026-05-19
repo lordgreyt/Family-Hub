@@ -94,7 +94,7 @@ function normalizeReminderGroups(rawReminders: any, today: string, children: { i
     }
   }
 
-  const dateBucket = rawReminders?.[today] || rawReminders?.today || rawReminders?.[today.replaceAll('-', '')] || {};
+  const dateBucket = rawReminders?.[today] || rawReminders?.today || rawReminders?.[today.replace(/-/g, '')] || {};
   const byChild: Record<string, string[]> = {};
 
   const add = (childKey: any, value: any) => {
@@ -117,7 +117,7 @@ function normalizeReminderGroups(rawReminders: any, today: string, children: { i
   if (rawReminders && typeof rawReminders === 'object' && !Array.isArray(rawReminders)) {
     for (const [childKey, value] of Object.entries(rawReminders)) {
       if (childKey === today || childKey === 'today') continue;
-      const bucket = (value as AnyRecord)?.[today] || (value as AnyRecord)?.[today.replaceAll('-', '')];
+      const bucket = (value as AnyRecord)?.[today] || (value as AnyRecord)?.[today.replace(/-/g, '')];
       if (bucket) add(childKey, bucket);
     }
   }
