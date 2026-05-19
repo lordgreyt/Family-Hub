@@ -139,6 +139,17 @@ export interface MoodEntry {
   createdAt: number;
 }
 
+export interface Reminder {
+  id: string;
+  text: string;
+  childId: string;
+  dayOfWeek: number; // 0=So, 1=Mo, ..., 6=Sa → always set (derived from date for one-time)
+  date?: string;     // YYYY-MM-DD for one-time; undefined for recurring
+  isRecurring: boolean;
+  createdAt: number;
+  createdBy: string;
+}
+
 export interface PantryItem {
   id: string;
   name: string;
@@ -220,6 +231,7 @@ export const DB_KEYS = {
   CUSTOM_TAGS: 'family_hub_custom_tags',
   PANTRY_ITEMS: 'family_hub_pantry_items',
   SHOPPING_LIST: 'family_hub_shopping_list',
+  REMINDERS: 'family_hub_reminders',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -1046,5 +1058,18 @@ export const mockDb = {
   },
   deleteCompletedShoppingItems: () => {
     updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => !i.isDone));
+  },
+
+  // Reminders (Denk dran)
+  getReminders: (): Reminder[] => get(DB_KEYS.REMINDERS, []),
+  addReminder: (item: Omit<Reminder, 'id' | 'createdAt'>) => {
+    const newItem: Reminder = { ...item, id: uuidv4(), createdAt: Date.now() };
+    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => [newItem, ...items]);
+  },
+  updateReminder: (updatedItem: Reminder) => {
+    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+  },
+  deleteReminder: (id: string) => {
+    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.filter(i => i.id !== id));
   },
 };

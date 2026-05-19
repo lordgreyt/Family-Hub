@@ -1,4 +1,4 @@
-import { Home, CheckSquare, BookOpen, Utensils, ShoppingCart, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity } from 'lucide-react';
+import { Home, CheckSquare, BookOpen, Utensils, ShoppingCart, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell } from 'lucide-react';
 import type { User } from '../services/mockDb';
 
 export interface NavItem {
@@ -20,6 +20,7 @@ export const getNavItems = (user: User | null): NavItem[] => {
       { to: '/n26', icon: CreditCard, label: 'N26' }
     ] : []),
     ...(!user.isChild ? [
+      { to: '/denk-dran', icon: Bell, label: 'Denk dran' },
       { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
       { to: '/budget', icon: Calculator, label: 'Budget' },
       { to: '/wallbox', icon: Zap, label: 'Wallbox' }
