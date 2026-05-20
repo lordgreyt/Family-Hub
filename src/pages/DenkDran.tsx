@@ -21,7 +21,10 @@ function getMonday(d: Date): Date {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function sameDay(a: Date, b: Date): boolean {
