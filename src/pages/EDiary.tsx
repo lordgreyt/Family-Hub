@@ -49,7 +49,6 @@ export const EDiary = () => {
   const navigate = useNavigate();
 
   const [entries, setEntries] = useState<MoodEntry[]>([]);
-  const [timeRange, setTimeRange] = useState<30 | 60>(30);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
@@ -295,77 +294,41 @@ export const EDiary = () => {
       {/* Calendar / List View Toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text)' }}>Dashboard</h2>
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '0.2rem', border: '1px solid var(--color-border)' }}>
-            <button
-              onClick={() => setTimeRange(30)}
-              style={{
-                padding: '0.4rem 0.8rem',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: timeRange === 30 ? 'var(--color-primary)' : 'transparent',
-                color: timeRange === 30 ? 'white' : 'var(--color-text-muted)',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              30 Tage
-            </button>
-            <button
-              onClick={() => setTimeRange(60)}
-              style={{
-                padding: '0.4rem 0.8rem',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: timeRange === 60 ? 'var(--color-primary)' : 'transparent',
-                color: timeRange === 60 ? 'white' : 'var(--color-text-muted)',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              60 Tage
-            </button>
-          </div>
-          <div style={{ display: 'flex', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '0.2rem', border: '1px solid var(--color-border)' }}>
-            <button
-              onClick={() => setViewMode('calendar')}
-              style={{
-                padding: '0.4rem',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: viewMode === 'calendar' ? 'var(--color-primary)' : 'transparent',
-                color: viewMode === 'calendar' ? 'white' : 'var(--color-text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'all 0.2s'
-              }}
-              title="Kalenderansicht"
-            >
-              <CalendarIcon size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '0.4rem',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
-                color: viewMode === 'list' ? 'white' : 'var(--color-text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'all 0.2s'
-              }}
-              title="Listenansicht"
-            >
-              <List size={16} />
-            </button>
-          </div>
+        <div style={{ display: 'flex', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '0.2rem', border: '1px solid var(--color-border)' }}>
+          <button
+            onClick={() => setViewMode('calendar')}
+            style={{
+              padding: '0.4rem',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: viewMode === 'calendar' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'calendar' ? 'white' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.2s'
+            }}
+            title="Kalenderansicht"
+          >
+            <CalendarIcon size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            style={{
+              padding: '0.4rem',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'list' ? 'white' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.2s'
+            }}
+            title="Listenansicht"
+          >
+            <List size={16} />
+          </button>
         </div>
       </div>
 
@@ -373,14 +336,14 @@ export const EDiary = () => {
       {viewMode === 'calendar' ? (
         <MoodCalendar entries={entries} onEditDay={openEditDialog} customTags={customTags} />
       ) : (
-        <MoodListView entries={entries} onEditDay={openEditDialog} customTags={customTags} days={timeRange} />
+        <MoodListView entries={entries} onEditDay={openEditDialog} customTags={customTags} days={30} />
       )}
 
       {/* Analysis */}
-      <MoodAnalysis entries={entries} days={timeRange} />
+      <MoodAnalysis entries={entries} days={30} />
 
       {/* Trend Graph */}
-      <MoodGraph entries={entries} days={timeRange} />
+      <MoodGraph entries={entries} days={30} />
 
       {/* Edit Dialog */}
       {editDate && (

@@ -26,7 +26,7 @@ export const getNavItems = (user: User | null): NavItem[] => {
       { to: '/wallbox', icon: Zap, label: 'Wallbox' }
     ] : []),
     { to: '/rewards', icon: Star, label: 'Sterne' },
-    { to: '/e-diary', icon: Activity, label: 'Stimmungskalender' },
+    { to: '/e-diary', icon: Activity, label: 'Stimmung' },
     { to: '/setup', icon: Settings, label: 'Setup' },
   ];
 };
