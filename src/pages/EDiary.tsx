@@ -240,7 +240,7 @@ export const EDiary = () => {
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -256,7 +256,7 @@ export const EDiary = () => {
               background: notificationsEnabled ? 'rgba(16, 185, 129, 0.1)' : 'var(--color-surface)',
               border: notificationsEnabled ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -272,7 +272,7 @@ export const EDiary = () => {
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -298,7 +298,7 @@ export const EDiary = () => {
           <button
             onClick={() => setViewMode('calendar')}
             style={{
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
               background: viewMode === 'calendar' ? 'var(--color-primary)' : 'transparent',
@@ -315,7 +315,7 @@ export const EDiary = () => {
           <button
             onClick={() => setViewMode('list')}
             style={{
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
               background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
