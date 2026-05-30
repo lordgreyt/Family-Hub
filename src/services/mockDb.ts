@@ -152,35 +152,6 @@ export interface Reminder {
   createdBy: string;
 }
 
-export interface PantryItem {
-  id: string;
-  name: string;
-  emoji: string;
-  quantity: number;
-  minQuantity: number;
-  unit: string;
-  category: string;
-  expiryDate?: string; // YYYY-MM-DD
-  barcode?: string;
-  imageUrl?: string;
-  notes?: string;
-  createdAt: number;
-  createdBy: string;
-}
-
-export interface ShoppingItem {
-  id: string;
-  name: string;
-  emoji: string;
-  quantity: number;
-  unit: string;
-  isDone: boolean;
-  category: string;
-  notes?: string;
-  createdAt: number;
-  createdBy: string;
-}
-
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -226,13 +197,10 @@ export const DB_KEYS = {
   DEPOTS: 'family_hub_depots',
   DEPOT_TRANSACTIONS: 'family_hub_depot_transactions',
   N26_SETTINGS: 'family_hub_n26_settings',
-  UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
   APP_SETTINGS: 'family_hub_settings',
   VICTRON_SETTINGS: 'family_hub_victron_settings',
   EDIARY: 'family_hub_ediary',
   CUSTOM_TAGS: 'family_hub_custom_tags',
-  PANTRY_ITEMS: 'family_hub_pantry_items',
-  SHOPPING_LIST: 'family_hub_shopping_list',
   REMINDERS: 'family_hub_reminders',
 };
 
@@ -762,16 +730,6 @@ export const mockDb = {
     updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => rewards.map(r => r.id === updatedReq.id ? updatedReq : r));
   },
 
-  // Videos
-  getUnlockedVideos: (): string[] => get(DB_KEYS.UNLOCKED_VIDEOS, []),
-  unlockVideo: (videoId: string) => {
-    updateCollection<string>(DB_KEYS.UNLOCKED_VIDEOS, current =>
-      current.includes(videoId) ? current : [...current, videoId]
-    );
-  },
-  getCustomVideos: (): any[] => get('family_hub_custom_videos', []),
-  setCustomVideos: (videos: any[]) => set('family_hub_custom_videos', videos),
-
   // Leaderboard
   getLeaderboard: (): ScoreEntry[] => get(DB_KEYS.LEADERBOARD, []),
   updateHighScore: (entry: ScoreEntry, lowerIsBetter: boolean = false) => {
@@ -903,7 +861,7 @@ export const mockDb = {
   exportAllData: () => {
     const allKeys = Object.values(DB_KEYS) as string[];
     // Also include keys not in DB_KEYS
-    const extraKeys = ['family_hub_custom_videos', 'victron_cache'];
+    const extraKeys = ['victron_cache'];
     const dump: Record<string, any> = {};
 
     allKeys.forEach(key => {
@@ -933,7 +891,7 @@ export const mockDb = {
   // Full restore: import a complete JSON backup snapshot
   importAllData: (dump: Record<string, any>) => {
     const allKeys = Object.values(DB_KEYS) as string[];
-    const extraKeys = ['family_hub_custom_videos', 'victron_cache'];
+    const extraKeys = ['victron_cache'];
     const allWritableKeys = [...allKeys, ...extraKeys];
 
     let restoredCount = 0;
@@ -1060,44 +1018,6 @@ export const mockDb = {
     const allTags: Record<string, TagOption[]> = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
     allTags[userId] = tags;
     set(DB_KEYS.CUSTOM_TAGS, allTags);
-  },
-
-  // Pantry (Vorratsschrank)
-  getPantryItems: (): PantryItem[] => {
-    const data: any = get(DB_KEYS.PANTRY_ITEMS, []);
-    return Array.isArray(data) ? data : Object.values(data || {});
-  },
-  addPantryItem: (item: Omit<PantryItem, 'id' | 'createdAt'>) => {
-    const newItem: PantryItem = { ...item, id: uuidv4(), createdAt: Date.now() };
-    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => [newItem, ...items]);
-  },
-  updatePantryItem: (updatedItem: PantryItem) => {
-    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
-  },
-  deletePantryItem: (id: string) => {
-    updateCollection<PantryItem>(DB_KEYS.PANTRY_ITEMS, items => items.filter(i => i.id !== id));
-  },
-
-  // Shopping List (Einkaufsliste)
-  getShoppingItems: (): ShoppingItem[] => {
-    const data: any = get(DB_KEYS.SHOPPING_LIST, []);
-    return Array.isArray(data) ? data : Object.values(data || {});
-  },
-  addShoppingItem: (item: Omit<ShoppingItem, 'id' | 'createdAt' | 'isDone'>) => {
-    const newItem: ShoppingItem = { ...item, id: uuidv4(), createdAt: Date.now(), isDone: false };
-    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => [newItem, ...items]);
-  },
-  updateShoppingItem: (updatedItem: ShoppingItem) => {
-    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
-  },
-  toggleShoppingItem: (id: string) => {
-    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.map(i => i.id === id ? { ...i, isDone: !i.isDone } : i));
-  },
-  deleteShoppingItem: (id: string) => {
-    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => i.id !== id));
-  },
-  deleteCompletedShoppingItems: () => {
-    updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => !i.isDone));
   },
 
   // Reminders (Denk dran)
