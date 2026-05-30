@@ -232,7 +232,7 @@ export const EDiary = () => {
       gap: '1.5rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Stimmungskalender</h1>
+        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Stimmung</h1>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={() => setShowTagManager(true)}
@@ -373,7 +373,7 @@ export const EDiary = () => {
       {viewMode === 'calendar' ? (
         <MoodCalendar entries={entries} onEditDay={openEditDialog} customTags={customTags} />
       ) : (
-        <MoodListView entries={entries} onEditDay={openEditDialog} customTags={customTags} />
+        <MoodListView entries={entries} onEditDay={openEditDialog} customTags={customTags} days={timeRange} />
       )}
 
       {/* Analysis */}
@@ -1176,12 +1176,16 @@ const CalendarDay = ({ day, color, hasEntry, isToday, isFuture, entry, onEdit, c
 
 // --- List View (alternative to calendar, shows comments) ---
 
-const MoodListView = ({ entries, onEditDay, customTags }: { entries: MoodEntry[], onEditDay: (dateStr: string) => void, customTags: TagOption[] }) => {
+const MoodListView = ({ entries, onEditDay, customTags, days }: { entries: MoodEntry[], onEditDay: (dateStr: string) => void, customTags: TagOption[], days: number }) => {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // Sort entries by date descending (newest first)
-  const sortedEntries = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  // Filter to last N days, then sort by date descending
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  cutoff.setHours(0, 0, 0, 0);
+  const filteredEntries = entries.filter(e => new Date(e.date + 'T00:00:00') >= cutoff);
+  const sortedEntries = [...filteredEntries].sort((a, b) => b.date.localeCompare(a.date));
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
@@ -1198,10 +1202,10 @@ const MoodListView = ({ entries, onEditDay, customTags }: { entries: MoodEntry[]
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <List size={18} color="var(--color-primary)" />
-          Einträge
+          Einträge ({days} Tage)
         </h3>
         <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-          {sortedEntries.length} {sortedEntries.length === 1 ? 'Eintrag' : 'Einträge'}
+          {sortedEntries.length} / {days} {days === 1 ? 'Tag' : 'Tage'}
         </span>
       </div>
 
@@ -1393,7 +1397,34 @@ const MoodAnalysis = ({ entries, days }: { entries: MoodEntry[], days: number })
     return { totalAvg, weekdayAvgs, trend, bestDay, bestAvg, worstDay, worstAvg, streak, count: filtered.length };
   }, [entries, days]);
 
-  if (!analysis) return null;
+  // Count entries in the time range for the fallback message
+  const entryCountInRange = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(0, 0, 0, 0);
+    return entries.filter(e => new Date(e.date + 'T00:00:00') >= cutoff).length;
+  }, [entries, days]);
+
+  if (!analysis) {
+    return (
+      <div className="glass-panel" style={{
+        padding: '1.25rem',
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--color-border)'
+      }}>
+        <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Activity size={18} color="var(--color-primary)" />
+          Analyse ({days} Tage)
+        </h3>
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+          {entryCountInRange === 0
+            ? `Keine Einträge in den letzten ${days} Tagen.`
+            : `Nur ${entryCountInRange} ${entryCountInRange === 1 ? 'Eintrag' : 'Einträge'} — mindestens 3 für eine Analyse nötig.`}
+        </div>
+      </div>
+    );
+  }
 
   const formatDate = (ds: string) => {
     const d = new Date(ds + 'T00:00:00');
@@ -1558,8 +1589,9 @@ const MoodGraph = ({ entries, days }: { entries: MoodEntry[], days: number }) =>
       </h3>
 
       {points.length < 2 ? (
-        <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-          Nicht genug Daten für einen Trend.
+        <div style={{ height: `${height}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem', gap: '0.25rem' }}>
+          <span>Nicht genug Daten für einen Trend.</span>
+          <span style={{ fontSize: '0.7rem' }}>{points.length} {points.length === 1 ? 'Eintrag' : 'Einträge'} in {days} Tagen — mindestens 2 nötig.</span>
         </div>
       ) : (
         <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
