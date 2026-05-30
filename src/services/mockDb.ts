@@ -136,6 +136,7 @@ export interface MoodEntry {
   mentalMood: number; // 1-5 (1 = worst, 5 = best)
   physicalMood: number; // 1-5
   tags?: string[]; // Context-Tags (z.B. "schule", "sport", "freunde")
+  comment?: string; // Freitext-Kommentar (nur in Listenansicht + Edit-Dialog sichtbar)
   createdAt: number;
 }
 
