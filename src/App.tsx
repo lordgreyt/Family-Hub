@@ -9,7 +9,6 @@ import { Dashboard } from './pages/Dashboard';
 import { Budget } from './pages/Budget';
 import { Notes } from './pages/Notes';
 import { Tasks } from './pages/Tasks';
-import { Meals } from './pages/Meals';
 import { Rewards } from './pages/Rewards';
 import { Setup } from './pages/Setup';
 import { Expenses } from './pages/Expenses';
@@ -17,7 +16,6 @@ import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
 import { DenkDran } from './pages/DenkDran';
-import { Paperless } from './pages/Paperless';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
 import { initNotificationService } from './services/notificationService';
@@ -47,14 +45,12 @@ function App() {
               <Route path="/budget" element={<Budget />} />
               <Route path="/notes" element={<Notes />} />
               <Route path="/tasks" element={<Tasks />} />
-              <Route path="/meals" element={<Meals />} />
               <Route path="/rewards" element={<Rewards />} />
               <Route path="/setup" element={<Setup />} />
               <Route path="/n26" element={<N26 />} />
               <Route path="/wallbox" element={<Wallbox />} />
               <Route path="/e-diary" element={<EDiary />} />
               <Route path="/denk-dran" element={<DenkDran />} />
-              <Route path="/paperless" element={<Paperless />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />
