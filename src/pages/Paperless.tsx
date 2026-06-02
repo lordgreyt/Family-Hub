@@ -21,7 +21,7 @@ export const Paperless = () => {
   const { user } = useAuth();
 
   // Settings
-  const [settings, setSettings] = useState<PaperlessSettings>({ url: '', token: '', enabled: false });
+  const [settings, setSettings] = useState<PaperlessSettings>({ url: '192.168.178.184:8000', token: '', enabled: false });
   const [showSettings, setShowSettings] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
@@ -55,7 +55,13 @@ export const Paperless = () => {
 
   // Load settings on mount
   useEffect(() => {
-    setSettings(mockDb.getPaperlessSettings());
+    const saved = mockDb.getPaperlessSettings();
+    // Merge: keep defaults if saved values are empty
+    setSettings({
+      url: saved.url || '192.168.178.184:8000',
+      token: saved.token || '',
+      enabled: saved.enabled || false,
+    });
   }, []);
 
   // Load metadata once settings are configured
@@ -114,7 +120,8 @@ export const Paperless = () => {
   const handleTestConnection = async () => {
     setTesting(true);
     setTestResult(null);
-    const result = await testConnection();
+    // Use current form values directly, not saved settings
+    const result = await testConnection(settings);
     setTestResult(result);
     setTesting(false);
   };

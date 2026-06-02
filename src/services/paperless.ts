@@ -37,15 +37,16 @@ function getSettings(): PaperlessSettings {
   return mockDb.getPaperlessSettings();
 }
 
-function buildUrl(path: string): string | null {
-  const settings = getSettings();
-  if (!settings.enabled || !settings.url || !settings.token) return null;
+function buildUrl(path: string, overrides?: PaperlessSettings): string | null {
+  const settings = overrides || getSettings();
+  if (!settings.url || !settings.token) return null;
+  if (!overrides && !settings.enabled) return null; // Only check enabled for stored settings, not test mode
   const cleanUrl = settings.url.replace(/\/+$/, '');
   return `${cleanUrl}${path}`;
 }
 
-function authHeaders(): Record<string, string> | null {
-  const settings = getSettings();
+function authHeaders(overrides?: PaperlessSettings): Record<string, string> | null {
+  const settings = overrides || getSettings();
   if (!settings.token) return null;
   return { 'Authorization': `Token ${settings.token}` };
 }
@@ -193,9 +194,9 @@ export async function getTags(): Promise<PaperlessTag[]> {
 
 // --- Connection Test ---
 
-export async function testConnection(): Promise<{ ok: boolean; error?: string }> {
-  const url = buildUrl('/api/documents/?page_size=1');
-  const headers = authHeaders();
+export async function testConnection(settingsOverride?: PaperlessSettings): Promise<{ ok: boolean; error?: string }> {
+  const url = buildUrl('/api/documents/?page_size=1', settingsOverride);
+  const headers = authHeaders(settingsOverride);
   if (!url || !headers) return { ok: false, error: 'Paperless nicht konfiguriert (URL oder Token fehlt)' };
 
   try {
@@ -206,9 +207,9 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string }>
 
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
-        return { ok: false, error: 'Authentifizierung fehlgeschlagen. Token prüfen.' };
+        return { ok: false, error: `Authentifizierung fehlgeschlagen. Token prüfen. (URL: ${url})` };
       }
-      return { ok: false, error: `Server antwortet mit Status ${res.status}` };
+      return { ok: false, error: `Server antwortet mit Status ${res.status} (URL: ${url})` };
     }
     return { ok: true };
   } catch (err: any) {

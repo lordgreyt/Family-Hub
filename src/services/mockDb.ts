@@ -363,7 +363,7 @@ export const initFirebase = async (force = false) => {
         [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
         [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
-        [DB_KEYS.PAPERLESS_SETTINGS]: get(DB_KEYS.PAPERLESS_SETTINGS, { url: '', token: '', enabled: false }),
+        [DB_KEYS.PAPERLESS_SETTINGS]: get(DB_KEYS.PAPERLESS_SETTINGS, { url: '192.168.178.184:8000', token: '', enabled: false }),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
