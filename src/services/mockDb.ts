@@ -152,6 +152,12 @@ export interface Reminder {
   createdBy: string;
 }
 
+export interface PaperlessSettings {
+  url: string;
+  token: string;
+  enabled: boolean;
+}
+
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -202,6 +208,7 @@ export const DB_KEYS = {
   EDIARY: 'family_hub_ediary',
   CUSTOM_TAGS: 'family_hub_custom_tags',
   REMINDERS: 'family_hub_reminders',
+  PAPERLESS_SETTINGS: 'family_hub_paperless_settings',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -356,6 +363,7 @@ export const initFirebase = async (force = false) => {
         [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
         [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
+        [DB_KEYS.PAPERLESS_SETTINGS]: get(DB_KEYS.PAPERLESS_SETTINGS, { url: '', token: '', enabled: false }),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -1018,6 +1026,14 @@ export const mockDb = {
     const allTags: Record<string, TagOption[]> = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
     allTags[userId] = tags;
     set(DB_KEYS.CUSTOM_TAGS, allTags);
+  },
+
+  // Paperless NGX Settings
+  getPaperlessSettings: (): PaperlessSettings => {
+    return get<PaperlessSettings>(DB_KEYS.PAPERLESS_SETTINGS, { url: '', token: '', enabled: false });
+  },
+  savePaperlessSettings: (settings: PaperlessSettings) => {
+    set(DB_KEYS.PAPERLESS_SETTINGS, settings);
   },
 
   // Reminders (Denk dran)
