@@ -7,10 +7,10 @@ export interface PaperlessDocument {
   correspondent: number | null;
   document_type: number | null;
   title: string;
-  content: string;        // OCR text
+  content: string;
   tags: number[];
-  created: string;        // ISO date
-  created_date: string;   // ISO date
+  created: string;
+  created_date: string;
   modified: string;
   added: string;
   archive_serial_number: number | null;
@@ -37,22 +37,54 @@ function getSettings(): PaperlessSettings {
   return mockDb.getPaperlessSettings();
 }
 
-function buildUrl(path: string, overrides?: PaperlessSettings): string | null {
-  const settings = overrides || getSettings();
-  if (!settings.url || !settings.token) return null;
-  if (!overrides && !settings.enabled) return null;
-  let cleanUrl = settings.url.replace(/\/+$/, '');
-  // Ensure protocol is present, default to http://
-  if (!/^https?:\/\//i.test(cleanUrl)) {
-    cleanUrl = 'http://' + cleanUrl;
-  }
-  return `${cleanUrl}${path}`;
+function isProxyMode(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:';
 }
 
-function authHeaders(overrides?: PaperlessSettings): Record<string, string> | null {
-  const settings = overrides || getSettings();
-  if (!settings.token) return null;
-  return { 'Authorization': `Token ${settings.token}` };
+/**
+ * Unified fetch for Paperless API.
+ * On HTTPS (Vercel): routes through /api/paperless/proxy
+ * On HTTP (localhost dev): direct connection
+ */
+async function paperlessFetch(
+  apiPath: string,
+  options: {
+    method?: string;
+    body?: BodyInit | null;
+    overrides?: PaperlessSettings;
+  } = {}
+): Promise<Response | null> {
+  const settings = options.overrides || getSettings();
+  if (!settings.url || !settings.token) return null;
+  if (!options.overrides && !settings.enabled) return null;
+
+  const cleanPath = apiPath.replace(/^\//, '');
+
+  if (isProxyMode()) {
+    // Vercel HTTPS → proxy to avoid mixed-content block
+    return fetch(`/api/paperless/proxy?path=${encodeURIComponent(cleanPath)}`, {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Paperless-Url': settings.url,
+        'X-Paperless-Token': settings.token,
+      },
+      body: options.body || undefined,
+    });
+  }
+
+  // Localhost dev → direct HTTP connection
+  let cleanUrl = settings.url.replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl;
+
+  return fetch(`${cleanUrl}/api/${cleanPath}`, {
+    method: options.method || 'GET',
+    headers: {
+      'Authorization': `Token ${settings.token}`,
+      ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: options.body || undefined,
+  });
 }
 
 // --- API Functions ---
@@ -62,19 +94,15 @@ export async function searchDocuments(
   page: number = 1,
   pageSize: number = 25
 ): Promise<{ results: PaperlessDocument[]; count: number } | null> {
-  const url = buildUrl('/api/documents/');
-  const headers = authHeaders();
-  if (!url || !headers) return null;
-
   const params = new URLSearchParams();
   if (query) params.set('query', query);
   params.set('page', String(page));
   params.set('page_size', String(pageSize));
 
   try {
-    const res = await fetch(`${url}?${params}`, { headers });
-    if (!res.ok) {
-      console.error(`Paperless search error ${res.status}: ${res.statusText}`);
+    const res = await paperlessFetch(`/documents/?${params}`);
+    if (!res || !res.ok) {
+      console.error(`Paperless search error ${res?.status}`);
       return null;
     }
     const data: PaperlessSearchResult = await res.json();
@@ -86,13 +114,9 @@ export async function searchDocuments(
 }
 
 export async function getDocument(id: number): Promise<PaperlessDocument | null> {
-  const url = buildUrl(`/api/documents/${id}/`);
-  const headers = authHeaders();
-  if (!url || !headers) return null;
-
   try {
-    const res = await fetch(url, { headers });
-    if (!res.ok) return null;
+    const res = await paperlessFetch(`/documents/${id}/`);
+    if (!res || !res.ok) return null;
     return await res.json();
   } catch (err) {
     console.error('Paperless getDocument error:', err);
@@ -101,24 +125,34 @@ export async function getDocument(id: number): Promise<PaperlessDocument | null>
 }
 
 export function getThumbnailUrl(id: number): string | null {
-  const url = buildUrl(`/api/documents/${id}/thumb/`);
-  return url;
+  if (isProxyMode()) {
+    return `/api/paperless/proxy?path=${encodeURIComponent(`documents/${id}/thumb/`)}`;
+  }
+  const settings = getSettings();
+  if (!settings.url) return null;
+  let cleanUrl = settings.url.replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl;
+  return `${cleanUrl}/api/documents/${id}/thumb/`;
 }
 
 export function getDownloadUrl(id: number, original: boolean = false): string | null {
-  const url = buildUrl(`/api/documents/${id}/download/`);
-  if (url && original) return `${url}?original=true`;
+  if (isProxyMode()) {
+    const path = `documents/${id}/download/${original ? '?original=true' : ''}`;
+    return `/api/paperless/proxy?path=${encodeURIComponent(path)}`;
+  }
+  const settings = getSettings();
+  if (!settings.url) return null;
+  let cleanUrl = settings.url.replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl;
+  let url = `${cleanUrl}/api/documents/${id}/download/`;
+  if (original) url += '?original=true';
   return url;
 }
 
 export async function getThumbnailDataUrl(id: number): Promise<string | null> {
-  const url = getThumbnailUrl(id);
-  const headers = authHeaders();
-  if (!url || !headers) return null;
-
   try {
-    const res = await fetch(url, { headers });
-    if (!res.ok) return null;
+    const res = await paperlessFetch(`/documents/${id}/thumb/`);
+    if (!res || !res.ok) return null;
     const blob = await res.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -137,12 +171,8 @@ export async function uploadDocument(
   correspondentId?: number,
   docTypeId?: number,
   tagIds?: number[],
-  created?: string  // ISO date string
+  created?: string
 ): Promise<boolean> {
-  const url = buildUrl('/api/documents/post_document/');
-  const headers = authHeaders();
-  if (!url || !headers) return false;
-
   const formData = new FormData();
   formData.append('document', file);
   if (title) formData.append('title', title);
@@ -154,13 +184,13 @@ export async function uploadDocument(
   if (created) formData.append('created', created);
 
   try {
-    const res = await fetch(url, {
+    // Note: multipart upload through Vercel proxy may hit size limits (~4.5MB hobby)
+    const res = await paperlessFetch('/documents/post_document/', {
       method: 'POST',
-      headers,  // FormData sets its own Content-Type; don't override
       body: formData,
     });
-    if (!res.ok) {
-      console.error(`Paperless upload error ${res.status}: ${res.statusText}`);
+    if (!res || !res.ok) {
+      console.error(`Paperless upload error ${res?.status}`);
       return false;
     }
     return true;
@@ -170,50 +200,51 @@ export async function uploadDocument(
   }
 }
 
-// --- Corresponent, Document Type, Tag helpers (for upload form dropdowns) ---
+// --- Corresponent, Document Type, Tag helpers ---
 
 async function fetchList<T>(endpoint: string): Promise<T[]> {
-  const url = buildUrl(endpoint);
-  const headers = authHeaders();
-  if (!url || !headers) return [];
   try {
-    const res = await fetch(url, { headers });
-    if (!res.ok) return [];
+    const res = await paperlessFetch(endpoint);
+    if (!res || !res.ok) return [];
     const data = await res.json();
     return data.results || [];
   } catch { return []; }
 }
 
 export async function getCorrespondents(): Promise<PaperlessCorrespondent[]> {
-  return fetchList<PaperlessCorrespondent>('/api/correspondents/');
+  return fetchList<PaperlessCorrespondent>('/correspondents/');
 }
 
 export async function getDocumentTypes(): Promise<PaperlessDocType[]> {
-  return fetchList<PaperlessDocType>('/api/document_types/');
+  return fetchList<PaperlessDocType>('/document_types/');
 }
 
 export async function getTags(): Promise<PaperlessTag[]> {
-  return fetchList<PaperlessTag>('/api/tags/');
+  return fetchList<PaperlessTag>('/tags/');
 }
 
 // --- Connection Test ---
 
 export async function testConnection(settingsOverride?: PaperlessSettings): Promise<{ ok: boolean; error?: string }> {
-  const url = buildUrl('/api/documents/?page_size=1', settingsOverride);
-  const headers = authHeaders(settingsOverride);
-  if (!url || !headers) return { ok: false, error: 'Paperless nicht konfiguriert (URL oder Token fehlt)' };
+  const settings = settingsOverride || getSettings();
+  if (!settings.url || !settings.token) {
+    return { ok: false, error: 'Paperless nicht konfiguriert (URL oder Token fehlt)' };
+  }
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { headers, signal: controller.signal });
+    const res = await paperlessFetch('/documents/?page_size=1', { overrides: settingsOverride });
     clearTimeout(timeout);
 
+    if (!res) {
+      return { ok: false, error: 'Keine Antwort vom Server' };
+    }
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
-        return { ok: false, error: `Authentifizierung fehlgeschlagen. Token prüfen. (URL: ${url})` };
+        return { ok: false, error: 'Authentifizierung fehlgeschlagen. Token prüfen.' };
       }
-      return { ok: false, error: `Server antwortet mit Status ${res.status} (URL: ${url})` };
+      return { ok: false, error: `Server antwortet mit Status ${res.status}` };
     }
     return { ok: true };
   } catch (err: any) {

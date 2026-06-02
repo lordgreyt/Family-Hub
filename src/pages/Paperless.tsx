@@ -160,7 +160,22 @@ export const Paperless = () => {
   const handleDownload = (doc: PaperlessDocument) => {
     const url = getDownloadUrl(doc.id);
     if (!url) return;
-    const headers = settings.token ? { 'Authorization': `Token ${settings.token}` } : {};
+
+    const isProxy = window.location.protocol === 'https:';
+    const headers: Record<string, string> = {};
+
+    if (isProxy) {
+      // Proxy mode: pass Paperless settings as headers
+      let paperlessUrl = settings.url;
+      if (!/^https?:\/\//i.test(paperlessUrl)) paperlessUrl = 'http://' + paperlessUrl;
+      headers['X-Paperless-Url'] = paperlessUrl;
+      headers['X-Paperless-Token'] = settings.token;
+    } else {
+      // Direct mode
+      headers['Authorization'] = `Token ${settings.token}`;
+    }
+
+    fetch(url, { headers })
     // Open in new tab — browser handles auth via URL (token in header isn't possible for <a>)
     // Instead, fetch and create blob URL
     fetch(url, { headers })
