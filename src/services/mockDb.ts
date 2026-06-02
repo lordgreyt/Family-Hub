@@ -180,6 +180,12 @@ export interface ShoppingItem {
   createdBy: string;
 }
 
+export interface PaperlessSettings {
+  url: string;       // e.g. "http://192.168.178.100:8000"
+  token: string;     // API auth token
+  enabled: boolean;  // master toggle
+}
+
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -233,6 +239,7 @@ export const DB_KEYS = {
   PANTRY_ITEMS: 'family_hub_pantry_items',
   SHOPPING_LIST: 'family_hub_shopping_list',
   REMINDERS: 'family_hub_reminders',
+  PAPERLESS_SETTINGS: 'family_hub_paperless_settings',
 };
 
 function get<T>(key: string, initialValue: T): T {
@@ -387,6 +394,7 @@ export const initFirebase = async (force = false) => {
         [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
         [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
+        [DB_KEYS.PAPERLESS_SETTINGS]: get(DB_KEYS.PAPERLESS_SETTINGS, { url: '', token: '', enabled: false }),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -1097,6 +1105,14 @@ export const mockDb = {
   },
   deleteCompletedShoppingItems: () => {
     updateCollection<ShoppingItem>(DB_KEYS.SHOPPING_LIST, items => items.filter(i => !i.isDone));
+  },
+
+  // Paperless NGX Settings
+  getPaperlessSettings: (): PaperlessSettings => {
+    return get<PaperlessSettings>(DB_KEYS.PAPERLESS_SETTINGS, { url: '', token: '', enabled: false });
+  },
+  savePaperlessSettings: (settings: PaperlessSettings) => {
+    set(DB_KEYS.PAPERLESS_SETTINGS, settings);
   },
 
   // Reminders (Denk dran)

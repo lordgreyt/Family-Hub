@@ -18,6 +18,7 @@ import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
 import { Pantry } from './pages/Pantry';
 import { DenkDran } from './pages/DenkDran';
+import { Paperless } from './pages/Paperless';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
 import { initNotificationService } from './services/notificationService';
@@ -55,6 +56,7 @@ function App() {
               <Route path="/e-diary" element={<EDiary />} />
               <Route path="/pantry" element={<Pantry />} />
               <Route path="/denk-dran" element={<DenkDran />} />
+              <Route path="/paperless" element={<Paperless />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

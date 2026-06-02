@@ -4,7 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { NoteItem, TaskItem, User, RewardRequest } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { Filter, Star, X, Save, Trash2, Wallet, TrendingDown } from 'lucide-react';
+import { Filter, Star, X, Save, Trash2, Wallet, TrendingDown, FileText } from 'lucide-react';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { TaskCard } from '../components/TaskCard';
 import { getNeonColor, getNeonCardStyle } from '../utils/neon';
@@ -22,6 +22,7 @@ export const Dashboard = () => {
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
   const [expenseStats, setExpenseStats] = useState({ total: 0, topCategory: '' });
+  const [paperlessEnabled, setPaperlessEnabled] = useState(false);
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,6 +52,7 @@ export const Dashboard = () => {
       setUpcomingTasks(tasks);
       setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
+      setPaperlessEnabled(mockDb.getPaperlessSettings().enabled);
 
       try {
         const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -390,6 +392,56 @@ export const Dashboard = () => {
               style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-xs)', textDecoration: 'none' }}
             >
               Details
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Paperless Widget */}
+      {user && !user.isChild && user.id === 'Falko' && (
+        <div className="glass-panel" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              backgroundColor: 'var(--color-primary-transparent)',
+              borderRadius: 'var(--radius-md)',
+              width: '48px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <FileText size={24} color="var(--color-primary)" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{
+                margin: 0,
+                fontSize: 'var(--font-xs)',
+                color: 'var(--color-text-muted)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}>
+                Paperless NGX
+              </p>
+              <p style={{
+                margin: '0.15rem 0',
+                fontSize: 'var(--font-base)',
+                fontWeight: 600,
+                color: paperlessEnabled ? 'var(--color-success, #16a34a)' : 'var(--color-text-muted)',
+              }}>
+                {paperlessEnabled ? 'Verbunden' : 'Nicht eingerichtet'}
+              </p>
+              <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>
+                Dokumenten-Management
+              </p>
+            </div>
+            <a
+              href="/paperless"
+              className="btn btn-secondary"
+              style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-xs)', textDecoration: 'none' }}
+            >
+              Öffnen
             </a>
           </div>
         </div>
