@@ -40,8 +40,12 @@ function getSettings(): PaperlessSettings {
 function buildUrl(path: string, overrides?: PaperlessSettings): string | null {
   const settings = overrides || getSettings();
   if (!settings.url || !settings.token) return null;
-  if (!overrides && !settings.enabled) return null; // Only check enabled for stored settings, not test mode
-  const cleanUrl = settings.url.replace(/\/+$/, '');
+  if (!overrides && !settings.enabled) return null;
+  let cleanUrl = settings.url.replace(/\/+$/, '');
+  // Ensure protocol is present, default to http://
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    cleanUrl = 'http://' + cleanUrl;
+  }
   return `${cleanUrl}${path}`;
 }
 
