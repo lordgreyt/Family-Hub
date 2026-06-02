@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { MoodEntry, TagOption } from '../services/mockDb';
-import { Calendar as CalendarIcon, TrendingUp, CheckCircle2, Brain, Activity, X, Tag, Bell, BellOff, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, TrendingUp, CheckCircle2, Brain, Activity, X, Tag, Bell, BellOff, Download, List } from 'lucide-react';
 
 const MOOD_LEVELS = [
   { value: 1, emoji: '😠', color: '#ef4444', label: 'Sehr schlecht' },
@@ -49,7 +49,6 @@ export const EDiary = () => {
   const navigate = useNavigate();
 
   const [entries, setEntries] = useState<MoodEntry[]>([]);
-  const [timeRange, setTimeRange] = useState<30 | 60>(30);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
@@ -59,6 +58,7 @@ export const EDiary = () => {
   );
   const [customTags, setCustomTags] = useState<TagOption[]>([]);
   const [showTagManager, setShowTagManager] = useState(false);
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
   useEffect(() => {
     if (!user) return;
@@ -73,19 +73,19 @@ export const EDiary = () => {
     setCustomTags(mockDb.getCustomTags(user.id));
   };
 
-  const handleMoodSelect = (mental: number, physical: number, tags: string[]) => {
+  const handleMoodSelect = (mental: number, physical: number, tags: string[], comment: string) => {
     const today = new Date().toISOString().split('T')[0];
     if (!user) return;
-    mockDb.addOrUpdateMoodEntry({ date: today, userId: user.id, mentalMood: mental, physicalMood: physical, tags });
+    mockDb.addOrUpdateMoodEntry({ date: today, userId: user.id, mentalMood: mental, physicalMood: physical, tags, comment: comment.trim() || undefined });
     setToastMessage('Stimmung gespeichert!');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleEditSave = (mental: number, physical: number, tags: string[]) => {
+  const handleEditSave = (mental: number, physical: number, tags: string[], comment: string) => {
     if (!editDate) return;
     if (!user) return;
-    mockDb.addOrUpdateMoodEntry({ date: editDate, userId: user.id, mentalMood: mental, physicalMood: physical, tags });
+    mockDb.addOrUpdateMoodEntry({ date: editDate, userId: user.id, mentalMood: mental, physicalMood: physical, tags, comment: comment.trim() || undefined });
     setEditDate(null);
     setEditingEntry(null);
     setToastMessage('Eintrag aktualisiert!');
@@ -231,7 +231,7 @@ export const EDiary = () => {
       gap: '1.5rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Stimmungskalender</h1>
+        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary)' }}>Stimmung</h1>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={() => setShowTagManager(true)}
@@ -240,7 +240,7 @@ export const EDiary = () => {
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -256,7 +256,7 @@ export const EDiary = () => {
               background: notificationsEnabled ? 'rgba(16, 185, 129, 0.1)' : 'var(--color-surface)',
               border: notificationsEnabled ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -272,7 +272,7 @@ export const EDiary = () => {
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.4rem',
+              padding: '0.5rem 0.8rem',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -291,53 +291,59 @@ export const EDiary = () => {
         customTags={customTags}
       />
 
-      {/* Dashboard Toggle */}
+      {/* Calendar / List View Toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text)' }}>Dashboard</h2>
         <div style={{ display: 'flex', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '0.2rem', border: '1px solid var(--color-border)' }}>
           <button
-            onClick={() => setTimeRange(30)}
+            onClick={() => setViewMode('calendar')}
             style={{
-              padding: '0.4rem 0.8rem',
+              padding: '0.5rem 0.8rem',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
-              background: timeRange === 30 ? 'var(--color-primary)' : 'transparent',
-              color: timeRange === 30 ? 'white' : 'var(--color-text-muted)',
-              fontSize: '0.8rem',
-              fontWeight: 700,
+              background: viewMode === 'calendar' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'calendar' ? 'white' : 'var(--color-text-muted)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
               transition: 'all 0.2s'
             }}
+            title="Kalenderansicht"
           >
-            30 Tage
+            <CalendarIcon size={16} />
           </button>
           <button
-            onClick={() => setTimeRange(60)}
+            onClick={() => setViewMode('list')}
             style={{
-              padding: '0.4rem 0.8rem',
+              padding: '0.5rem 0.8rem',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
-              background: timeRange === 60 ? 'var(--color-primary)' : 'transparent',
-              color: timeRange === 60 ? 'white' : 'var(--color-text-muted)',
-              fontSize: '0.8rem',
-              fontWeight: 700,
+              background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'list' ? 'white' : 'var(--color-text-muted)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
               transition: 'all 0.2s'
             }}
+            title="Listenansicht"
           >
-            60 Tage
+            <List size={16} />
           </button>
         </div>
       </div>
 
-      {/* Calendar View */}
-      <MoodCalendar entries={entries} onEditDay={openEditDialog} customTags={customTags} />
+      {/* Calendar / List View */}
+      {viewMode === 'calendar' ? (
+        <MoodCalendar entries={entries} onEditDay={openEditDialog} customTags={customTags} />
+      ) : (
+        <MoodListView entries={entries} onEditDay={openEditDialog} customTags={customTags} days={30} />
+      )}
 
       {/* Analysis */}
-      <MoodAnalysis entries={entries} days={timeRange} />
+      <MoodAnalysis entries={entries} days={30} />
 
       {/* Trend Graph */}
-      <MoodGraph entries={entries} days={timeRange} />
+      <MoodGraph entries={entries} days={30} />
 
       {/* Edit Dialog */}
       {editDate && (
@@ -499,10 +505,11 @@ const TagManagerDialog = ({ tags, onAdd, onDelete, onClose }: {
 
 // --- Mood Check-In (Today) ---
 
-const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: number, physical: number, tags: string[]) => void, existingEntry?: MoodEntry, customTags: TagOption[] }) => {
+const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: number, physical: number, tags: string[], comment: string) => void, existingEntry?: MoodEntry, customTags: TagOption[] }) => {
   const [mental, setMental] = useState<number>(existingEntry?.mentalMood || 0);
   const [physical, setPhysical] = useState<number>(existingEntry?.physicalMood || 0);
   const [selectedTags, setSelectedTags] = useState<string[]>(existingEntry?.tags || []);
+  const [comment, setComment] = useState<string>(existingEntry?.comment || '');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -510,6 +517,7 @@ const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: n
       setMental(existingEntry.mentalMood);
       setPhysical(existingEntry.physicalMood);
       setSelectedTags(existingEntry.tags || []);
+      setComment(existingEntry.comment || '');
       setSaved(true);
     }
   }, [existingEntry]);
@@ -523,7 +531,7 @@ const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: n
 
   const handleSave = () => {
     if (mental === 0 || physical === 0) return;
-    onSave(mental, physical, selectedTags);
+    onSave(mental, physical, selectedTags, comment);
     setSaved(true);
   };
 
@@ -663,6 +671,34 @@ const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: n
         </div>
       </div>
 
+      {/* Comment */}
+      <div style={{ marginBottom: '1rem' }}>
+        <textarea
+          value={comment}
+          onChange={e => { setComment(e.target.value); setSaved(false); }}
+          placeholder="Kommentar (optional) — wird nur beim langen Drücken im Kalender angezeigt..."
+          className="input-field"
+          maxLength={500}
+          rows={2}
+          style={{
+            width: '100%',
+            padding: '0.6rem 0.75rem',
+            fontSize: '0.8rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text)',
+            resize: 'vertical',
+            fontFamily: 'inherit',
+          }}
+        />
+        {comment.length > 0 && (
+          <div style={{ textAlign: 'right', fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+            {comment.length}/500
+          </div>
+        )}
+      </div>
+
       {/* Save Button + Average Preview */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginTop: '0.5rem' }}>
         {avg !== null && !saved && (
@@ -696,13 +732,14 @@ const MoodCheckIn = ({ onSave, existingEntry, customTags }: { onSave: (mental: n
 const EditDialog = ({ date, existingEntry, onSave, onClose, customTags }: {
   date: string;
   existingEntry: MoodEntry | null;
-  onSave: (mental: number, physical: number, tags: string[]) => void;
+  onSave: (mental: number, physical: number, tags: string[], comment: string) => void;
   onClose: () => void;
   customTags: TagOption[];
 }) => {
   const [mental, setMental] = useState<number>(existingEntry?.mentalMood || 0);
   const [physical, setPhysical] = useState<number>(existingEntry?.physicalMood || 0);
   const [selectedTags, setSelectedTags] = useState<string[]>(existingEntry?.tags || []);
+  const [comment, setComment] = useState<string>(existingEntry?.comment || '');
 
   const dateObj = new Date(date + 'T00:00:00');
   const formattedDate = dateObj.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -715,7 +752,7 @@ const EditDialog = ({ date, existingEntry, onSave, onClose, customTags }: {
 
   const handleSave = () => {
     if (mental === 0 || physical === 0) return;
-    onSave(mental, physical, selectedTags);
+    onSave(mental, physical, selectedTags, comment);
   };
 
   return (
@@ -848,6 +885,28 @@ const EditDialog = ({ date, existingEntry, onSave, onClose, customTags }: {
               );
             })}
           </div>
+        </div>
+
+        {/* Comment */}
+        <div style={{ marginBottom: '1rem' }}>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="Kommentar..."
+            maxLength={500}
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '0.6rem 0.75rem',
+              fontSize: '0.8rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text)',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+            }}
+          />
         </div>
 
         <button
@@ -1078,6 +1137,158 @@ const CalendarDay = ({ day, color, hasEntry, isToday, isFuture, entry, onEdit, c
   );
 };
 
+// --- List View (alternative to calendar, shows comments) ---
+
+const MoodListView = ({ entries, onEditDay, customTags, days }: { entries: MoodEntry[], onEditDay: (dateStr: string) => void, customTags: TagOption[], days: number }) => {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Filter to last N days, then sort by date descending
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  cutoff.setHours(0, 0, 0, 0);
+  const filteredEntries = entries.filter(e => new Date(e.date + 'T00:00:00') >= cutoff);
+  const sortedEntries = [...filteredEntries].sort((a, b) => b.date.localeCompare(a.date));
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  return (
+    <div className="glass-panel" style={{
+      padding: '1.25rem',
+      backgroundColor: 'var(--color-surface)',
+      borderRadius: 'var(--radius-xl)',
+      border: '1px solid var(--color-border)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <List size={18} color="var(--color-primary)" />
+          Einträge ({days} Tage)
+        </h3>
+        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+          {sortedEntries.length} / {days} {days === 1 ? 'Tag' : 'Tage'}
+        </span>
+      </div>
+
+      {sortedEntries.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+          Noch keine Einträge.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {sortedEntries.map(entry => {
+            const avg = getWeightedAverage(entry.mentalMood, entry.physicalMood);
+            const moodColor = getMoodColor(avg);
+            const isToday = entry.date === todayStr;
+
+            return (
+              <div
+                key={entry.date}
+                onClick={() => onEditDay(entry.date)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--color-background)',
+                  borderRadius: 'var(--radius-md)',
+                  borderLeft: `4px solid ${moodColor}`,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-background)'}
+              >
+                {/* Mood indicator */}
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: moodColor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.3rem',
+                  flexShrink: 0,
+                }}>
+                  {MOOD_LEVELS[Math.round(avg) - 1]?.emoji}
+                </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                      {formatDate(entry.date)}
+                    </span>
+                    {isToday && (
+                      <span style={{
+                        fontSize: '0.6rem',
+                        fontWeight: 600,
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: 'var(--radius-full)',
+                        backgroundColor: 'var(--color-primary)',
+                        color: 'white',
+                      }}>
+                        heute
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.75rem', color: moodColor, fontWeight: 600, marginLeft: 'auto' }}>
+                      {avg.toFixed(1)}
+                    </span>
+                  </div>
+
+                  {/* Mental + Physical bars */}
+                  <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.25rem' }}>
+                    <div style={{ flex: 2, fontSize: '0.65rem', color: 'var(--color-primary)' }}>
+                      🧠 Mental: {MOOD_LEVELS.find(m => m.value === entry.mentalMood)?.emoji}
+                    </div>
+                    <div style={{ flex: 1, fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                      💪 {MOOD_LEVELS.find(m => m.value === entry.physicalMood)?.emoji}
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {entry.tags && entry.tags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.15rem' }}>
+                      {entry.tags.map(tagId => {
+                        const tag = customTags.find(t => t.id === tagId);
+                        return tag ? (
+                          <span key={tagId} style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>
+                            {tag.emoji} {tag.label}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+
+                  {/* Comment */}
+                  {entry.comment && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-text-muted)',
+                      fontStyle: 'italic',
+                      lineHeight: 1.4,
+                      marginTop: '0.25rem',
+                      padding: '0.4rem 0.5rem',
+                      backgroundColor: 'var(--color-surface)',
+                      borderRadius: 'var(--radius-sm)',
+                      borderLeft: '3px solid var(--color-border)',
+                    }}>
+                      💬 {entry.comment}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Analysis (weekday averages, trend, insights) ---
 
 const MoodAnalysis = ({ entries, days }: { entries: MoodEntry[], days: number }) => {
@@ -1149,7 +1360,34 @@ const MoodAnalysis = ({ entries, days }: { entries: MoodEntry[], days: number })
     return { totalAvg, weekdayAvgs, trend, bestDay, bestAvg, worstDay, worstAvg, streak, count: filtered.length };
   }, [entries, days]);
 
-  if (!analysis) return null;
+  // Count entries in the time range for the fallback message
+  const entryCountInRange = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(0, 0, 0, 0);
+    return entries.filter(e => new Date(e.date + 'T00:00:00') >= cutoff).length;
+  }, [entries, days]);
+
+  if (!analysis) {
+    return (
+      <div className="glass-panel" style={{
+        padding: '1.25rem',
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--color-border)'
+      }}>
+        <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Activity size={18} color="var(--color-primary)" />
+          Analyse ({days} Tage)
+        </h3>
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+          {entryCountInRange === 0
+            ? `Keine Einträge in den letzten ${days} Tagen.`
+            : `Nur ${entryCountInRange} ${entryCountInRange === 1 ? 'Eintrag' : 'Einträge'} — mindestens 3 für eine Analyse nötig.`}
+        </div>
+      </div>
+    );
+  }
 
   const formatDate = (ds: string) => {
     const d = new Date(ds + 'T00:00:00');
@@ -1314,8 +1552,9 @@ const MoodGraph = ({ entries, days }: { entries: MoodEntry[], days: number }) =>
       </h3>
 
       {points.length < 2 ? (
-        <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-          Nicht genug Daten für einen Trend.
+        <div style={{ height: `${height}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem', gap: '0.25rem' }}>
+          <span>Nicht genug Daten für einen Trend.</span>
+          <span style={{ fontSize: '0.7rem' }}>{points.length} {points.length === 1 ? 'Eintrag' : 'Einträge'} in {days} Tagen — mindestens 2 nötig.</span>
         </div>
       ) : (
         <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>

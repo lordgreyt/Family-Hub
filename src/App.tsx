@@ -16,7 +16,6 @@ import { Expenses } from './pages/Expenses';
 import { N26 } from './pages/N26';
 import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
-import { Pantry } from './pages/Pantry';
 import { DenkDran } from './pages/DenkDran';
 import { Paperless } from './pages/Paperless';
 import { VictronProvider } from './context/VictronContext';
@@ -54,7 +53,6 @@ function App() {
               <Route path="/n26" element={<N26 />} />
               <Route path="/wallbox" element={<Wallbox />} />
               <Route path="/e-diary" element={<EDiary />} />
-              <Route path="/pantry" element={<Pantry />} />
               <Route path="/denk-dran" element={<DenkDran />} />
               <Route path="/paperless" element={<Paperless />} />
             </Route>
