@@ -45,8 +45,8 @@ export const MainLayout = () => {
     return <Outlet />;
   }
 
-  // Children cannot access the budget page
-  if (user?.isChild && location.pathname === '/budget') {
+  // Children cannot access adult-only pages
+  if (user?.isChild && ['/budget', '/smart-home'].includes(location.pathname)) {
     return <Navigate to="/" replace />;
   }
 

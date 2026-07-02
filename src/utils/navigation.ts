@@ -1,9 +1,10 @@
-import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell } from 'lucide-react';
+import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell, SlidersHorizontal } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { User } from '../services/mockDb';
 
 export interface NavItem {
   to: string;
-  icon: any;
+  icon: LucideIcon;
   label: string;
 }
 
@@ -21,6 +22,7 @@ export const getNavItems = (user: User | null): NavItem[] => {
       { to: '/denk-dran', icon: Bell, label: 'Denk dran' },
       { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
       { to: '/budget', icon: Calculator, label: 'Budget' },
+      { to: '/smart-home', icon: SlidersHorizontal, label: 'Smart Home' },
       { to: '/wallbox', icon: Zap, label: 'Wallbox' }
     ] : []),
     { to: '/rewards', icon: Star, label: 'Sterne' },
