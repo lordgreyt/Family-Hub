@@ -152,6 +152,33 @@ export interface Reminder {
   createdBy: string;
 }
 
+export interface GradeEntry {
+  id: string;
+  value: number;
+  date: string; // YYYY-MM-DD
+  weight: number; // 100 = voll, 50 = halbe Gewichtung
+  createdAt: number;
+}
+
+export interface GradeSubject {
+  id: string;
+  name: string;
+  grades: GradeEntry[];
+}
+
+export interface GradeChildSettings {
+  isSecondarySchool: boolean;
+  majorSubjectIds: string[];
+}
+
+export interface GradeChildRecord {
+  childId: string;
+  subjects: GradeSubject[];
+  settings: GradeChildSettings;
+}
+
+export type GradeBook = Record<string, GradeChildRecord>;
+
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -202,7 +229,33 @@ export const DB_KEYS = {
   EDIARY: 'family_hub_ediary',
   CUSTOM_TAGS: 'family_hub_custom_tags',
   REMINDERS: 'family_hub_reminders',
+  GRADES: 'family_hub_grades',
 };
+
+const DEFAULT_GRADE_SETTINGS: GradeChildSettings = {
+  isSecondarySchool: false,
+  majorSubjectIds: [],
+};
+
+function normalizeGradeChild(childId: string, record?: Partial<GradeChildRecord>): GradeChildRecord {
+  const subjects = Array.isArray(record?.subjects) ? record.subjects : [];
+  const settings = record?.settings || DEFAULT_GRADE_SETTINGS;
+
+  return {
+    childId,
+    subjects: subjects
+      .filter(subject => subject && subject.name)
+      .map(subject => ({
+        id: subject.id || uuidv4(),
+        name: subject.name,
+        grades: Array.isArray(subject.grades) ? subject.grades.filter(Boolean) : [],
+      })),
+    settings: {
+      isSecondarySchool: Boolean(settings.isSecondarySchool),
+      majorSubjectIds: Array.isArray(settings.majorSubjectIds) ? settings.majorSubjectIds : [],
+    },
+  };
+}
 
 function get<T>(key: string, initialValue: T): T {
   const data = localStorage.getItem(key);
@@ -356,6 +409,7 @@ export const initFirebase = async (force = false) => {
         [DB_KEYS.UNLOCKED_VIDEOS]: get(DB_KEYS.UNLOCKED_VIDEOS, []),
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
         [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
+        [DB_KEYS.GRADES]: get(DB_KEYS.GRADES, {}),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -1036,6 +1090,21 @@ export const mockDb = {
   },
   deleteReminder: (id: string) => {
     updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.filter(i => i.id !== id));
+  },
+
+  // Grades
+  getGradeBook: (): GradeBook => {
+    const data = get<GradeBook>(DB_KEYS.GRADES, {});
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  },
+  getGradeChild: (childId: string): GradeChildRecord => {
+    const book = mockDb.getGradeBook();
+    return normalizeGradeChild(childId, book[childId]);
+  },
+  saveGradeChild: (record: GradeChildRecord) => {
+    const book = mockDb.getGradeBook();
+    const normalized = normalizeGradeChild(record.childId, record);
+    set(DB_KEYS.GRADES, { ...book, [record.childId]: normalized });
   },
 };
 

@@ -1,4 +1,4 @@
-import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell, SlidersHorizontal } from 'lucide-react';
+import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell, SlidersHorizontal, GraduationCap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../services/mockDb';
 
@@ -15,6 +15,7 @@ export const getNavItems = (user: User | null): NavItem[] => {
     { to: '/', icon: Home, label: 'Home' },
     { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
     { to: '/notes', icon: BookOpen, label: 'Notizen' },
+    { to: '/grades', icon: GraduationCap, label: 'Noten' },
     ...(user.id === 'Falko' ? [
       { to: '/n26', icon: CreditCard, label: 'N26' },
     ] : []),
