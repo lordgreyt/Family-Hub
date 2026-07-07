@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, Plus, Save, Settings, Star, Trash2, X } from 'lucide-react';
+import { Archive, BarChart3, BookOpen, ChevronDown, ChevronRight, Plus, Save, Settings, Star, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import type { GradeChildRecord, GradeEntry, GradeSubject, User } from '../services/mockDb';
+import type { GradeArchivedYear, GradeChildRecord, GradeChildSettings, GradeEntry, GradeSubject, User } from '../services/mockDb';
 
 const CHILDREN = ['Lennart', 'Oskar', 'Lotta'] as const;
+const CURRENT_YEAR_ID = 'current';
 
 type ChildId = typeof CHILDREN[number];
 
@@ -14,10 +15,34 @@ interface GradeDraft {
   weight: string;
 }
 
+interface GradeYearView {
+  id: string;
+  label: string;
+  subjects: GradeSubject[];
+  settings: GradeChildSettings;
+  isCurrent: boolean;
+  archivedAt?: number;
+}
+
+interface GradeYearSummary {
+  id: string;
+  label: string;
+  isCurrent: boolean;
+  overall: number | null;
+  subjectAverages: Array<{ name: string; average: number | null }>;
+}
+
+interface ChartPoint {
+  label: string;
+  value: number | null;
+}
+
 interface SettingsModalProps {
   record: GradeChildRecord;
+  archiveCount: number;
   onClose: () => void;
   onSave: (record: GradeChildRecord) => void;
+  onStartNewSchoolYear: (record: GradeChildRecord) => void;
 }
 
 function todayIso() {
@@ -30,6 +55,38 @@ function createId() {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function currentSchoolYearLabel() {
+  const now = new Date();
+  const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${startYear}/${String(startYear + 1).slice(-2)}`;
+}
+
+function nextSchoolYearLabel(label: string) {
+  const match = label.match(/^(\d{4})/);
+  if (!match) return currentSchoolYearLabel();
+  const nextStart = Number(match[1]) + 1;
+  return `${nextStart}/${String(nextStart + 1).slice(-2)}`;
+}
+
+function schoolYearStart(label: string) {
+  const match = label.match(/^(\d{4})/);
+  return match ? Number(match[1]) : 0;
+}
+
+function cloneSettings(settings: GradeChildSettings): GradeChildSettings {
+  return {
+    isSecondarySchool: settings.isSecondarySchool,
+    majorSubjectIds: [...settings.majorSubjectIds],
+  };
+}
+
+function cloneSubjects(subjects: GradeSubject[], withGrades = true): GradeSubject[] {
+  return subjects.map(subject => ({
+    ...subject,
+    grades: withGrades ? subject.grades.map(grade => ({ ...grade })) : [],
+  }));
+}
+
 function weightedAverage(grades: GradeEntry[]) {
   const valid = grades.filter(grade => Number.isFinite(grade.value) && Number.isFinite(grade.weight) && grade.weight > 0);
   const weightSum = valid.reduce((sum, grade) => sum + grade.weight, 0);
@@ -38,11 +95,11 @@ function weightedAverage(grades: GradeEntry[]) {
 }
 
 function formatAverage(value: number | null) {
-  return value === null ? '—' : value.toFixed(2).replace('.', ',');
+  return value === null ? '-' : value.toFixed(2).replace('.', ',');
 }
 
-function overallAverage(record: GradeChildRecord) {
-  const subjectValues = record.subjects
+function overallAverage(year: Pick<GradeYearView, 'subjects' | 'settings'>) {
+  const subjectValues = year.subjects
     .map(subject => ({ subject, average: weightedAverage(subject.grades) }))
     .filter((item): item is { subject: GradeSubject; average: number } => item.average !== null);
 
@@ -52,7 +109,7 @@ function overallAverage(record: GradeChildRecord) {
   let count = 0;
 
   subjectValues.forEach(({ subject, average }) => {
-    const multiplier = record.settings.isSecondarySchool && record.settings.majorSubjectIds.includes(subject.id) ? 2 : 1;
+    const multiplier = year.settings.isSecondarySchool && year.settings.majorSubjectIds.includes(subject.id) ? 2 : 1;
     sum += average * multiplier;
     count += multiplier;
   });
@@ -60,11 +117,214 @@ function overallAverage(record: GradeChildRecord) {
   return count > 0 ? sum / count : null;
 }
 
-function SettingsModal({ record, onClose, onSave }: SettingsModalProps) {
+function formatDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function formatDateTime(timestamp?: number) {
+  if (!timestamp) return '';
+  return new Date(timestamp).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function sortArchivedYears(years: GradeArchivedYear[]) {
+  return [...years].sort((a, b) => schoolYearStart(b.label) - schoolYearStart(a.label) || b.archivedAt - a.archivedAt);
+}
+
+function currentYearView(record: GradeChildRecord): GradeYearView {
+  return {
+    id: CURRENT_YEAR_ID,
+    label: record.currentSchoolYear,
+    subjects: record.subjects,
+    settings: record.settings,
+    isCurrent: true,
+  };
+}
+
+function archivedYearView(year: GradeArchivedYear): GradeYearView {
+  return {
+    id: year.id,
+    label: year.label,
+    subjects: year.subjects,
+    settings: year.settings,
+    isCurrent: false,
+    archivedAt: year.archivedAt,
+  };
+}
+
+function selectedYearView(record: GradeChildRecord, selectedYearId: string): GradeYearView {
+  if (selectedYearId === CURRENT_YEAR_ID) return currentYearView(record);
+  const archived = record.archivedYears.find(year => year.id === selectedYearId);
+  return archived ? archivedYearView(archived) : currentYearView(record);
+}
+
+function buildYearSummaries(record: GradeChildRecord): GradeYearSummary[] {
+  const archived = [...record.archivedYears].sort((a, b) => schoolYearStart(a.label) - schoolYearStart(b.label) || a.archivedAt - b.archivedAt);
+  const years = [...archived.map(archivedYearView), currentYearView(record)];
+
+  return years.map(year => ({
+    id: year.id,
+    label: year.label,
+    isCurrent: year.isCurrent,
+    overall: overallAverage(year),
+    subjectAverages: year.subjects.map(subject => ({
+      name: subject.name,
+      average: weightedAverage(subject.grades),
+    })),
+  }));
+}
+
+function GradeTrendLine({ points, compact = false }: { points: ChartPoint[]; compact?: boolean }) {
+  const width = 340;
+  const height = compact ? 92 : 132;
+  const paddingX = 26;
+  const paddingTop = 12;
+  const paddingBottom = compact ? 22 : 30;
+  const chartHeight = height - paddingTop - paddingBottom;
+  const chartWidth = width - paddingX * 2;
+  const positioned = points.map((point, index) => {
+    const x = points.length <= 1 ? width / 2 : paddingX + (chartWidth * index) / (points.length - 1);
+    const clamped = point.value === null ? null : Math.min(6, Math.max(1, point.value));
+    const y = clamped === null ? null : paddingTop + ((clamped - 1) / 5) * chartHeight;
+    return { ...point, x, y };
+  });
+  const valid = positioned.filter((point): point is ChartPoint & { x: number; y: number } => point.y !== null);
+  const polyline = valid.map(point => `${point.x},${point.y}`).join(' ');
+
+  if (!points.length || !valid.length) {
+    return (
+      <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
+        Noch keine Jahresdaten.
+      </p>
+    );
+  }
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Notenverlauf" style={{ width: '100%', height: compact ? '92px' : '132px', display: 'block' }}>
+      {[1, 2, 3, 4, 5, 6].map(value => {
+        const y = paddingTop + ((value - 1) / 5) * chartHeight;
+        return (
+          <g key={value}>
+            <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="var(--color-border)" strokeWidth="1" />
+            {!compact && (
+              <text x="4" y={y + 4} fill="var(--color-text-muted)" fontSize="10" fontWeight="700">
+                {value}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      {valid.length > 1 && (
+        <polyline points={polyline} fill="none" stroke="var(--color-primary)" strokeWidth={compact ? 3 : 4} strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {valid.map(point => (
+        <g key={`${point.label}-${point.x}`}>
+          <circle cx={point.x} cy={point.y} r={compact ? 4 : 5} fill="var(--color-primary)" />
+          {!compact && (
+            <text x={point.x} y={Math.max(12, point.y - 8)} textAnchor="middle" fill="var(--color-primary)" fontSize="11" fontWeight="900">
+              {formatAverage(point.value)}
+            </text>
+          )}
+        </g>
+      ))}
+      {positioned.map(point => (
+        <text key={point.label} x={point.x} y={height - 5} textAnchor="middle" fill="var(--color-text-muted)" fontSize={compact ? 9 : 10} fontWeight="800">
+          {point.label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function GradeAnalytics({ record }: { record: GradeChildRecord }) {
+  const summaries = useMemo(() => buildYearSummaries(record), [record]);
+  const subjectNames = useMemo(() => {
+    const names = new Set<string>();
+    summaries.forEach(summary => {
+      summary.subjectAverages.forEach(subject => names.add(subject.name));
+    });
+    return [...names].sort((a, b) => a.localeCompare(b, 'de'));
+  }, [summaries]);
+  const hasValues = summaries.some(summary => summary.overall !== null || summary.subjectAverages.some(subject => subject.average !== null));
+
+  return (
+    <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{
+          width: '38px',
+          height: '38px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--color-primary-transparent)',
+          color: 'var(--color-primary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <BarChart3 size={20} />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 'var(--font-lg)' }}>Auswertung</h2>
+          <p style={{ margin: '0.15rem 0 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>
+            {summaries.length} Schuljahre
+          </p>
+        </div>
+      </div>
+
+      {!hasValues ? (
+        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
+          Sobald Noten eingetragen sind, erscheint hier der Verlauf.
+        </p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <h3 style={{ margin: 0, fontSize: 'var(--font-base)' }}>Gesamtschnitt</h3>
+            <GradeTrendLine points={summaries.map(summary => ({ label: summary.label, value: summary.overall }))} />
+          </div>
+
+          {subjectNames.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: 'var(--font-base)' }}>Fächer</h3>
+              {subjectNames.map(name => {
+                const points = summaries.map(summary => ({
+                  label: summary.label,
+                  value: summary.subjectAverages.find(subject => subject.name === name)?.average ?? null,
+                }));
+                const latest = [...points].reverse().find(point => point.value !== null)?.value ?? null;
+                return (
+                  <div key={name} style={{
+                    padding: '0.8rem',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--color-background)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.4rem',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                      <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</strong>
+                      <span style={{ color: 'var(--color-primary)', fontWeight: 900 }}>{formatAverage(latest)}</span>
+                    </div>
+                    <GradeTrendLine points={points} compact />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SettingsModal({ record, archiveCount, onClose, onSave, onStartNewSchoolYear }: SettingsModalProps) {
   const [draft, setDraft] = useState<GradeChildRecord>(() => ({
     ...record,
-    subjects: record.subjects.map(subject => ({ ...subject, grades: [...subject.grades] })),
-    settings: { ...record.settings, majorSubjectIds: [...record.settings.majorSubjectIds] },
+    subjects: cloneSubjects(record.subjects),
+    settings: cloneSettings(record.settings),
+    archivedYears: record.archivedYears.map(year => ({
+      ...year,
+      subjects: cloneSubjects(year.subjects),
+      settings: cloneSettings(year.settings),
+    })),
   }));
   const [newSubject, setNewSubject] = useState('');
 
@@ -147,7 +407,7 @@ function SettingsModal({ record, onClose, onSave }: SettingsModalProps) {
           <div>
             <h2 style={{ margin: 0, fontSize: 'var(--font-lg)' }}>{record.childId} Einstellungen</h2>
             <p style={{ margin: '0.2rem 0 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>
-              Fächer und Hauptfach-Gewichtung
+              {record.currentSchoolYear} · {archiveCount} im Archiv
             </p>
           </div>
           <button onClick={onClose} aria-label="Schließen" style={{ color: 'var(--color-text-muted)', display: 'flex', padding: '0.25rem' }}>
@@ -249,6 +509,21 @@ function SettingsModal({ record, onClose, onSave }: SettingsModalProps) {
           </div>
         </div>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.25rem', borderTop: '1px solid var(--color-border)' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => onStartNewSchoolYear(draft)}
+            style={{ justifyContent: 'center', borderRadius: 'var(--radius-md)' }}
+          >
+            <Archive size={17} />
+            Neues Schuljahr beginnen
+          </button>
+          <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', lineHeight: 1.4 }}>
+            {record.currentSchoolYear} wird archiviert, das nächste Schuljahr startet mit leeren Noten.
+          </p>
+        </div>
+
         <button className="btn btn-primary" onClick={() => onSave(draft)} style={{ justifyContent: 'center' }}>
           <Save size={17} />
           Speichern
@@ -263,6 +538,7 @@ export const Grades = () => {
   const [activeChild, setActiveChild] = useState<ChildId>('Lennart');
   const [users, setUsers] = useState<User[]>([]);
   const [record, setRecord] = useState<GradeChildRecord>(() => mockDb.getGradeChild('Lennart'));
+  const [selectedYearId, setSelectedYearId] = useState(CURRENT_YEAR_ID);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addingSubjectId, setAddingSubjectId] = useState<string | null>(null);
@@ -274,6 +550,7 @@ export const Grades = () => {
       setUsers(mockDb.getUsers());
       const nextRecord = mockDb.getGradeChild(activeChild);
       setRecord(nextRecord);
+      setSelectedYearId(current => current === CURRENT_YEAR_ID || nextRecord.archivedYears.some(year => year.id === current) ? current : CURRENT_YEAR_ID);
       setExpandedSubjects(current => {
         if (current.size > 0) return current;
         return new Set(nextRecord.subjects.slice(0, 1).map(subject => subject.id));
@@ -284,26 +561,61 @@ export const Grades = () => {
     return () => window.removeEventListener('db_updated', load);
   }, [activeChild, user]);
 
+  const selectedYear = useMemo(() => selectedYearView(record, selectedYearId), [record, selectedYearId]);
+  const archivedYears = useMemo(() => sortArchivedYears(record.archivedYears), [record.archivedYears]);
   const childUser = users.find(item => item.id === activeChild);
-  const totalAverage = useMemo(() => overallAverage(record), [record]);
+  const totalAverage = useMemo(() => overallAverage(selectedYear), [selectedYear]);
 
   if (!user) return null;
-  const canEdit = !user.isChild;
+  const canManage = !user.isChild;
+  const canEdit = canManage && selectedYear.isCurrent;
 
   const saveRecord = (nextRecord: GradeChildRecord) => {
-    if (!canEdit) return;
+    if (!canManage) return;
     setRecord(nextRecord);
     mockDb.saveGradeChild(nextRecord);
   };
 
   const saveSettings = (nextRecord: GradeChildRecord) => {
-    if (!canEdit) return;
+    if (!canManage) return;
     saveRecord(nextRecord);
+    setSelectedYearId(CURRENT_YEAR_ID);
     setSettingsOpen(false);
     setExpandedSubjects(current => {
       const subjectIds = new Set(nextRecord.subjects.map(subject => subject.id));
       return new Set([...current].filter(id => subjectIds.has(id)));
     });
+  };
+
+  const startNewSchoolYear = (baseRecord: GradeChildRecord) => {
+    if (!canManage) return;
+    const nextLabel = nextSchoolYearLabel(baseRecord.currentSchoolYear);
+    const confirmed = window.confirm(`Schuljahr ${baseRecord.currentSchoolYear} archivieren und ${nextLabel} beginnen?`);
+    if (!confirmed) return;
+
+    const archived: GradeArchivedYear = {
+      id: createId(),
+      label: baseRecord.currentSchoolYear,
+      subjects: cloneSubjects(baseRecord.subjects),
+      settings: cloneSettings(baseRecord.settings),
+      startedAt: baseRecord.startedAt,
+      archivedAt: Date.now(),
+    };
+
+    const nextRecord: GradeChildRecord = {
+      ...baseRecord,
+      currentSchoolYear: nextLabel,
+      startedAt: Date.now(),
+      subjects: cloneSubjects(baseRecord.subjects, false),
+      settings: cloneSettings(baseRecord.settings),
+      archivedYears: [archived, ...record.archivedYears],
+    };
+
+    saveRecord(nextRecord);
+    setSelectedYearId(CURRENT_YEAR_ID);
+    setSettingsOpen(false);
+    setAddingSubjectId(null);
+    setExpandedSubjects(new Set(nextRecord.subjects.slice(0, 1).map(subject => subject.id)));
   };
 
   const toggleSubject = (subjectId: string) => {
@@ -377,10 +689,10 @@ export const Grades = () => {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 'var(--font-xl)' }}>Noten</h1>
           <p style={{ margin: '0.2rem 0 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            {record.subjects.length} Fächer · {record.settings.isSecondarySchool ? 'Weiterführende Schule' : 'Grundschule'}
+            {selectedYear.subjects.length} Fächer · {selectedYear.label} · {selectedYear.settings.isSecondarySchool ? 'Weiterführende Schule' : 'Grundschule'}
           </p>
         </div>
-        {canEdit && (
+        {canManage && selectedYear.isCurrent && (
           <button
             onClick={() => setSettingsOpen(true)}
             title="Einstellungen"
@@ -409,6 +721,7 @@ export const Grades = () => {
               key={childId}
               onClick={() => {
                 setActiveChild(childId);
+                setSelectedYearId(CURRENT_YEAR_ID);
                 setExpandedSubjects(new Set());
                 setAddingSubjectId(null);
               }}
@@ -419,6 +732,34 @@ export const Grades = () => {
             </button>
           );
         })}
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.05rem' }}>
+        <button
+          onClick={() => {
+            setSelectedYearId(CURRENT_YEAR_ID);
+            setAddingSubjectId(null);
+            setExpandedSubjects(new Set(record.subjects.slice(0, 1).map(subject => subject.id)));
+          }}
+          className={selectedYearId === CURRENT_YEAR_ID ? 'chip chip-active' : 'chip'}
+          style={{ flex: '0 0 auto' }}
+        >
+          Aktuell {record.currentSchoolYear}
+        </button>
+        {archivedYears.map(year => (
+          <button
+            key={year.id}
+            onClick={() => {
+              setSelectedYearId(year.id);
+              setAddingSubjectId(null);
+              setExpandedSubjects(new Set(year.subjects.slice(0, 1).map(subject => subject.id)));
+            }}
+            className={selectedYearId === year.id ? 'chip chip-active' : 'chip'}
+            style={{ flex: '0 0 auto' }}
+          >
+            {year.label}
+          </button>
+        ))}
       </div>
 
       <div className="glass-panel" style={{
@@ -440,22 +781,24 @@ export const Grades = () => {
         <div style={{ textAlign: 'right', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', lineHeight: 1.45 }}>
           <strong style={{ color: 'var(--color-text)' }}>{childUser?.id || activeChild}</strong>
           <br />
-          Hauptfächer zählen doppelt
+          {selectedYear.isCurrent ? selectedYear.label : `Archiv ${formatDateTime(selectedYear.archivedAt)}`}
+          <br />
+          {selectedYear.settings.isSecondarySchool ? 'Hauptfächer zählen doppelt' : 'Alle Fächer gleich'}
         </div>
       </div>
 
-      {record.subjects.length === 0 ? (
+      {selectedYear.subjects.length === 0 ? (
         <div className="glass-panel" style={{ padding: '2rem 1.25rem', textAlign: 'center' }}>
           <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            {canEdit ? `Lege zuerst über das Zahnrad die Fächer für ${activeChild} an.` : `Für ${activeChild} sind noch keine Fächer angelegt.`}
+            {canEdit ? `Lege zuerst über das Zahnrad die Fächer für ${activeChild} an.` : `Für ${activeChild} sind in diesem Schuljahr noch keine Fächer angelegt.`}
           </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-          {record.subjects.map(subject => {
+          {selectedYear.subjects.map(subject => {
             const isOpen = expandedSubjects.has(subject.id);
             const subjectAverage = weightedAverage(subject.grades);
-            const isMajor = record.settings.isSecondarySchool && record.settings.majorSubjectIds.includes(subject.id);
+            const isMajor = selectedYear.settings.isSecondarySchool && selectedYear.settings.majorSubjectIds.includes(subject.id);
 
             return (
               <div key={subject.id} className="glass-panel" style={{ overflow: 'hidden' }}>
@@ -509,7 +852,7 @@ export const Grades = () => {
                             key={grade.id}
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '1fr auto auto auto',
+                              gridTemplateColumns: canEdit ? '1fr auto auto auto' : '1fr auto auto',
                               gap: '0.55rem',
                               alignItems: 'center',
                               padding: '0.55rem 0.65rem',
@@ -519,7 +862,7 @@ export const Grades = () => {
                             }}
                           >
                             <span style={{ color: 'var(--color-text-muted)' }}>
-                              {new Date(`${grade.date}T00:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                              {formatDate(grade.date)}
                             </span>
                             <strong>{String(grade.value).replace('.', ',')}</strong>
                             <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', minWidth: '2.6rem', textAlign: 'right' }}>
@@ -628,11 +971,15 @@ export const Grades = () => {
         </div>
       )}
 
-      {settingsOpen && canEdit && (
+      <GradeAnalytics record={record} />
+
+      {settingsOpen && canManage && (
         <SettingsModal
           record={record}
+          archiveCount={record.archivedYears.length}
           onClose={() => setSettingsOpen(false)}
           onSave={saveSettings}
+          onStartNewSchoolYear={startNewSchoolYear}
         />
       )}
     </div>

@@ -171,10 +171,22 @@ export interface GradeChildSettings {
   majorSubjectIds: string[];
 }
 
-export interface GradeChildRecord {
-  childId: string;
+export interface GradeArchivedYear {
+  id: string;
+  label: string;
   subjects: GradeSubject[];
   settings: GradeChildSettings;
+  startedAt: number;
+  archivedAt: number;
+}
+
+export interface GradeChildRecord {
+  childId: string;
+  currentSchoolYear: string;
+  startedAt: number;
+  subjects: GradeSubject[];
+  settings: GradeChildSettings;
+  archivedYears: GradeArchivedYear[];
 }
 
 export type GradeBook = Record<string, GradeChildRecord>;
@@ -237,23 +249,56 @@ const DEFAULT_GRADE_SETTINGS: GradeChildSettings = {
   majorSubjectIds: [],
 };
 
-function normalizeGradeChild(childId: string, record?: Partial<GradeChildRecord>): GradeChildRecord {
-  const subjects = Array.isArray(record?.subjects) ? record.subjects : [];
-  const settings = record?.settings || DEFAULT_GRADE_SETTINGS;
+function currentSchoolYearLabel() {
+  const now = new Date();
+  const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${startYear}/${String(startYear + 1).slice(-2)}`;
+}
 
+function normalizeGradeSettings(settings?: Partial<GradeChildSettings>): GradeChildSettings {
   return {
-    childId,
-    subjects: subjects
+    isSecondarySchool: Boolean(settings?.isSecondarySchool),
+    majorSubjectIds: Array.isArray(settings?.majorSubjectIds) ? settings.majorSubjectIds.filter(Boolean) : [],
+  };
+}
+
+function normalizeGradeSubjects(subjects?: Partial<GradeSubject>[]): GradeSubject[] {
+  return Array.isArray(subjects)
+    ? subjects
       .filter(subject => subject && subject.name)
       .map(subject => ({
         id: subject.id || uuidv4(),
-        name: subject.name,
-        grades: Array.isArray(subject.grades) ? subject.grades.filter(Boolean) : [],
-      })),
-    settings: {
-      isSecondarySchool: Boolean(settings.isSecondarySchool),
-      majorSubjectIds: Array.isArray(settings.majorSubjectIds) ? settings.majorSubjectIds : [],
-    },
+        name: subject.name || '',
+        grades: Array.isArray(subject.grades) ? subject.grades.filter(Boolean) as GradeEntry[] : [],
+      }))
+    : [];
+}
+
+function normalizeArchivedYear(year?: Partial<GradeArchivedYear>): GradeArchivedYear | null {
+  if (!year || !year.label) return null;
+
+  return {
+    id: year.id || uuidv4(),
+    label: year.label,
+    subjects: normalizeGradeSubjects(year.subjects),
+    settings: normalizeGradeSettings(year.settings),
+    startedAt: Number.isFinite(year.startedAt) ? Number(year.startedAt) : Date.now(),
+    archivedAt: Number.isFinite(year.archivedAt) ? Number(year.archivedAt) : Date.now(),
+  };
+}
+
+function normalizeGradeChild(childId: string, record?: Partial<GradeChildRecord>): GradeChildRecord {
+  return {
+    childId,
+    currentSchoolYear: record?.currentSchoolYear || currentSchoolYearLabel(),
+    startedAt: Number.isFinite(record?.startedAt) ? Number(record?.startedAt) : Date.now(),
+    subjects: normalizeGradeSubjects(record?.subjects),
+    settings: normalizeGradeSettings(record?.settings || DEFAULT_GRADE_SETTINGS),
+    archivedYears: Array.isArray(record?.archivedYears)
+      ? record.archivedYears
+        .map(normalizeArchivedYear)
+        .filter((year): year is GradeArchivedYear => year !== null)
+      : [],
   };
 }
 
