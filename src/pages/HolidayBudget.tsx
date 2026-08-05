@@ -220,6 +220,23 @@ export const HolidayBudget = () => {
     return () => window.removeEventListener('db_updated', load);
   }, [user]);
 
+  // Hooks müssen VOR jedem bedingten Return stehen (React-Hooks-Regel)
+  const daysList = useMemo(() => {
+    const s = data.settings;
+    if (!s.startDate || s.days <= 0 || s.dailyGoal <= 0) return [];
+    const list: Date[] = [];
+    for (let i = 0; i < s.days; i++) list.push(addDays(toDate(s.startDate), i));
+    return list;
+  }, [data.settings.startDate, data.settings.days, data.settings.dailyGoal]);
+
+  const entriesByDate = useMemo(() => {
+    const map: Record<string, HolidayBudgetEntry[]> = {};
+    data.entries.forEach(e => {
+      (map[e.date] = map[e.date] || []).push(e);
+    });
+    return map;
+  }, [data.entries]);
+
   if (!user || user.isChild || !dataLoaded) return null;
 
   const { settings, entries } = data;
@@ -234,27 +251,12 @@ export const HolidayBudget = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const daysList = useMemo(() => {
-    if (!configured) return [];
-    const list: Date[] = [];
-    for (let i = 0; i < settings.days; i++) list.push(addDays(toDate(settings.startDate), i));
-    return list;
-  }, [configured, settings.startDate, settings.days]);
-
   // Verbrauchte Tage (bis heute, begrenzt auf Urlaubslänge) für die Prognose
   const start = configured ? toDate(settings.startDate) : today;
   const elapsed = configured ? Math.min(settings.days, Math.max(0, Math.floor((today.getTime() - start.getTime()) / 86400000) + 1)) : 0;
   const restDays = Math.max(0, settings.days - elapsed);
   const projection = spent + restDays * settings.dailyGoal;
   const projectionDiff = totalBudget - projection;
-
-  const entriesByDate = useMemo(() => {
-    const map: Record<string, HolidayBudgetEntry[]> = {};
-    entries.forEach(e => {
-      (map[e.date] = map[e.date] || []).push(e);
-    });
-    return map;
-  }, [entries]);
 
   // ── Mutationen ──
   const persist = (next: HolidayBudgetData) => mockDb.saveHolidayBudget(next);
