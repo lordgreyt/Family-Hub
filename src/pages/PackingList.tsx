@@ -5,7 +5,7 @@ import { mockDb } from '../services/mockDb';
 import type { PackCategory, PackItem, PacklistData } from '../services/mockDb';
 import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { Plus, X, Trash2, RotateCcw, Luggage } from 'lucide-react';
+import { Plus, X, Trash2, RotateCcw, Luggage, List, LayoutGrid } from 'lucide-react';
 
 const EMPTY: PacklistData = { categories: [], items: [] };
 
@@ -215,6 +215,7 @@ export const PackingList = () => {
 
   // Reset-Bestätigung
   const [confirmReset, setConfirmReset] = useState(false);
+  const [compactView, setCompactView] = useState(false);
 
   useEffect(() => {
     if (!user || user.isChild) return;
@@ -347,12 +348,21 @@ export const PackingList = () => {
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Luggage size={24} /> Packliste
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {totalItems > 0 && (
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-              {packedCount}/{totalItems} eingepackt
+              {packedCount}/{totalItems}
             </span>
           )}
+          <button
+            onClick={() => setCompactView(v => !v)}
+            className="btn btn-secondary"
+            disabled={totalItems === 0}
+            style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            title={compactView ? 'Zurück zur Kategorien-Ansicht' : 'Alle Einträge als kompakte Liste anzeigen'}
+          >
+            {compactView ? <LayoutGrid size={15} /> : <List size={15} />} {compactView ? 'Kategorien' : 'Liste'}
+          </button>
           <button
             onClick={() => setShowCategoryModal(true)}
             className="btn btn-secondary"
@@ -366,7 +376,7 @@ export const PackingList = () => {
             disabled={packedCount === 0}
             style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
           >
-            <RotateCcw size={15} /> Zurücksetzen
+            <RotateCcw size={15} /> Reset
           </button>
         </div>
       </div>
@@ -391,8 +401,91 @@ export const PackingList = () => {
         </div>
       )}
 
-      {/* Kategorien */}
-      {data.categories.length === 0 ? (
+      {/* Ansicht: kompakte Gesamtliste ODER Kategorien */}
+      {compactView && totalItems > 0 ? (
+        <div className="glass-panel" style={{ padding: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <List size={16} /> Alles auf einen Blick
+            </h3>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+              {packedCount}/{totalItems}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {[...data.items].sort((a, b) => Number(a.isPacked) - Number(b.isPacked)).map(item => {
+              const packer = people.find(p => p.id === item.packedBy);
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => openEditItem(item)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.3rem 0.4rem', borderRadius: 'var(--radius-sm)',
+                    backgroundColor: item.isPacked ? 'rgba(16,185,129,0.08)' : 'transparent',
+                    cursor: 'pointer', userSelect: 'none',
+                  }}
+                >
+                  <button
+                    onClick={e => { e.stopPropagation(); toggleItem(item); }}
+                    style={{
+                      width: '22px', height: '22px', flexShrink: 0,
+                      borderRadius: '6px', border: '2px solid',
+                      borderColor: item.isPacked ? '#10B981' : 'var(--color-border)',
+                      backgroundColor: item.isPacked ? '#10B981' : 'transparent',
+                      color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 800,
+                    }}
+                    title={item.isPacked ? 'Abhaken (nicht eingepackt)' : 'Als eingepackt markieren'}
+                  >
+                    {item.isPacked ? '✓' : ''}
+                  </button>
+                  <span style={{
+                    flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 600,
+                    color: item.isPacked ? 'var(--color-text-muted)' : 'var(--color-text)',
+                    textDecoration: item.isPacked ? 'line-through' : 'none',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {item.text}
+                  </span>
+                  {item.quantity && item.quantity > 0 && (
+                    <span style={{
+                      fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)',
+                      backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                      padding: '0.05rem 0.4rem', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap',
+                    }}>
+                      ×{item.quantity}
+                    </span>
+                  )}
+                  {packer && (
+                    <span
+                      title={`${item.packedBy} packt ein`}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '3px',
+                        fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)',
+                        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                        padding: '0.05rem 0.4rem 0.05rem 0.1rem', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', background: packer.avatarColor || '#6366f1', overflow: 'hidden' }}>
+                        <AvatarEmoji emoji={packer.avatar} size={14} />
+                      </span>
+                      {item.packedBy}
+                    </span>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteItem(item.id); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', opacity: 0.55, display: 'flex', padding: '0.15rem', flexShrink: 0 }}
+                    title="Eintrag löschen"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : data.categories.length === 0 ? (
         <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
           <Luggage size={40} style={{ opacity: 0.4 }} />
           <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text)' }}>
@@ -411,7 +504,8 @@ export const PackingList = () => {
         </div>
       ) : (
         data.categories.map(cat => {
-          const catItems = data.items.filter(i => i.categoryId === cat.id);
+          // Offene Einträge zuerst, abgehakte nach unten (stabile Sortierung behält Einfüge-Reihenfolge)
+          const catItems = [...data.items.filter(i => i.categoryId === cat.id)].sort((a, b) => Number(a.isPacked) - Number(b.isPacked));
           const catPacked = catItems.filter(i => i.isPacked).length;
           const done = catItems.length > 0 && catPacked === catItems.length;
           const ncs = isNeon ? getNeonCardStyle(cat.id) : undefined;

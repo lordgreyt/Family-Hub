@@ -4,7 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { HolidayBudgetData, HolidayBudgetEntry } from '../services/mockDb';
 import { getNeonCardStyle } from '../utils/neon';
-import { Plus, X, RotateCcw, Euro, Settings2, Save, Pencil, CalendarDays } from 'lucide-react';
+import { Plus, X, RotateCcw, Euro, Settings2, Save, Pencil, CalendarDays, ChevronDown } from 'lucide-react';
 
 // ─── Datums-Helfer ───
 function toDate(s: string): Date {
@@ -15,6 +15,12 @@ function formatDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+function fmtDateShort(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}.${mm}.${yy}`;
 }
 function addDays(d: Date, n: number): Date {
   const r = new Date(d);
@@ -28,7 +34,8 @@ const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const DAY_NAMES_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
 function fmtEUR(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  // Geschütztes Leerzeichen (U+00A0) zwischen Zahl und € → kein Umbruch möglich
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00A0€';
 }
 
 // Ampelfarbe: grün = im Ziel, gelb = bis 25 % drüber, rot = deutlich drüber
@@ -40,14 +47,20 @@ function ampel(spent: number, goal: number): 'green' | 'yellow' | 'red' {
 
 const EMPTY: HolidayBudgetData = { settings: { startDate: '', days: 0, dailyGoal: 0 }, entries: [] };
 
-// ─── Einstellungs-Formular ───
+// ─── Einstellungs-Modal ───
 interface SettingsForm {
   startDate: string;
   days: string;
   dailyGoal: string;
 }
 
-const SettingsPanel = ({ settings, onSave }: { settings: HolidayBudgetData['settings']; onSave: (s: HolidayBudgetData['settings']) => void }) => {
+interface SettingsModalProps {
+  settings: HolidayBudgetData['settings'];
+  onSave: (s: HolidayBudgetData['settings']) => void;
+  onClose: () => void;
+}
+
+const SettingsModal = ({ settings, onSave, onClose }: SettingsModalProps) => {
   const [editing, setEditing] = useState(!settings.startDate || !settings.days || !settings.dailyGoal);
   const [form, setForm] = useState<SettingsForm>({
     startDate: settings.startDate || formatDate(new Date()),
@@ -66,53 +79,67 @@ const SettingsPanel = ({ settings, onSave }: { settings: HolidayBudgetData['sett
     setEditing(false);
   };
 
-  if (!editing) {
-    const endDate = addDays(toDate(settings.startDate), settings.days - 1);
-    return (
-      <div className="glass-panel" style={{ padding: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <CalendarDays size={18} /> {formatDate(toDate(settings.startDate))} – {formatDate(endDate)}
-            </h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              {settings.days} Tage · {fmtEUR(settings.dailyGoal)}/Tag
-            </span>
-          </div>
-          <button onClick={() => setEditing(true)} className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Pencil size={14} /> Einstellungen
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const configured = Boolean(settings.startDate && settings.days > 0 && settings.dailyGoal > 0);
 
   return (
-    <div className="glass-panel" style={{ padding: '1.25rem' }}>
-      <h3 style={{ margin: 0, marginBottom: '1rem', fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text)' }}>
-        <Settings2 size={18} style={{ verticalAlign: '-3px', marginRight: '0.3rem' }} /> Urlaub einstellen
-      </h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-        <div>
-          <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Startdatum</label>
-          <input type="date" className="input-field" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+    }}>
+      <div className="glass-panel" style={{
+        maxWidth: '420px', width: '100%', padding: '1.25rem',
+        borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
+            <Settings2 size={18} style={{ verticalAlign: '-3px', marginRight: '0.3rem' }} /> Urlaub einstellen
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+            <X size={20} />
+          </button>
         </div>
-        <div>
-          <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Tage</label>
-          <input type="number" min={1} className="input-field" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
-        </div>
-        <div>
-          <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Ziel pro Tag (€)</label>
-          <input type="number" min={0} step={5} className="input-field" value={form.dailyGoal} onChange={e => setForm(f => ({ ...f, dailyGoal: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-          Gesamtbudget: {valid ? fmtEUR(total) : '—'}
-        </span>
-        <button onClick={submit} className="btn btn-primary" disabled={!valid} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Save size={15} /> Speichern
-        </button>
+
+        {!editing && configured ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CalendarDays size={18} /> von {fmtDateShort(toDate(settings.startDate))} bis {fmtDateShort(addDays(toDate(settings.startDate), settings.days - 1))}
+              </div>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                {settings.days} Tage · {fmtEUR(settings.dailyGoal)}/Tag · Gesamt {fmtEUR(settings.days * settings.dailyGoal)}
+              </span>
+            </div>
+            <button onClick={() => setEditing(true)} className="btn btn-primary" style={{ padding: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+              <Pencil size={16} /> Einstellungen bearbeiten
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Startdatum</label>
+                <input type="date" className="input-field" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Tage</label>
+                <input type="number" min={1} className="input-field" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block' }}>Ziel pro Tag (€)</label>
+                <input type="number" min={0} step={5} className="input-field" value={form.dailyGoal} onChange={e => setForm(f => ({ ...f, dailyGoal: e.target.value }))} style={{ width: '100%', fontSize: 'var(--font-sm)' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                Gesamtbudget: {valid ? fmtEUR(total) : '—'}
+              </span>
+              <button onClick={submit} className="btn btn-primary" disabled={!valid} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Save size={15} /> Speichern
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -208,6 +235,8 @@ export const HolidayBudget = () => {
   const [entryDate, setEntryDate] = useState(formatDate(new Date()));
 
   const [confirmReset, setConfirmReset] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (!user || user.isChild) return;
@@ -236,6 +265,22 @@ export const HolidayBudget = () => {
     });
     return map;
   }, [data.entries]);
+
+  // Standardansicht: nur „heute" (bzw. erster Tag, falls noch nicht im Urlaub) + letzter Tag;
+  // „Alle Tage" nur wenn ausgeklappt
+  const displayedDays = useMemo(() => {
+    if (showAllDays) return daysList;
+    if (daysList.length === 0) return [];
+    const last = daysList[daysList.length - 1];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const todayStr = formatDate(now);
+    const todayIdx = daysList.findIndex(d => formatDate(d) === todayStr);
+    if (todayIdx >= 0) {
+      return todayIdx === daysList.length - 1 ? [daysList[todayIdx]] : [daysList[todayIdx], last];
+    }
+    return daysList.length > 1 ? [daysList[0], last] : [daysList[0]];
+  }, [showAllDays, daysList]);
 
   if (!user || user.isChild || !dataLoaded) return null;
 
@@ -326,15 +371,25 @@ export const HolidayBudget = () => {
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Euro size={24} /> Urlaubsbudget
         </h1>
-        {configured && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button
-            onClick={() => setConfirmReset(true)}
+            onClick={() => setShowSettings(true)}
             className="btn btn-secondary"
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            style={{ padding: '0.45rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            title="Urlaub einstellen"
           >
-            <RotateCcw size={15} /> Zurücksetzen
+            <Settings2 size={16} /> Einstellungen
           </button>
-        )}
+          {configured && (
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="btn btn-secondary"
+              style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              <RotateCcw size={15} /> Zurücksetzen
+            </button>
+          )}
+        </div>
       </div>
 
       {confirmReset && (
@@ -357,9 +412,6 @@ export const HolidayBudget = () => {
         </div>
       )}
 
-      {/* Einstellungen */}
-      <SettingsPanel settings={settings} onSave={saveSettings} />
-
       {!configured ? (
         <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
           <Euro size={40} style={{ opacity: 0.4 }} />
@@ -367,8 +419,11 @@ export const HolidayBudget = () => {
             Noch kein Urlaubsbudget eingestellt
           </p>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)', maxWidth: '360px' }}>
-            Trage oben Startdatum, Anzahl Tage und dein Tagesziel ein — dann siehst du hier die Soll-Ist-Übersicht.
+            Trage Startdatum, Anzahl Tage und dein Tagesziel ein — dann siehst du hier die Soll-Ist-Übersicht.
           </p>
+          <button onClick={() => setShowSettings(true)} className="btn btn-primary" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Settings2 size={16} /> Urlaub einstellen
+          </button>
         </div>
       ) : (
         <>
@@ -394,15 +449,12 @@ export const HolidayBudget = () => {
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: projectionDiff >= 0 ? '#10B981' : '#DC2626' }}>
                   {projectionDiff >= 0 ? `+${fmtEUR(projectionDiff)} übrig` : `${fmtEUR(Math.abs(projectionDiff))} drüber`}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
-                  bei {restDays} verbleibenden Tag{restDays === 1 ? '' : 'en'} à {fmtEUR(settings.dailyGoal)}
-                </div>
               </div>
             </div>
 
             {/* Gesamtbalken Soll vs Ist */}
             <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
-              Budget verbraucht: {Math.round(budgetBarPct)} % ({fmtEUR(spent)} von {fmtEUR(totalBudget)})
+              Budget verbraucht: {Math.round(budgetBarPct)} %
             </div>
             <div style={{ height: '14px', borderRadius: '20px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
               <div style={{
@@ -411,6 +463,110 @@ export const HolidayBudget = () => {
                 transition: 'width 0.3s ease',
               }} />
             </div>
+          </div>
+
+          {/* Tagesliste (Standard: heute + letzter Tag, ausklappbar) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text)' }}>Tage</h3>
+              <button
+                onClick={() => setShowAllDays(v => !v)}
+                className="btn btn-secondary"
+                style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                {showAllDays ? 'Weniger anzeigen' : `Alle ${daysList.length} Tage anzeigen`}
+                <ChevronDown size={14} style={{ transition: 'transform 0.2s', transform: showAllDays ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+              </button>
+            </div>
+            {displayedDays.map(day => {
+              const dateStr = formatDate(day);
+              const dayNumber = daysList.findIndex(d => formatDate(d) === dateStr) + 1;
+              const dayEntries = entriesByDate[dateStr] || [];
+              const daySpent = dayEntries.reduce((s, e) => s + e.amount, 0);
+              const isToday = sameDay(day, today);
+              const col = ampel(daySpent, settings.dailyGoal);
+              const ncs = isNeon ? getNeonCardStyle(dateStr) : undefined;
+              const dayPct = settings.dailyGoal > 0 ? Math.min(100, (daySpent / settings.dailyGoal) * 100) : 0;
+
+              return (
+                <div
+                  key={dateStr}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: isToday ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    backgroundColor: isToday ? 'var(--color-primary-transparent)' : 'var(--color-surface)',
+                    ...(isNeon && ncs && !isToday ? {
+                      backgroundImage: ncs.backgroundImage,
+                      backgroundOrigin: ncs.backgroundOrigin as any,
+                      backgroundClip: ncs.backgroundClip,
+                      border: ncs.border,
+                      boxShadow: ncs.boxShadow,
+                    } : {}),
+                  }}
+                >
+                  {/* Tageskopf */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: dayEntries.length ? '0.5rem' : 0 }}>
+                    <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '54px' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Tag {dayNumber}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isToday ? 'var(--color-primary)' : 'var(--color-text)', whiteSpace: 'nowrap' }}>
+                        {DAY_NAMES_LONG[day.getDay()].slice(0, 2)} {day.getDate()}.
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem', flexWrap: 'nowrap', minWidth: 0 }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text)', whiteSpace: 'nowrap' }}>{fmtEUR(daySpent)}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>von {fmtEUR(settings.dailyGoal)}</span>
+                      </div>
+                      <div style={{ height: '7px', borderRadius: '4px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${dayPct}%`, borderRadius: '4px',
+                          backgroundColor: col === 'green' ? '#10B981' : col === 'yellow' ? '#F59E0B' : '#DC2626',
+                          transition: 'width 0.3s ease',
+                        }} />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openAdd(dateStr)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.35rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', flexShrink: 0 }}
+                    >
+                      <Plus size={14} /> Eintrag
+                    </button>
+                  </div>
+
+                  {/* Tageseinträge */}
+                  {dayEntries.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.4rem' }}>
+                      {dayEntries.map(e => (
+                        <div
+                          key={e.id}
+                          onClick={() => openEdit(e)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                            padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid var(--color-border)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtEUR(e.amount)}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {e.note || '—'}
+                          </span>
+                          <button
+                            onClick={ev => { ev.stopPropagation(); deleteEntry(e.id); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', opacity: 0.55, display: 'flex', padding: '0.2rem', flexShrink: 0 }}
+                            title="Eintrag löschen"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Kumulierte Soll-Ist-Grafik */}
@@ -447,7 +603,7 @@ export const HolidayBudget = () => {
                         }} />
                       </div>
                     </div>
-                    <span style={{ width: '72px', flexShrink: 0, textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: over ? '#DC2626' : 'var(--color-text-muted)' }}>
+                    <span style={{ width: '86px', flexShrink: 0, textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', color: over ? '#DC2626' : 'var(--color-text-muted)' }}>
                       {fmtEUR(ist)}
                     </span>
                   </div>
@@ -463,111 +619,13 @@ export const HolidayBudget = () => {
               </span>
             </div>
           </div>
-
-          {/* Tagesliste */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {daysList.map((day, i) => {
-              const dateStr = formatDate(day);
-              const dayEntries = entriesByDate[dateStr] || [];
-              const daySpent = dayEntries.reduce((s, e) => s + e.amount, 0);
-              const isToday = sameDay(day, today);
-              const col = ampel(daySpent, settings.dailyGoal);
-              const ncs = isNeon ? getNeonCardStyle(dateStr) : undefined;
-              const dayPct = settings.dailyGoal > 0 ? Math.min(100, (daySpent / settings.dailyGoal) * 100) : 0;
-
-              return (
-                <div
-                  key={dateStr}
-                  style={{
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: isToday ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                    backgroundColor: isToday ? 'var(--color-primary-transparent)' : 'var(--color-surface)',
-                    ...(isNeon && ncs && !isToday ? {
-                      backgroundImage: ncs.backgroundImage,
-                      backgroundOrigin: ncs.backgroundOrigin as any,
-                      backgroundClip: ncs.backgroundClip,
-                      border: ncs.border,
-                      boxShadow: ncs.boxShadow,
-                    } : {}),
-                  }}
-                >
-                  {/* Tageskopf */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: dayEntries.length ? '0.5rem' : 0 }}>
-                    <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '44px' }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Tag {i + 1}</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isToday ? 'var(--color-primary)' : 'var(--color-text)' }}>
-                        {DAY_NAMES_LONG[day.getDay()].slice(0, 2)} {day.getDate()}.
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text)' }}>{fmtEUR(daySpent)}</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>von {fmtEUR(settings.dailyGoal)}</span>
-                        <span
-                          style={{
-                            fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '20px',
-                            backgroundColor: col === 'green' ? 'rgba(16,185,129,0.15)' : col === 'yellow' ? 'rgba(245,158,11,0.15)' : 'rgba(220,38,38,0.15)',
-                            color: col === 'green' ? '#10B981' : col === 'yellow' ? '#D97706' : '#DC2626',
-                          }}
-                        >
-                          {col === 'green' ? '✓ im Ziel' : col === 'yellow' ? '~ leicht drüber' : '! deutlich drüber'}
-                        </span>
-                      </div>
-                      <div style={{ height: '7px', borderRadius: '4px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', width: `${dayPct}%`, borderRadius: '4px',
-                          backgroundColor: col === 'green' ? '#10B981' : col === 'yellow' ? '#F59E0B' : '#DC2626',
-                          transition: 'width 0.3s ease',
-                        }} />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => openAdd(dateStr)}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.35rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', flexShrink: 0 }}
-                    >
-                      <Plus size={14} /> Eintrag
-                    </button>
-                  </div>
-
-                  {/* Tageseinträge */}
-                  {dayEntries.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.4rem' }}>
-                      {dayEntries.map(e => (
-                        <div
-                          key={e.id}
-                          onClick={() => openEdit(e)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '0.5rem',
-                            padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid var(--color-border)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0 }}>{fmtEUR(e.amount)}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {e.note || '—'}
-                          </span>
-                          <button
-                            onClick={ev => { ev.stopPropagation(); deleteEntry(e.id); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', opacity: 0.55, display: 'flex', padding: '0.2rem', flexShrink: 0 }}
-                            title="Eintrag löschen"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </>
       )}
 
       {/* Modals */}
+      {showSettings && (
+        <SettingsModal settings={settings} onSave={saveSettings} onClose={() => setShowSettings(false)} />
+      )}
       {showEntryModal && (
         <EntryModal
           key={editingEntry ? editingEntry.id : `new-${entryDate}-${Date.now()}`}
