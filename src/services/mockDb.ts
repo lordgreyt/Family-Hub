@@ -176,6 +176,27 @@ export interface PacklistData {
   items: PackItem[];
 }
 
+// Urlaubsbudget
+export interface HolidayBudgetSettings {
+  startDate: string; // YYYY-MM-DD
+  days: number;
+  dailyGoal: number; // € pro Tag
+}
+
+export interface HolidayBudgetEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  note?: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface HolidayBudgetData {
+  settings: HolidayBudgetSettings;
+  entries: HolidayBudgetEntry[];
+}
+
 export interface GradeEntry {
   id: string;
   value: number;
@@ -267,6 +288,7 @@ export const DB_KEYS = {
   REMINDERS: 'family_hub_reminders',
   GRADES: 'family_hub_grades',
   PACKLIST: 'family_hub_packlist',
+  HOLIDAY_BUDGET: 'family_hub_holiday_budget',
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
 };
 
@@ -1176,6 +1198,26 @@ export const mockDb = {
   },
   savePacklist: (data: PacklistData) => {
     set(DB_KEYS.PACKLIST, data);
+  },
+
+  // Urlaubsbudget
+  getHolidayBudget: (): HolidayBudgetData => {
+    const data: any = get(DB_KEYS.HOLIDAY_BUDGET, null);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { settings: { startDate: '', days: 0, dailyGoal: 0 }, entries: [] };
+    }
+    const s = data.settings && typeof data.settings === 'object' ? data.settings : {};
+    return {
+      settings: {
+        startDate: typeof s.startDate === 'string' ? s.startDate : '',
+        days: Number.isFinite(Number(s.days)) ? Number(s.days) : 0,
+        dailyGoal: Number.isFinite(Number(s.dailyGoal)) ? Number(s.dailyGoal) : 0,
+      },
+      entries: Array.isArray(data.entries) ? data.entries.filter((e: any) => e && e.id && e.date && Number.isFinite(Number(e.amount))) : [],
+    };
+  },
+  saveHolidayBudget: (data: HolidayBudgetData) => {
+    set(DB_KEYS.HOLIDAY_BUDGET, data);
   },
 
   // Grades

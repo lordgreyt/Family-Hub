@@ -17,6 +17,7 @@ import { Wallbox } from './pages/Wallbox';
 import { EDiary } from './pages/EDiary';
 import { DenkDran } from './pages/DenkDran';
 import { PackingList } from './pages/PackingList';
+import { HolidayBudget } from './pages/HolidayBudget';
 import { SmartHome } from './pages/SmartHome';
 import { Grades } from './pages/Grades';
 import { VictronProvider } from './context/VictronContext';
@@ -57,6 +58,7 @@ function App() {
               <Route path="/e-diary" element={<EDiary />} />
               <Route path="/denk-dran" element={<DenkDran />} />
               <Route path="/packliste" element={<PackingList />} />
+              <Route path="/urlaubsbudget" element={<HolidayBudget />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />
