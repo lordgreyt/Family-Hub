@@ -8,13 +8,17 @@ export interface NavItem {
   label: string;
 }
 
-export const getNavItems = (user: User | null, showPacklist = true, showHolidayBudget = true): NavItem[] => {
+export const getNavItems = (user: User | null, showPacklist = true, showHolidayBudget = true, showTasks = true, showNotes = true): NavItem[] => {
   if (!user) return [];
 
   return [
     { to: '/', icon: Home, label: 'Home' },
-    { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
-    { to: '/notes', icon: BookOpen, label: 'Notizen' },
+    ...(showTasks ? [
+      { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
+    ] : []),
+    ...(showNotes ? [
+      { to: '/notes', icon: BookOpen, label: 'Notizen' },
+    ] : []),
     { to: '/grades', icon: GraduationCap, label: 'Noten' },
     ...(user.id === 'Falko' ? [
       { to: '/n26', icon: CreditCard, label: 'N26' },

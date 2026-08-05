@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown, Luggage } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown, Luggage, CheckSquare, BookOpen } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { getNeonColor } from '../utils/neon';
 import type { ThemeColor } from '../services/mockDb';
@@ -513,6 +513,35 @@ export const Setup = () => {
           </label>
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
             Wenn deaktiviert, werden die Menüpunkte ausgeblendet — z. B. außerhalb der Urlaubszeit. Die Daten bleiben erhalten.
+          </p>
+        </div>
+      )}
+
+      {(user?.isAdmin || user?.id === 'Falko') && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
+            <CheckSquare size={20} /> Sichtbarkeit
+          </h3>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)', marginBottom: '0.6rem' }}>
+            <input
+              type="checkbox"
+              checked={settings.showTasks}
+              onChange={e => updateSettings({ showTasks: e.target.checked })}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
+            />
+            <CheckSquare size={16} /> Aufgaben im Menü anzeigen
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
+            <input
+              type="checkbox"
+              checked={settings.showNotes}
+              onChange={e => updateSettings({ showNotes: e.target.checked })}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
+            />
+            <BookOpen size={16} /> Notizen im Menü anzeigen
+          </label>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
+            Gilt global für alle Nutzer — ideal für Bereiche, die kaum genutzt werden. Die Daten bleiben erhalten.
           </p>
         </div>
       )}
