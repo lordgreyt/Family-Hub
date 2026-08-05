@@ -8,6 +8,7 @@ interface AppSettings {
   fontSize: FontSize;
   designMode: DesignMode;
   prioPoints: Record<number, number>;
+  showPacklist: boolean;
 }
 
 interface SettingsContextType {
@@ -20,6 +21,7 @@ const defaultSettings: AppSettings = {
   fontSize: 'base',
   designMode: 'classic',
   prioPoints: { 1: 5, 2: 10, 3: 15 },
+  showPacklist: true,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

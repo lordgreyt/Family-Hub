@@ -1,4 +1,4 @@
-import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell, SlidersHorizontal, GraduationCap } from 'lucide-react';
+import { Home, CheckSquare, BookOpen, CreditCard, Wallet, Calculator, Star, Settings, Zap, Activity, Bell, SlidersHorizontal, GraduationCap, Luggage } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../services/mockDb';
 
@@ -8,7 +8,7 @@ export interface NavItem {
   label: string;
 }
 
-export const getNavItems = (user: User | null): NavItem[] => {
+export const getNavItems = (user: User | null, showPacklist = true): NavItem[] => {
   if (!user) return [];
 
   return [
@@ -21,6 +21,9 @@ export const getNavItems = (user: User | null): NavItem[] => {
     ] : []),
     ...(!user.isChild ? [
       { to: '/denk-dran', icon: Bell, label: 'Denk dran' },
+      ...(showPacklist ? [
+        { to: '/packliste', icon: Luggage, label: 'Packliste' },
+      ] : []),
       { to: '/expenses', icon: Wallet, label: 'Ausgaben' },
       { to: '/budget', icon: Calculator, label: 'Budget' },
       { to: '/smart-home', icon: SlidersHorizontal, label: 'Smart Home' },

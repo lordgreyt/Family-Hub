@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown, Luggage } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { getNeonColor } from '../utils/neon';
 import type { ThemeColor } from '../services/mockDb';
@@ -487,6 +487,26 @@ export const Setup = () => {
           </div>
         )}
       </div>
+
+      {(user?.isAdmin || user?.id === 'Falko') && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
+            <Luggage size={20} /> Urlaubs-Packliste
+          </h3>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
+            <input
+              type="checkbox"
+              checked={settings.showPacklist}
+              onChange={e => updateSettings({ showPacklist: e.target.checked })}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
+            />
+            Packliste im Menü anzeigen
+          </label>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
+            Wenn deaktiviert, wird der Menüpunkt „Packliste" ausgeblendet — z. B. außerhalb der Urlaubszeit. Die Daten bleiben erhalten.
+          </p>
+        </div>
+      )}
 
       {(user?.isAdmin || user?.id === 'Falko') && (
         <div className="glass-panel" style={{ padding: '1.5rem' }}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { X, LogOut, Info } from 'lucide-react';
 import { getNavItems } from '../../utils/navigation';
 import { APP_VERSION, getRecentChangelog } from '../../data/changelog';
@@ -13,9 +14,10 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const [showChangelog, setShowChangelog] = useState(false);
 
-  const navItems = getNavItems(user);
+  const navItems = getNavItems(user, settings.showPacklist);
   const recentChangelog = getRecentChangelog(2);
 
   return (

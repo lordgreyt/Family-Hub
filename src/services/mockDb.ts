@@ -152,6 +152,30 @@ export interface Reminder {
   createdBy: string;
 }
 
+// Packliste (Urlaub)
+export interface PackCategory {
+  id: string;
+  name: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface PackItem {
+  id: string;
+  text: string;
+  categoryId: string;
+  quantity?: number;
+  isPacked: boolean;
+  packedBy?: string; // User ID (wer hat es eingepackt)
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface PacklistData {
+  categories: PackCategory[];
+  items: PackItem[];
+}
+
 export interface GradeEntry {
   id: string;
   value: number;
@@ -242,6 +266,8 @@ export const DB_KEYS = {
   CUSTOM_TAGS: 'family_hub_custom_tags',
   REMINDERS: 'family_hub_reminders',
   GRADES: 'family_hub_grades',
+  PACKLIST: 'family_hub_packlist',
+  UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
 };
 
 const DEFAULT_GRADE_SETTINGS: GradeChildSettings = {
@@ -1135,6 +1161,21 @@ export const mockDb = {
   },
   deleteReminder: (id: string) => {
     updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.filter(i => i.id !== id));
+  },
+
+  // Packliste (Urlaub)
+  getPacklist: (): PacklistData => {
+    const data: any = get(DB_KEYS.PACKLIST, null);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { categories: [], items: [] };
+    }
+    return {
+      categories: Array.isArray(data.categories) ? data.categories : [],
+      items: Array.isArray(data.items) ? data.items : [],
+    };
+  },
+  savePacklist: (data: PacklistData) => {
+    set(DB_KEYS.PACKLIST, data);
   },
 
   // Grades
