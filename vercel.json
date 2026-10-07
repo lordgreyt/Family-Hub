@@ -11,6 +11,10 @@
     "api/home-assistant/covers/action.js": {
       "memory": 256,
       "maxDuration": 10
+    },
+    "api/private/surgery-finance.js": {
+      "memory": 256,
+      "maxDuration": 10
     }
   }
 }

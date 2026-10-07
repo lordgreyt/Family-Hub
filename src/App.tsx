@@ -19,6 +19,7 @@ import { DenkDran } from './pages/DenkDran';
 import { PackingList } from './pages/PackingList';
 import { HolidayBudget } from './pages/HolidayBudget';
 import { SmartHome } from './pages/SmartHome';
+import { SurgeryFinance } from './pages/SurgeryFinance';
 import { Grades } from './pages/Grades';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
@@ -59,6 +60,7 @@ function App() {
               <Route path="/denk-dran" element={<DenkDran />} />
               <Route path="/packliste" element={<PackingList />} />
               <Route path="/urlaubsbudget" element={<HolidayBudget />} />
+              <Route path="/op-finanzen" element={<SurgeryFinance />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

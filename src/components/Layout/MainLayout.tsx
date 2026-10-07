@@ -46,7 +46,7 @@ export const MainLayout = () => {
   }
 
   // Children cannot access adult-only pages
-  if (user?.isChild && ['/budget', '/smart-home'].includes(location.pathname)) {
+  if (user?.isChild && ['/budget', '/smart-home', '/op-finanzen'].includes(location.pathname)) {
     return <Navigate to="/" replace />;
   }
 
