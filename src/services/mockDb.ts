@@ -236,6 +236,35 @@ export interface GradeChildRecord {
 
 export type GradeBook = Record<string, GradeChildRecord>;
 
+export interface VocabularyEntry {
+  id: string;
+  front: string;
+  back: string;
+}
+
+export interface VocabularyProgress {
+  correctCount: number;
+  wrongCount: number;
+  streak: number;
+  lastReviewedAt: number;
+  nextReviewAt: number;
+}
+
+export interface VocabularySet {
+  id: string;
+  title: string;
+  languageFrom: string;
+  languageTo: string;
+  entries: VocabularyEntry[];
+  createdAt: number;
+  updatedAt?: number;
+  createdBy: string;
+  source?: string;
+  progressByUser?: Record<string, Record<string, VocabularyProgress>>;
+}
+
+export type VocabularyStore = Record<string, VocabularySet>;
+
 export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
@@ -289,6 +318,7 @@ export const DB_KEYS = {
   GRADES: 'family_hub_grades',
   PACKLIST: 'family_hub_packlist',
   HOLIDAY_BUDGET: 'family_hub_holiday_budget',
+  VOCABULARY: 'family_hub_vocabulary',
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
 };
 
@@ -503,6 +533,7 @@ export const initFirebase = async (force = false) => {
         [DB_KEYS.APP_SETTINGS]: get(DB_KEYS.APP_SETTINGS, null),
         [DB_KEYS.EDIARY]: get(DB_KEYS.EDIARY, []),
         [DB_KEYS.GRADES]: get(DB_KEYS.GRADES, {}),
+        [DB_KEYS.VOCABULARY]: get(DB_KEYS.VOCABULARY, {}),
       };
       await firebaseSet(rootRef, dump);
       console.log("Initial Cloud sync complete!");
@@ -1233,6 +1264,64 @@ export const mockDb = {
     const book = mockDb.getGradeBook();
     const normalized = normalizeGradeChild(record.childId, record);
     set(DB_KEYS.GRADES, { ...book, [record.childId]: normalized });
+  },
+
+  // Shared vocabulary sets and per-user spaced-repetition progress
+  getVocabularyStore: (): VocabularyStore => {
+    const data = get<VocabularyStore | VocabularySet[]>(DB_KEYS.VOCABULARY, {});
+    if (Array.isArray(data)) {
+      return Object.fromEntries(data.filter(item => item && item.id).map(item => [item.id, item]));
+    }
+    if (!data || typeof data !== 'object') return {};
+    return Object.fromEntries(Object.entries(data).filter(([, item]) => Boolean(item)).map(([id, item]) => [
+      id,
+      { ...item, id: item.id || id, entries: Array.isArray(item.entries) ? item.entries.filter(Boolean) : [] },
+    ]));
+  },
+  getVocabularySets: (): VocabularySet[] => Object.values(mockDb.getVocabularyStore())
+    .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)),
+  saveVocabularySet: (vocabularySet: VocabularySet) => {
+    const store = mockDb.getVocabularyStore();
+    set(DB_KEYS.VOCABULARY, {
+      ...store,
+      [vocabularySet.id]: { ...vocabularySet, updatedAt: Date.now() },
+    });
+  },
+  deleteVocabularySet: (id: string) => {
+    const store = mockDb.getVocabularyStore();
+    if (!store[id]) return;
+    delete store[id];
+    set(DB_KEYS.VOCABULARY, store);
+  },
+  recordVocabularyAnswer: (setId: string, userId: string, entryId: string, correct: boolean) => {
+    const store = mockDb.getVocabularyStore();
+    const vocabularySet = store[setId];
+    if (!vocabularySet || !vocabularySet.entries.some(entry => entry.id === entryId)) return;
+
+    const previous = vocabularySet.progressByUser?.[userId]?.[entryId];
+    const now = Date.now();
+    const streak = correct ? (previous?.streak || 0) + 1 : 0;
+    const intervalDays = [1, 3, 7, 14][Math.min(Math.max(streak - 1, 0), 3)];
+    const progress: VocabularyProgress = {
+      correctCount: (previous?.correctCount || 0) + (correct ? 1 : 0),
+      wrongCount: (previous?.wrongCount || 0) + (correct ? 0 : 1),
+      streak,
+      lastReviewedAt: now,
+      nextReviewAt: now + (correct ? intervalDays * 24 * 60 * 60 * 1000 : 10 * 60 * 1000),
+    };
+
+    store[setId] = {
+      ...vocabularySet,
+      updatedAt: now,
+      progressByUser: {
+        ...(vocabularySet.progressByUser || {}),
+        [userId]: {
+          ...(vocabularySet.progressByUser?.[userId] || {}),
+          [entryId]: progress,
+        },
+      },
+    };
+    set(DB_KEYS.VOCABULARY, store);
   },
 };
 

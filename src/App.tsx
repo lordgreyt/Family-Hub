@@ -21,6 +21,7 @@ import { HolidayBudget } from './pages/HolidayBudget';
 import { SmartHome } from './pages/SmartHome';
 import { SurgeryFinance } from './pages/SurgeryFinance';
 import { Grades } from './pages/Grades';
+import { Vocabulary } from './pages/Vocabulary';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
 import { initNotificationService } from './services/notificationService';
@@ -56,6 +57,7 @@ function App() {
               <Route path="/wallbox" element={<Wallbox />} />
               <Route path="/smart-home" element={<SmartHome />} />
               <Route path="/grades" element={<Grades />} />
+              <Route path="/vokabeln" element={<Vocabulary />} />
               <Route path="/e-diary" element={<EDiary />} />
               <Route path="/denk-dran" element={<DenkDran />} />
               <Route path="/packliste" element={<PackingList />} />
