@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/vokabeln",
+      "destination": "/index.html"
+    }
+  ],
   "functions": {
     "api/home-assistant/family-status.js": {
       "memory": 256,
