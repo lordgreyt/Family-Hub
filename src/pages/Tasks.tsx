@@ -4,11 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, User } from '../services/mockDb';
-import { Plus, X, Check, CheckSquare, Star, Trash2, CalendarDays, ClipboardList } from 'lucide-react';
+import { Plus, X, Check, CheckSquare, Star, Trash2, ClipboardList } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { HERO_GRADIENT, GREEN, ORANGE, PINK, PINK_TEXT, PRIMARY, BLUE, CARD, sectionTitle, fieldLabel, iconChip } from '../components/SurgeryFinance/theme';
-
-type Priority = 1 | 2 | 3;
+import { HERO_GRADIENT, GREEN, PINK_TEXT, PRIMARY, CARD, sectionTitle, fieldLabel, iconChip } from '../components/SurgeryFinance/theme';
+import { TaskRow, PRIO_COLOR, todayIso } from '../components/TaskParts';
+import type { Priority } from '../components/TaskParts';
 
 interface Draft {
   id?: string;
@@ -18,60 +18,10 @@ interface Draft {
   assignedTo: string[];
 }
 
-const PRIO_COLOR: Record<Priority, string> = { 1: BLUE, 2: ORANGE, 3: PINK };
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const todayIso = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-
-const dueInfo = (iso?: string): { label: string; color: string; bg: string } | null => {
-  if (!iso) return null;
-  const day = iso.slice(0, 10);
-  const date = new Date(`${day}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return null;
-  const today = new Date(`${todayIso()}T12:00:00`);
-  const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
-  const short = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }).replace('.', '');
-  if (diff < 0) return { label: `Überfällig · ${short}`, color: PINK_TEXT, bg: '#FDE8EF' };
-  if (diff === 0) return { label: 'Heute', color: '#C9702F', bg: '#FDEBDD' };
-  if (diff === 1) return { label: 'Morgen', color: PRIMARY, bg: '#ECE8FF' };
-  return { label: short, color: 'var(--color-text-muted)', bg: 'var(--color-surface-muted)' };
-};
-
 const chipWhite = {
   display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', borderRadius: '999px',
   background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 'var(--font-xs)', fontWeight: 700, lineHeight: 1.3,
 } as const;
-
-const metaChip = (color: string, bg: string) => ({
-  display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '2px 8px', borderRadius: '999px',
-  background: bg, color, fontSize: '11px', fontWeight: 800, lineHeight: 1.4, whiteSpace: 'nowrap',
-}) as const;
-
-const Avatars = ({ users }: { users: User[] }) => {
-  if (users.length === 0) return null;
-  const size = users.length === 1 ? 34 : 28;
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-      {users.slice(0, 3).map((u, i) => (
-        <span
-          key={u.id}
-          title={u.id}
-          style={{
-            width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: u.avatarColor || 'var(--color-text-tertiary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-            marginLeft: i > 0 ? '-10px' : 0, border: users.length > 1 ? '2px solid var(--color-surface)' : 'none', zIndex: users.length - i,
-          }}
-        >
-          <AvatarEmoji emoji={u.avatar} size={size} />
-        </span>
-      ))}
-      {users.length > 3 && <span style={{ marginLeft: '4px', fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)' }}>+{users.length - 3}</span>}
-    </div>
-  );
-};
 
 export const Tasks = () => {
   const { user } = useAuth();
@@ -189,57 +139,17 @@ export const Tasks = () => {
     mockDb.toggleTask(task.id, settings.prioPoints[task.priority] || 0);
   };
 
-  const renderRow = (task: TaskItem) => {
-    const assignees = task.assignedTo?.length ? users.filter(u => task.assignedTo!.includes(u.id)) : [];
-    const due = task.isDone ? null : dueInfo(task.dueDate);
-    const points = settings.prioPoints[task.priority] || 0;
-    const color = PRIO_COLOR[task.priority];
-    return (
-      <div
-        key={task.id}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem 0', borderTop: '1px solid var(--color-border)', opacity: task.isDone ? 0.62 : 1 }}
-      >
-        <button
-          type="button"
-          onClick={() => handleToggle(task)}
-          disabled={isChild}
-          aria-label={task.isDone ? 'Als unerledigt markieren' : 'Als erledigt markieren'}
-          style={{
-            width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0, padding: 0, fontFamily: 'inherit',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isChild ? 'default' : 'pointer',
-            border: task.isDone ? 'none' : `2.5px solid ${color}`,
-            background: task.isDone ? GREEN : color + '14',
-            color: 'white', transition: 'all 0.15s',
-          }}
-        >
-          {task.isDone && <Check size={17} strokeWidth={3} />}
-        </button>
-
-        <div
-          onClick={() => openEdit(task)}
-          role={isChild ? undefined : 'button'}
-          style={{ flex: 1, minWidth: 0, cursor: isChild ? 'default' : 'pointer' }}
-        >
-          <div style={{
-            fontSize: 'var(--font-sm)', fontWeight: 700, lineHeight: 1.35, overflowWrap: 'anywhere',
-            color: task.isDone ? 'var(--color-text-muted)' : 'var(--color-text)',
-            textDecoration: task.isDone ? 'line-through' : 'none',
-          }}>
-            {task.content}
-          </div>
-          <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem' }}>
-            {due && <span style={metaChip(due.color, due.bg)}><CalendarDays size={11} /> {due.label}</span>}
-            <span style={metaChip(color, color + '1F')}>Prio {task.priority}</span>
-            {points > 0 && (
-              <span style={metaChip('#B9791B', '#FFF2D6')}><Star size={11} fill="currentColor" /> {points}</span>
-            )}
-          </div>
-        </div>
-
-        <Avatars users={assignees} />
-      </div>
-    );
-  };
+  const renderRow = (task: TaskItem) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      assignees={task.assignedTo?.length ? users.filter(u => task.assignedTo!.includes(u.id)) : []}
+      points={settings.prioPoints[task.priority] || 0}
+      canToggle={!isChild}
+      onToggle={handleToggle}
+      onOpen={isChild ? undefined : openEdit}
+    />
+  );
 
   const sectionHeader = (icon: React.ReactNode, color: string, title: string, count: number) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.3rem' }}>
