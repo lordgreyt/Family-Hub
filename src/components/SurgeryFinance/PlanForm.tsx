@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { SurgeryFinanceBonus, SurgeryFinancePlan, SurgeryFinanceSource } from '../../services/surgeryFinance';
-import { Save, X } from 'lucide-react';
+import { Banknote, CalendarClock, Gift, HeartPulse, LockKeyhole, Receipt, Save, X } from 'lucide-react';
+import { CARD, GREEN, HERO_GRADIENT, PINK_TEXT, PRIMARY, BLUE, fieldLabel, fmtEUR, iconChip, parseEuroCents as parseCents, sectionTitle, sourceColor } from './theme';
 
 interface PlanDraft {
   surgeryCost: string;
@@ -18,13 +20,6 @@ interface PlanFormProps {
 }
 
 const euroInput = (cents: number) => cents ? (cents / 100).toFixed(2).replace('.', ',') : '';
-const parseCents = (value: string): number | null => {
-  const normalized = value.trim().replace(',', '.');
-  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
-  const [euros, cents = ''] = normalized.split('.');
-  const total = Number(euros) * 100 + Number(cents.padEnd(2, '0'));
-  return Number.isSafeInteger(total) ? total : null;
-};
 
 const createDraft = (initial: SurgeryFinancePlan | null): PlanDraft => ({
   surgeryCost: euroInput(initial?.surgeryCostCents || 0),
@@ -41,6 +36,33 @@ const createDraft = (initial: SurgeryFinancePlan | null): PlanDraft => ({
     { id: 'future-bonus', label: 'Weitere erwartete Bonuszahlung', amount: '', expectedOn: '' },
   ],
 });
+
+const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+  <label style={{ display: 'block', minWidth: 0 }}>
+    <span style={fieldLabel}>{label}</span>
+    {children}
+  </label>
+);
+
+const EuroInput = ({ value, onChange, label, placeholder = '0,00' }: { value: string; onChange: (value: string) => void; label: string; placeholder?: string }) => (
+  <div style={{ position: 'relative' }}>
+    <input
+      className="input-field" inputMode="decimal" placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)}
+      required aria-label={label} style={{ width: '100%', paddingRight: '2rem', fontWeight: 700 }}
+    />
+    <span style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>€</span>
+  </div>
+);
+
+const SectionHead = ({ icon, color, title, hint }: { icon: ReactNode; color: string; title: string; hint?: string }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+    <span style={iconChip(color)}>{icon}</span>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <h3 style={sectionTitle}>{title}</h3>
+      {hint && <p style={{ margin: '0.1rem 0 0', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 600 }}>{hint}</p>}
+    </div>
+  </div>
+);
 
 export const PlanForm = ({ initial, onSave, onCancel }: PlanFormProps) => {
   const [draft, setDraft] = useState<PlanDraft>(() => createDraft(initial));
@@ -113,66 +135,125 @@ export const PlanForm = ({ initial, onSave, onCancel }: PlanFormProps) => {
     }
   };
 
+  // Live-Abgleich: Summe aller Quellen gegen die OP-Rechnung
+  const costCents = parseCents(draft.surgeryCost);
+  const sourcesCents = draft.sources.reduce((sum, source) => sum + (parseCents(source.amount) || 0), 0);
+  const diff = costCents !== null && costCents > 0 ? sourcesCents - costCents : null;
+
   return (
-    <form onSubmit={submit} className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-      <div>
-        <h2 style={{ fontSize: '1.1rem', color: 'var(--color-primary)' }}>{initial ? 'Finanzplan bearbeiten' : 'OP-Finanzplan einrichten'}</h2>
-        <p style={{ marginTop: '0.25rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>
-          Die Beträge werden nur verschlüsselt gespeichert und nicht im App-Code hinterlegt.
-        </p>
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '1rem' }}>
+      <div style={{
+        background: HERO_GRADIENT, borderRadius: 'var(--radius-xl)', boxShadow: '0 12px 28px rgba(63,52,196,0.28)',
+        padding: '1.3rem 1.25rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.75rem',
+      }}>
+        <span style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <HeartPulse size={20} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--font-lg)', fontWeight: 800, color: 'white' }}>{initial ? 'Finanzplan bearbeiten' : 'OP-Finanzplan einrichten'}</h1>
+          <p style={{ margin: '0.15rem 0 0', opacity: 0.88, fontSize: 'var(--font-xs)', display: 'flex', alignItems: 'flex-start', gap: '0.3rem', lineHeight: 1.35 }}>
+            <LockKeyhole size={12} style={{ flexShrink: 0, marginTop: '1px' }} /> Beträge werden nur verschlüsselt gespeichert, nicht im App-Code.
+          </p>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem' }}>
-        <label style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>OP-Rechnung (€)
-          <input className="input-field" inputMode="decimal" placeholder="Betrag" value={draft.surgeryCost} onChange={e => setDraft(v => ({ ...v, surgeryCost: e.target.value }))} required />
-        </label>
-        <label style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Fällig am
-          <input className="input-field" type="date" value={draft.billDueDate} onChange={e => setDraft(v => ({ ...v, billDueDate: e.target.value }))} required />
-        </label>
-        <label style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Monatsrate gesamt (€)
-          <input className="input-field" inputMode="decimal" placeholder="Betrag" value={draft.monthlyTarget} onChange={e => setDraft(v => ({ ...v, monthlyTarget: e.target.value }))} required />
-        </label>
-        <label style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Rückzahlung ab
-          <input className="input-field" type="month" value={draft.monthlyStartMonth} onChange={e => setDraft(v => ({ ...v, monthlyStartMonth: e.target.value }))} required />
-        </label>
-      </div>
-
-      <section>
-        <h3 style={{ fontSize: '0.9rem', marginBottom: '0.45rem' }}>Finanzierung</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-          {draft.sources.map(source => (
-            <div key={source.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(105px, 0.55fr)', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-sm)' }}>
-                <span>{source.label}</span>
-                <input className="input-field" inputMode="decimal" placeholder="€" value={source.amount} onChange={e => updateSource(source.id, e.target.value)} required aria-label={`${source.label}, Betrag in Euro`} />
-              </label>
-              {source.id === 'bonus' && <label style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Bonus verfügbar am
-                <input className="input-field" type="date" value={source.availableOn || ''} onChange={e => updateSourceDate(source.id, e.target.value)} required />
-              </label>}
-            </div>
-          ))}
+      <section style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <SectionHead icon={<Receipt size={19} />} color={PRIMARY} title="Die Rechnung" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem' }}>
+          <Field label="OP-Rechnung">
+            <EuroInput value={draft.surgeryCost} onChange={surgeryCost => setDraft(v => ({ ...v, surgeryCost }))} label="OP-Rechnung in Euro" />
+          </Field>
+          <Field label="Fällig am">
+            <input className="input-field" type="date" value={draft.billDueDate} onChange={e => setDraft(v => ({ ...v, billDueDate: e.target.value }))} required style={{ width: '100%' }} />
+          </Field>
         </div>
       </section>
 
-      <section>
-        <h3 style={{ fontSize: '0.9rem', marginBottom: '0.45rem' }}>Erwarteter Bonus zur späteren Tilgung</h3>
-        {draft.futureBonuses.map(bonus => (
-          <div key={bonus.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(100px, 0.55fr)', gap: '0.45rem', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--font-sm)' }}>{bonus.label}</span>
-            <input className="input-field" inputMode="decimal" placeholder="€" value={bonus.amount} onChange={e => updateBonus(bonus.id, e.target.value)} required aria-label={`${bonus.label}, Betrag in Euro`} />
-            <label style={{ gridColumn: '1 / -1', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Voraussichtlich am
-              <input className="input-field" type="date" value={bonus.expectedOn} onChange={e => updateBonusDate(bonus.id, e.target.value)} required />
-            </label>
-          </div>
-        ))}
-        <p style={{ marginTop: '0.35rem', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Bonuszahlungen werden erst nach tatsächlicher Buchung als Rückzahlung angerechnet.</p>
+      <section style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <SectionHead icon={<CalendarClock size={19} />} color={BLUE} title="Rückzahlung" hint="Richtwert pro Monat" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem' }}>
+          <Field label="Monatsrate gesamt">
+            <EuroInput value={draft.monthlyTarget} onChange={monthlyTarget => setDraft(v => ({ ...v, monthlyTarget }))} label="Monatsrate gesamt in Euro" />
+          </Field>
+          <Field label="Rückzahlung ab">
+            <input className="input-field" type="month" value={draft.monthlyStartMonth} onChange={e => setDraft(v => ({ ...v, monthlyStartMonth: e.target.value }))} required style={{ width: '100%' }} />
+          </Field>
+        </div>
       </section>
 
-      {error && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 'var(--font-sm)' }}>{error}</p>}
+      <section style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <SectionHead icon={<Banknote size={19} />} color={GREEN} title="Finanzierung" hint="Woher kommt das Geld für die Rechnung?" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          {draft.sources.map(source => (
+            <div key={source.id} style={{ padding: '0.8rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem 0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: sourceColor(source.id), flexShrink: 0 }} />
+                <span style={{ flex: '1 1 150px', minWidth: 0, fontSize: 'var(--font-sm)', fontWeight: 800 }}>{source.label}</span>
+                <span style={{ fontSize: '10px', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '999px', background: source.kind === 'repayable' ? '#FDE8EF' : '#E3F6EF', color: source.kind === 'repayable' ? PINK_TEXT : '#1E9A78', whiteSpace: 'nowrap' }}>
+                  {source.kind === 'repayable' ? 'Rückzahlung' : 'Eigenmittel'}
+                </span>
+              </div>
+              <EuroInput value={source.amount} onChange={value => updateSource(source.id, value)} label={`${source.label}, Betrag in Euro`} />
+              {source.id === 'bonus' && (
+                <Field label="Bonus verfügbar am">
+                  <input className="input-field" type="date" value={source.availableOn || ''} onChange={e => updateSourceDate(source.id, e.target.value)} required style={{ width: '100%' }} />
+                </Field>
+              )}
+            </div>
+          ))}
+        </div>
+        {diff !== null && (
+          <div role="status" style={{
+            padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-xs)', fontWeight: 800, lineHeight: 1.4,
+            background: diff === 0 ? '#E3F6EF' : '#FFF0E4', color: diff === 0 ? '#1E9A78' : '#B8651F',
+          }}>
+            {diff === 0 ? 'Finanzierung deckt die Rechnung genau.' : diff > 0 ? `${fmtEUR(diff)} mehr als die Rechnung.` : `${fmtEUR(-diff)} noch nicht zugeordnet.`}
+          </div>
+        )}
+      </section>
 
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        {onCancel && <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.6rem' }}><X size={16} /> Abbrechen</button>}
-        <button type="submit" className="btn btn-primary" disabled={saving} style={{ flex: 1, padding: '0.6rem' }}><Save size={16} /> {saving ? 'Speichert…' : 'Plan speichern'}</button>
+      <section style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <SectionHead icon={<Gift size={19} />} color="#F5A06B" title="Erwarteter Bonus" hint="Für die spätere Tilgung" />
+        {draft.futureBonuses.map(bonus => (
+          <div key={bonus.id} style={{ padding: '0.8rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <span style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>{bonus.label}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem' }}>
+              <Field label="Betrag">
+                <EuroInput value={bonus.amount} onChange={value => updateBonus(bonus.id, value)} label={`${bonus.label}, Betrag in Euro`} />
+              </Field>
+              <Field label="Voraussichtlich am">
+                <input className="input-field" type="date" value={bonus.expectedOn} onChange={e => updateBonusDate(bonus.id, e.target.value)} required style={{ width: '100%' }} />
+              </Field>
+            </div>
+          </div>
+        ))}
+        <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', lineHeight: 1.45, fontWeight: 600 }}>
+          Bonuszahlungen werden erst nach tatsächlicher Buchung als Rückzahlung angerechnet.
+        </p>
+      </section>
+
+      {error && <p role="alert" style={{ margin: 0, padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)', background: '#FDE8EF', color: PINK_TEXT, fontSize: 'var(--font-sm)', fontWeight: 700 }}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: '0.6rem' }}>
+        {onCancel && (
+          <button
+            type="button" onClick={onCancel} disabled={saving}
+            style={{ flex: 1, height: '50px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'var(--color-surface-muted)', color: 'var(--color-text-muted)', fontSize: 'var(--font-base)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <X size={18} /> Abbrechen
+          </button>
+        )}
+        <button
+          type="submit" disabled={saving}
+          style={{
+            flex: 1.4, height: '50px', border: 'none', borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            background: 'linear-gradient(135deg, #3F34C4 0%, #6D5DF0 100%)', color: 'white',
+            fontSize: 'var(--font-base)', fontWeight: 800, boxShadow: '0 8px 20px rgba(63,52,196,0.3)', opacity: saving ? 0.7 : 1,
+          }}
+        >
+          <Save size={18} /> {saving ? 'Speichert…' : 'Plan speichern'}
+        </button>
       </div>
     </form>
   );

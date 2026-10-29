@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Plus, Minus, TrendingDown, TrendingUp, Check, X, Tag, ChevronDown, CalendarPlus, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, Check, X, Tag, ChevronDown, CalendarPlus, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { ExpenseItem } from '../services/mockDb';
 import { ExpenseForm, CATEGORY_ICONS } from '../components/Expenses/ExpenseForm';
+import { CategoryChanges } from '../components/Expenses/CategoryChanges';
 import { PageBottomBar } from '../components/Layout/PageBottomBar';
 
 const LONG_PRESS_MS = 600;
@@ -377,8 +378,6 @@ export const Expenses = () => {
     { key: 'DAILY', label: 'Buchungen' },
   ];
 
-  const visibleTrends = categoryTrends.filter(t => Math.abs(t.changePct) >= 5).slice(0, 5);
-
   return (
     <div style={{ paddingBottom: '8rem' }}>
       {/* Monats-Navigation */}
@@ -683,32 +682,7 @@ export const Expenses = () => {
       )}
 
       {/* Größte Veränderungen */}
-      {visibleTrends.length > 0 && (
-        <div style={CARD}>
-          <h3 style={cardTitle}>Größte Veränderungen</h3>
-          <p style={{ ...cardSub, marginBottom: '0.9rem' }}>im Vergleich zum 3-Monats-Schnitt</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-            {visibleTrends.map(t => {
-              const isDown = t.changePct < 0;
-              const tone = isDown ? '#43C773' : '#F04444';
-              const Icon = CATEGORY_ICONS[t.category] || Tag;
-              return (
-                <div key={t.category} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={iconChip('#6D5DF0')}><Icon size={18} /></span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>{t.category}</div>
-                    <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{fmt0(t.current)} · Ø {fmt0(t.avg)}</div>
-                  </div>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: tone + '1F', color: tone, fontSize: 'var(--font-xs)', fontWeight: 800 }}>
-                    {isDown ? <TrendingDown size={12} /> : <TrendingUp size={12} />}
-                    {Math.abs(Math.round(t.changePct))}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <CategoryChanges expenses={expenses} currentMonth={currentMonth} card={CARD} categoryColor={categoryColor} />
 
       <PageBottomBar
         left={[{ key: 'new-month', label: 'Neuer Monat', icon: CalendarPlus, onClick: handleNewMonth }]}

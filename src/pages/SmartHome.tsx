@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AlertCircle, ChevronDown, ChevronUp, Pause, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, Blinds, ChevronDown, ChevronUp, Pause, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   fetchHomeAssistantCovers,
@@ -9,13 +9,16 @@ import {
   type CoverState,
   type HomeAssistantCover,
 } from '../services/homeAssistant';
+import {
+  HERO_GRADIENT, GREEN, GREEN_TEXT, ORANGE, PINK, PINK_TEXT, PRIMARY, BLUE, CARD,
+} from '../components/SurgeryFinance/theme';
 
-const STATUS_META: Record<CoverState, { label: string; color: string; background: string }> = {
-  open: { label: 'open', color: 'var(--color-success)', background: 'rgba(67, 199, 115, 0.12)' },
-  closed: { label: 'closed', color: 'var(--color-primary)', background: 'var(--color-primary-transparent)' },
-  opening: { label: 'opening', color: 'var(--color-blue)', background: 'rgba(75, 141, 255, 0.12)' },
-  closing: { label: 'closing', color: 'var(--color-orange)', background: 'rgba(255, 159, 45, 0.12)' },
-  unavailable: { label: 'unavailable', color: 'var(--color-danger)', background: 'rgba(240, 68, 68, 0.10)' },
+const STATUS_META: Record<CoverState, { label: string; color: string; text: string }> = {
+  open: { label: 'Offen', color: GREEN, text: GREEN_TEXT },
+  closed: { label: 'Geschlossen', color: PRIMARY, text: PRIMARY },
+  opening: { label: 'Öffnet', color: BLUE, text: BLUE },
+  closing: { label: 'Schließt', color: ORANGE, text: '#C26A2E' },
+  unavailable: { label: 'Nicht erreichbar', color: PINK, text: PINK_TEXT },
 };
 
 const QUICK_POSITIONS = [0, 50, 100] as const;
@@ -28,6 +31,25 @@ function formatUpdatedAt(value: string | null) {
   if (!value) return 'kein Status';
   return new Date(value).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }
+
+// Kleines Fenster-Symbol: je geschlossener der Rollladen, desto weiter ist er von oben heruntergefahren
+const BlindGlyph = ({ position, color }: { position: number | null; color: string }) => {
+  const covered = position === null ? 0 : 100 - Math.max(0, Math.min(100, position));
+  return (
+    <div style={{
+      width: '44px', height: '52px', borderRadius: '12px', flexShrink: 0, position: 'relative', overflow: 'hidden',
+      background: '#ECE8FF', border: `2px solid ${color}55`,
+    }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: `${covered}%`, transition: 'height 0.4s ease',
+        background: `repeating-linear-gradient(180deg, ${color} 0 4px, ${color}99 4px 6px)`,
+      }} />
+      {position === null && (
+        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color, fontWeight: 800, fontSize: '16px' }}>?</span>
+      )}
+    </div>
+  );
+};
 
 export const SmartHome = () => {
   const { user } = useAuth();
@@ -77,6 +99,8 @@ export const SmartHome = () => {
   const summary = useMemo(() => ({
     available: covers.filter((cover) => cover.state !== 'unavailable').length,
     moving: covers.filter((cover) => cover.state === 'opening' || cover.state === 'closing').length,
+    open: covers.filter((cover) => cover.state !== 'unavailable' && cover.position !== null && cover.position > 0).length,
+    closed: covers.filter((cover) => cover.state !== 'unavailable' && cover.position === 0).length,
   }), [covers]);
 
   if (user?.isChild) {
@@ -99,70 +123,63 @@ export const SmartHome = () => {
 
   const isBusy = loading || refreshing;
 
+  const chipWhite = {
+    display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', borderRadius: '999px',
+    background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 'var(--font-xs)', fontWeight: 700, lineHeight: 1.3,
+  } as const;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--color-primary-gradient)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <SlidersHorizontal size={24} />
+    <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '2rem' }}>
+      {/* Hero */}
+      <div style={{ background: HERO_GRADIENT, borderRadius: 'var(--radius-xl)', padding: '1.3rem 1.25rem', color: 'white', boxShadow: '0 12px 28px rgba(63,52,196,0.28)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Blinds size={19} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-base)', fontWeight: 800 }}>Smart Home</div>
+            <div style={{ fontSize: 'var(--font-xs)', opacity: 0.85, fontWeight: 600 }}>
+              {updatedAt ? `Stand ${formatUpdatedAt(updatedAt)} Uhr` : 'Rollläden steuern'}
+            </div>
+          </div>
+          <button
+            onClick={() => void loadCovers(true)}
+            disabled={isBusy}
+            title="Status neu laden"
+            aria-label="Status neu laden"
+            className="glass-btn"
+            style={{ opacity: isBusy ? 0.7 : 1 }}
+          >
+            <RefreshCw className={isBusy ? 'smart-home-spin' : undefined} size={18} />
+          </button>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--font-xl)' }}>Rollläden</h2>
-          <p style={{ margin: '0.2rem 0 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            {summary.available}/{covers.length || 11} erreichbar
-            {summary.moving > 0 ? ` · ${summary.moving} in Bewegung` : ''}
-            {updatedAt ? ` · ${formatUpdatedAt(updatedAt)}` : ''}
-          </p>
+
+        <div style={{ marginTop: '1.1rem', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', opacity: 0.85 }}>ROLLLÄDEN ERREICHBAR</div>
+        <div style={{ fontSize: '2.6rem', fontWeight: 800, lineHeight: 1.1, marginTop: '0.2rem' }}>
+          {summary.available}<span style={{ fontSize: '1.4rem', opacity: 0.75 }}> / {covers.length || '–'}</span>
         </div>
-        <button
-          onClick={() => void loadCovers(true)}
-          disabled={isBusy}
-          title="Status neu laden"
-          aria-label="Status neu laden"
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--color-surface-hover)',
-            color: 'var(--color-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: isBusy ? 0.6 : 1,
-          }}
-        >
-          <RefreshCw className={isBusy ? 'smart-home-spin' : undefined} size={18} />
-        </button>
+
+        {covers.length > 0 && (
+          <div style={{ marginTop: '0.9rem', display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+            <span style={chipWhite}>{summary.open} offen</span>
+            <span style={chipWhite}>{summary.closed} geschlossen</span>
+            {summary.moving > 0 && <span style={chipWhite}><RefreshCw size={12} className="smart-home-spin" /> {summary.moving} in Bewegung</span>}
+          </div>
+        )}
       </div>
 
       {error && (
-        <div className="glass-panel" style={{
-          padding: '0.9rem 1rem',
-          borderColor: 'rgba(240, 68, 68, 0.35)',
-          background: 'rgba(240, 68, 68, 0.08)',
-          color: 'var(--color-danger)',
-          display: 'flex',
-          gap: '0.6rem',
-          alignItems: 'flex-start',
-          fontSize: 'var(--font-sm)',
-          fontWeight: 700,
+        <div style={{
+          padding: '0.9rem 1rem', borderRadius: 'var(--radius-lg)', background: '#FDE8EF', color: PINK_TEXT,
+          display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: 'var(--font-sm)', fontWeight: 700,
         }}>
           <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span>{error}</span>
+          <span style={{ overflowWrap: 'anywhere' }}>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <div className="glass-panel" style={{ padding: '2rem 1.25rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+        <div style={{ ...CARD, padding: '2rem 1.25rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
           <RefreshCw className="smart-home-spin" size={22} />
           <p style={{ margin: '0.75rem 0 0 0', fontSize: 'var(--font-sm)', fontWeight: 700 }}>Lädt Status...</p>
         </div>
@@ -172,123 +189,101 @@ export const SmartHome = () => {
             const meta = STATUS_META[cover.state];
             const pendingAction = pending[cover.entity_id];
             const unavailable = cover.state === 'unavailable';
+            const disabled = Boolean(pendingAction) || unavailable;
             const targetPosition = targetPositions[cover.entity_id] ?? cover.position ?? 50;
 
-            return (
-              <div
-                key={cover.entity_id}
-                className="glass-panel"
-                style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}
+            const actionBtn = (action: 'open' | 'stop' | 'close', Icon: typeof ChevronUp, label: string) => (
+              <button
+                disabled={disabled}
+                onClick={() => void handleAction(cover, action)}
+                style={{
+                  height: '44px', borderRadius: '999px', border: 'none', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+                  background: action === 'stop' ? 'var(--color-surface-muted)' : '#ECE8FF',
+                  color: action === 'stop' ? 'var(--color-text-muted)' : PRIMARY,
+                  fontSize: 'var(--font-sm)', fontWeight: 800, opacity: disabled ? 0.5 : 1,
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h3 style={{ margin: 0, fontSize: 'var(--font-lg)', wordBreak: 'break-word' }}>{cover.name}</h3>
-                    <p style={{ margin: '0.25rem 0 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>
-                      Position: {cover.position === null ? 'unbekannt' : `${cover.position}%`} · {formatUpdatedAt(cover.updated_at)}
+                <Icon size={16} /> {label}
+              </button>
+            );
+
+            return (
+              <div key={cover.entity_id} style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: '0.95rem' }}>
+                <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                  <BlindGlyph position={unavailable ? null : cover.position} color={meta.color} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-base)', fontWeight: 800, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{cover.name}</h3>
+                    <p style={{ margin: '0.2rem 0 0.45rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', fontWeight: 600 }}>
+                      {cover.position === null ? 'Position unbekannt' : `${cover.position} % offen`} · {formatUpdatedAt(cover.updated_at)}
                     </p>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.65rem', borderRadius: '999px',
+                      background: meta.color + '26', color: meta.text, fontSize: '11px', fontWeight: 800, whiteSpace: 'nowrap',
+                    }}>
+                      {unavailable && <ShieldAlert size={12} />}
+                      {meta.label}
+                    </span>
                   </div>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    padding: '0.35rem 0.6rem',
-                    borderRadius: 'var(--radius-full)',
-                    background: meta.background,
-                    color: meta.color,
-                    fontSize: 'var(--font-xs)',
-                    fontWeight: 800,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {unavailable && <ShieldAlert size={13} />}
-                    {meta.label}
-                  </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-                  <button
-                    className="btn btn-secondary"
-                    disabled={Boolean(pendingAction) || unavailable}
-                    onClick={() => void handleAction(cover, 'open')}
-                    style={{ padding: '0.65rem 0.45rem', borderRadius: 'var(--radius-md)', opacity: pendingAction || unavailable ? 0.55 : 1 }}
-                  >
-                    <ChevronUp size={16} />
-                    Öffnen
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    disabled={Boolean(pendingAction) || unavailable}
-                    onClick={() => void handleAction(cover, 'stop')}
-                    style={{ padding: '0.65rem 0.45rem', borderRadius: 'var(--radius-md)', opacity: pendingAction || unavailable ? 0.55 : 1 }}
-                  >
-                    <Pause size={16} />
-                    Stop
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    disabled={Boolean(pendingAction) || unavailable}
-                    onClick={() => void handleAction(cover, 'close')}
-                    style={{ padding: '0.65rem 0.45rem', borderRadius: 'var(--radius-md)', opacity: pendingAction || unavailable ? 0.55 : 1 }}
-                  >
-                    <ChevronDown size={16} />
-                    Schließen
-                  </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.8fr 1fr', gap: '0.45rem' }}>
+                  {actionBtn('open', ChevronUp, 'Öffnen')}
+                  {actionBtn('stop', Pause, 'Stop')}
+                  {actionBtn('close', ChevronDown, 'Zu')}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ padding: '0.85rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                     <input
                       type="range"
                       min="0"
                       max="100"
                       step="1"
                       value={targetPosition}
-                      disabled={Boolean(pendingAction) || unavailable}
+                      disabled={disabled}
                       onChange={(event) => {
                         const next = Number(event.target.value);
                         setTargetPositions((current) => ({ ...current, [cover.entity_id]: next }));
                       }}
-                      style={{ flex: 1, minWidth: 0 }}
+                      style={{ flex: 1, minWidth: 0, accentColor: PRIMARY }}
                     />
-                    <span style={{ minWidth: '3rem', textAlign: 'right', fontSize: 'var(--font-sm)', fontWeight: 800 }}>
-                      {targetPosition}%
+                    <span style={{ minWidth: '3rem', textAlign: 'right', fontSize: 'var(--font-base)', fontWeight: 800, color: 'var(--color-text)' }}>
+                      {targetPosition} %
                     </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                    {QUICK_POSITIONS.map((position) => (
+                      <button
+                        key={position}
+                        disabled={disabled}
+                        onClick={() => void handleAction(cover, 'set_position', position)}
+                        style={{
+                          flex: 1, height: '38px', borderRadius: '999px', border: '1px solid var(--color-border)', cursor: disabled ? 'default' : 'pointer',
+                          background: 'var(--color-surface)', color: 'var(--color-text)', fontFamily: 'inherit',
+                          fontSize: 'var(--font-sm)', fontWeight: 800, opacity: disabled ? 0.5 : 1,
+                        }}
+                      >
+                        {position} %
+                      </button>
+                    ))}
                     <button
-                      className="btn btn-primary"
-                      disabled={Boolean(pendingAction) || unavailable}
+                      disabled={disabled}
                       onClick={() => void handleAction(cover, 'set_position', targetPosition)}
-                      style={{ padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-md)', opacity: pendingAction || unavailable ? 0.55 : 1 }}
+                      style={{
+                        flex: 1.3, height: '38px', borderRadius: '999px', border: 'none', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                        background: 'linear-gradient(135deg, #3F34C4, #6D5DF0)', color: 'white', fontSize: 'var(--font-sm)', fontWeight: 800,
+                        boxShadow: '0 6px 14px rgba(63,52,196,0.28)', opacity: disabled ? 0.5 : 1,
+                      }}
                     >
                       Setzen
                     </button>
                   </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                    {QUICK_POSITIONS.map((position) => (
-                      <button
-                        key={position}
-                        className="chip"
-                        disabled={Boolean(pendingAction) || unavailable}
-                        onClick={() => void handleAction(cover, 'set_position', position)}
-                        style={{
-                          justifyContent: 'center',
-                          opacity: pendingAction || unavailable ? 0.55 : 1,
-                        }}
-                      >
-                        {position}%
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {pendingAction && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    color: 'var(--color-primary)',
-                    fontSize: 'var(--font-xs)',
-                    fontWeight: 800,
-                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: PRIMARY, fontSize: 'var(--font-xs)', fontWeight: 800 }}>
                     <RefreshCw className="smart-home-spin" size={14} />
                     Aktion läuft...
                   </div>
@@ -296,18 +291,11 @@ export const SmartHome = () => {
 
                 {coverErrors[cover.entity_id] && (
                   <div style={{
-                    padding: '0.65rem 0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'rgba(240, 68, 68, 0.08)',
-                    color: 'var(--color-danger)',
-                    fontSize: 'var(--font-xs)',
-                    fontWeight: 700,
-                    display: 'flex',
-                    gap: '0.45rem',
-                    alignItems: 'flex-start',
+                    padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', background: '#FDE8EF', color: PINK_TEXT,
+                    fontSize: 'var(--font-xs)', fontWeight: 700, display: 'flex', gap: '0.45rem', alignItems: 'flex-start',
                   }}>
                     <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                    <span>{coverErrors[cover.entity_id]}</span>
+                    <span style={{ overflowWrap: 'anywhere' }}>{coverErrors[cover.entity_id]}</span>
                   </div>
                 )}
               </div>

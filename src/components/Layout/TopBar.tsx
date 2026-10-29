@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { getNavItems } from '../../utils/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -6,14 +7,22 @@ import { mockDb } from '../../services/mockDb';
 import { useVictron } from '../../context/VictronContext';
 import { auth } from '../../services/firebase';
 import { AvatarEmoji } from '../AvatarEmoji';
-import { X, Camera, Check, Menu, Zap } from 'lucide-react';
+import { X, Camera, Check, Menu, Zap, CheckCircle2, Trophy, Star, Mail } from 'lucide-react';
 import { AVATAR_CATEGORIES } from '../../data/avatarEmojis';
 
 const AVATAR_COLORS = [
-  '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#06b6d4',
-  '#8b5cf6', '#ef4444', '#22c55e', '#3b82f6', '#f97316',
-  '#a855f7', '#84cc16',
+  '#6D5DF0', '#3F34C4', '#F27A9B', '#F5A06B', '#4FC3A1',
+  '#4B8DFF', '#C7B6F7', '#FFD9C2', '#ec4899', '#14b8a6',
+  '#f59e0b', '#8b5cf6',
 ];
+
+const chip = (color: string): React.CSSProperties => ({
+  width: '36px', height: '36px', borderRadius: '50%', flex: 'none', background: color + '26', color,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+});
+const sectionLabel: React.CSSProperties = {
+  margin: '0 0 0.5rem', fontSize: '11px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)',
+};
 
 export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { user, updateUser } = useAuth();
@@ -124,252 +133,181 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         </div>
       </header>
 
-      {/* Profile Edit Modal */}
-      {showProfile && (
-        <div 
+      {/* Profil-Sheet */}
+      {showProfile && createPortal(
+        <div
           onClick={() => setShowProfile(false)}
           style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
-            animation: 'fadeIn 0.2s ease',
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(23,20,58,0.5)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000,
+            animation: 'profileFade 0.2s ease',
           }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.5rem',
-              width: '100%',
-              maxWidth: '400px',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              animation: 'slideUp 0.3s ease',
+              width: '100%', maxWidth: '500px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              borderRadius: '28px 28px 0 0', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)',
+              boxShadow: '0 -12px 40px rgba(63,52,196,0.25)', animation: 'profileSheetUp 0.28s ease',
             }}
           >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexShrink: 0 }}>
-              <h2 style={{ fontSize: 'var(--font-xl)', color: 'var(--color-text)', margin: 0 }}>Mein Profil</h2>
+            {/* Hero */}
+            <div style={{ flex: 'none', position: 'relative', padding: '1.5rem 1.25rem 1.25rem', color: 'white', textAlign: 'center', background: 'linear-gradient(160deg, #3A2FC0 0%, #6D5DF0 60%, #9B86F4 100%)' }}>
+              <div style={{ position: 'absolute', top: '0.6rem', left: '50%', transform: 'translateX(-50%)', width: '44px', height: '5px', borderRadius: '999px', background: 'rgba(255,255,255,0.45)' }} />
+              <button className="glass-btn" onClick={() => setShowProfile(false)} aria-label="Schließen" style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+                <X size={20} />
+              </button>
+              <div style={{ position: 'relative', width: '92px', height: '92px', margin: '0.6rem auto 0.75rem' }}>
+                <div style={{
+                  width: '100%', height: '100%', borderRadius: '50%', backgroundColor: editAvatarColor, overflow: 'hidden',
+                  border: '3px solid rgba(255,255,255,0.85)', boxShadow: '0 8px 20px rgba(23,20,58,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.2s',
+                }}>
+                  <AvatarEmoji emoji={editAvatar} size={86} />
+                </div>
+                <span style={{ position: 'absolute', right: '-2px', bottom: '-2px', width: '28px', height: '28px', borderRadius: '50%', background: 'white', color: '#3F34C4', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(23,20,58,0.25)' }}>
+                  <Camera size={14} />
+                </span>
+              </div>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-xl)', fontWeight: 800, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {editName.trim() || 'Mein Profil'}
+              </h2>
+              <p style={{ margin: '0.15rem 0 0', fontSize: 'var(--font-xs)', fontWeight: 600, opacity: 0.85 }}>Mein Profil</p>
+            </div>
+
+            {/* Inhalt */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem 1.25rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {stats && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                  {[
+                    { icon: CheckCircle2, color: '#4FC3A1', value: stats.tasksThisWeek, label: 'diese Woche' },
+                    { icon: Trophy, color: '#6D5DF0', value: stats.tasksTotal, label: 'Tasks gesamt' },
+                    { icon: Star, color: '#F5A06B', value: stats.stars, label: 'Sterne' },
+                  ].map(tile => (
+                    <div key={tile.label} style={{ padding: '0.75rem 0.4rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={chip(tile.color)}><tile.icon size={17} /></span>
+                      <span style={{ fontSize: 'var(--font-lg)', fontWeight: 800, lineHeight: 1 }}>{tile.value}</span>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center' }}>{tile.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Name */}
+              <div>
+                <p style={sectionLabel}>Anzeigename</p>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="input-field"
+                  placeholder="Dein Name"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Profilbild */}
+              <div>
+                <p style={sectionLabel}>Profilbild</p>
+                <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem', overflowX: 'auto', paddingBottom: '2px' }}>
+                  {AVATAR_CATEGORIES.map((cat, i) => (
+                    <button
+                      key={cat.label}
+                      onClick={() => setAvatarCategory(i)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.8rem', borderRadius: '999px', border: 'none', flex: 'none',
+                        background: avatarCategory === i ? 'linear-gradient(135deg, #3F34C4, #6D5DF0)' : 'var(--color-surface-muted)',
+                        color: avatarCategory === i ? 'white' : 'var(--color-text-muted)',
+                        fontFamily: 'inherit', fontSize: 'var(--font-xs)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.9rem' }}>{cat.icon}</span>
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.45rem', maxHeight: '190px', overflowY: 'auto', padding: '2px' }}>
+                  {AVATAR_CATEGORIES[avatarCategory].emojis.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => setEditAvatar(emoji)}
+                      style={{
+                        padding: '0.25rem', borderRadius: '16px', cursor: 'pointer', aspectRatio: '1',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: editAvatar === emoji ? '#ECE8FF' : 'var(--color-surface-hover)',
+                        border: editAvatar === emoji ? '2px solid #6D5DF0' : '2px solid transparent',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <AvatarEmoji emoji={emoji} size={36} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Farbe */}
+              <div>
+                <p style={sectionLabel}>Hintergrundfarbe</p>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  {(AVATAR_COLORS.includes(editAvatarColor) ? AVATAR_COLORS : [editAvatarColor, ...AVATAR_COLORS.slice(0, -1)]).map(clr => (
+                    <button
+                      key={clr}
+                      onClick={() => setEditAvatarColor(clr)}
+                      aria-label={`Farbe ${clr}`}
+                      style={{
+                        width: '34px', height: '34px', borderRadius: '50%', backgroundColor: clr, cursor: 'pointer', padding: 0,
+                        border: '3px solid var(--color-surface)',
+                        boxShadow: editAvatarColor === clr ? `0 0 0 2.5px ${clr}` : '0 0 0 1px var(--color-border)',
+                        transform: editAvatarColor === clr ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.12s, box-shadow 0.12s',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Account */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)' }}>
+                <span style={chip('#6D5DF0')}><Mail size={17} /></span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ ...sectionLabel, margin: 0 }}>Account</p>
+                  <div style={{ fontSize: 'var(--font-xs)', fontWeight: 600, wordBreak: 'break-all' }}>
+                    {auth.currentUser?.email || 'Nicht mit E-Mail verknüpft'}
+                  </div>
+                </div>
+              </div>
+
+              {saveMessage && (
+                <div style={{
+                  padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-sm)', fontWeight: 700, textAlign: 'center',
+                  color: saveMessage.includes('vergeben') ? '#D4416E' : '#1E9A78',
+                  background: saveMessage.includes('vergeben') ? '#FDE8EF' : '#E3F6EF',
+                }}>
+                  {saveMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Speichern */}
+            <div style={{ flex: 'none', padding: '0.75rem 1.25rem calc(1rem + env(safe-area-inset-bottom))', boxShadow: '0 -10px 18px -14px rgba(63,52,196,0.25)' }}>
               <button
-                onClick={() => setShowProfile(false)}
-                style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '0.25rem' }}
+                onClick={handleSaveProfile}
+                style={{
+                  width: '100%', height: '50px', border: 'none', borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  background: 'linear-gradient(135deg, #3F34C4 0%, #6D5DF0 100%)', color: 'white',
+                  fontSize: 'var(--font-base)', fontWeight: 800, boxShadow: '0 8px 20px rgba(63,52,196,0.3)',
+                }}
               >
-                <X size={22} />
+                <Check size={18} /> Speichern
               </button>
             </div>
-
-            {/* Scrollable Content */}
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.25rem' }}>
-
-            {/* Avatar Preview */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                backgroundColor: editAvatarColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                border: `3px solid ${editAvatarColor}`,
-                marginBottom: '0.5rem',
-                transition: 'background-color 0.2s, border-color 0.2s',
-                overflow: 'hidden',
-              }}>
-                <AvatarEmoji emoji={editAvatar} size={80} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-2px',
-                  right: '-2px',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Camera size={12} color="white" />
-                </div>
-              </div>
-            </div>
-
-            {/* Avatar Selection */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Profilbild wählen
-              </label>
-
-              {/* Category Tabs */}
-              <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.75rem', overflowX: 'auto' }}>
-                {AVATAR_CATEGORIES.map((cat, i) => (
-                  <button
-                    key={cat.label}
-                    onClick={() => setAvatarCategory(i)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.2rem',
-                      padding: '0.35rem 0.6rem',
-                      borderRadius: 'var(--radius-full)',
-                      border: 'none',
-                      backgroundColor: avatarCategory === i ? 'var(--color-primary)' : 'var(--color-surface-hover)',
-                      color: avatarCategory === i ? 'white' : 'var(--color-text-muted)',
-                      fontSize: '0.7rem',
-                      fontWeight: avatarCategory === i ? 600 : 400,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.85rem' }}>{cat.icon}</span>
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Emoji Grid */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '0.4rem',
-                maxHeight: '180px',
-                overflowY: 'auto',
-                paddingRight: '0.25rem',
-              }}>
-                {AVATAR_CATEGORIES[avatarCategory].emojis.map(emoji => (
-                  <button
-                    key={emoji}
-                    onClick={() => setEditAvatar(emoji)}
-                    style={{
-                      padding: '0.3rem',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: editAvatar === emoji ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
-                      border: editAvatar === emoji ? '2px solid var(--color-primary)' : '2px solid transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      aspectRatio: '1',
-                    }}
-                  >
-                    <AvatarEmoji emoji={emoji} size={36} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Avatar Color Picker */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Avatar-Farbe (Klassisch)
-              </label>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                {AVATAR_COLORS.map(clr => (
-                  <button
-                    key={clr}
-                    onClick={() => setEditAvatarColor(clr)}
-                    style={{
-                      width: '28px', height: '28px', borderRadius: '50%',
-                      backgroundColor: clr,
-                      border: editAvatarColor === clr ? '3px solid var(--color-text)' : '3px solid transparent',
-                      cursor: 'pointer', transition: 'transform 0.1s',
-                      transform: editAvatarColor === clr ? 'scale(1.15)' : 'scale(1)',
-                      outline: 'none',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Statistics */}
-            {stats && (
-              <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-                <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-                  Statistiken
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>{stats.tasksThisWeek}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Tasks diese Woche</div>
-                  </div>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>{stats.tasksTotal}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Tasks insgesamt</div>
-                  </div>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>⭐ {stats.stars}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Sterne gesammelt</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Account Info */}
-            <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Account
-              </label>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-text)', padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', wordBreak: 'break-all' }}>
-                {auth.currentUser?.email || 'Nicht mit E-Mail verknüpft'}
-              </div>
-            </div>
-
-            {/* Name Input */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Anzeigename
-              </label>
-              <input
-                type="text"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                className="input-field"
-                placeholder="Dein Name"
-              />
-            </div>
-
-            {/* Save Message */}
-            {saveMessage && (
-              <div style={{
-                padding: '0.5rem',
-                marginBottom: '0.75rem',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-sm)',
-                textAlign: 'center',
-                color: saveMessage.includes('vergeben') ? 'var(--color-danger)' : 'var(--color-success)',
-                backgroundColor: saveMessage.includes('vergeben') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-              }}>
-                {saveMessage}
-              </div>
-            )}
-
-            </div>{/* End Scrollable Content */}
-
-            {/* Save Button — fixed at bottom */}
-            <div style={{ flexShrink: 0, paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
-            <button
-              onClick={handleSaveProfile}
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              <Check size={18} />
-              Speichern
-            </button>
-            </div>
           </div>
-        </div>
+          <style>{`
+            @keyframes profileFade { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes profileSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+          `}</style>
+        </div>,
+        document.body
       )}
 
       <style>{`

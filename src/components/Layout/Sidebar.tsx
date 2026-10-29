@@ -111,58 +111,14 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           ))}
         </nav>
 
-        {/* Footer Info */}
-        <div style={{
-          marginTop: 'auto',
-          padding: '0.75rem 1.25rem max(1rem, env(safe-area-inset-bottom))',
-          borderTop: '1px solid var(--color-border)',
-          color: 'var(--color-text-muted)',
-          fontSize: 'var(--font-xs)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.4rem',
-          flexShrink: 0,
-        }}>
-          <div>
-            <p style={{ margin: 0 }}>Angemeldet als <strong>{user?.id}</strong></p>
-            <button
-              onClick={() => { logout(); onClose(); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                background: 'none',
-                border: 'none',
-                color: 'var(--color-danger)',
-                cursor: 'pointer',
-                padding: '0.5rem 0',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                marginTop: '0.25rem'
-              }}
-            >
-              <LogOut size={14} /> Abmelden
-            </button>
-          </div>
-          <button
-            onClick={() => setShowChangelog(true)}
-            className="sidebar-version-btn"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              margin: 0,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--color-text-muted)',
-              fontSize: 'inherit',
-              padding: '0.15rem 0',
-            }}
-            title="Changelog anzeigen"
-          >
-            <Info size={12} />
-            <span>Family Hub v{APP_VERSION}</span>
+        {/* Footer */}
+        <div className="drawer-foot">
+          <button className="drawer-logout" onClick={() => { logout(); onClose(); }}>
+            <LogOut size={18} /> Abmelden
+          </button>
+          <button className="drawer-version" onClick={() => setShowChangelog(true)} title="Changelog anzeigen">
+            <Info size={13} />
+            <span>Family Hub v{APP_VERSION} · Neuigkeiten</span>
           </button>
         </div>
       </aside>

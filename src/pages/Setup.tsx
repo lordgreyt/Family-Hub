@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Luggage, CheckSquare } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Settings, Eye, KeyRound, Star, Check, X } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -14,6 +15,39 @@ import { isDriveConnected, requestAccessToken, disconnectDrive, getGoogleClientI
 import { runBackup, getLastBackupInfo, isBackupDue, fetchDriveBackups, restoreFromDrive } from '../services/backupService';
 
 import { getNavItems } from '../utils/navigation';
+import { HERO_GRADIENT, GREEN, GREEN_TEXT, ORANGE, PINK, PINK_TEXT, PRIMARY, BLUE, LILAC, iconChip, CARD, sectionTitle, fieldLabel } from '../components/SurgeryFinance/theme';
+
+const Section = ({ icon: Icon, color, title, subtitle, children }: { icon: typeof Palette; color: string; title: string; subtitle?: string; children: React.ReactNode }) => (
+  <div style={CARD}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '1rem' }}>
+      <span style={iconChip(color, 38)}><Icon size={18} /></span>
+      <div style={{ minWidth: 0 }}>
+        <h3 style={sectionTitle}>{title}</h3>
+        {subtitle && <div style={{ fontSize: 'var(--font-xs)', fontWeight: 600, color: 'var(--color-text-muted)' }}>{subtitle}</div>}
+      </div>
+    </div>
+    {children}
+  </div>
+);
+
+const Toggle = ({ checked, onChange, label, hint }: { checked: boolean; onChange: (value: boolean) => void; label: string; hint?: string }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.7rem 0', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--color-text)' }}
+  >
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ display: 'block', fontSize: 'var(--font-sm)', fontWeight: 700 }}>{label}</span>
+      {hint && <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{hint}</span>}
+    </span>
+    <span style={{ width: '48px', height: '28px', borderRadius: '999px', flexShrink: 0, position: 'relative', background: checked ? 'linear-gradient(135deg, #3F34C4, #6D5DF0)' : 'var(--color-border)', transition: 'background 0.2s' }}>
+      <span style={{ position: 'absolute', top: '3px', left: checked ? '23px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: 'white', boxShadow: '0 2px 6px rgba(23,20,58,0.3)', transition: 'left 0.2s' }} />
+    </span>
+  </button>
+);
+
 
 export const Setup = () => {
   const { settings, updateSettings } = useSettings();
@@ -30,6 +64,7 @@ export const Setup = () => {
   const [lastCreatedUser, setLastCreatedUser] = useState<{ id: string, pass: string } | null>(null);
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const [changePwOld, setChangePwOld] = useState('');
   const [changePwNew, setChangePwNew] = useState('');
@@ -101,6 +136,7 @@ export const Setup = () => {
       setNewEmail('');
       setNewPassword('');
       setNewUserIsChild(false);
+      setShowCreate(false);
     } catch (err: any) {
       console.error("User creation error:", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -255,222 +291,218 @@ export const Setup = () => {
     }
   };
   
-  const handleFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateSettings({ fontSize: e.target.value as any });
+  const isAdmin = Boolean(user?.isAdmin || user?.id === 'Falko');
+  const roleLabel = isAdmin ? 'Administrator' : user?.isChild ? 'Kind' : 'Erwachsener';
+
+  const primaryBtn: React.CSSProperties = {
+    width: '100%', height: '50px', border: 'none', borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+    background: 'linear-gradient(135deg, #3F34C4 0%, #6D5DF0 100%)', color: 'white',
+    fontSize: 'var(--font-base)', fontWeight: 800, boxShadow: '0 8px 20px rgba(63,52,196,0.3)',
   };
+  const softBtn: React.CSSProperties = {
+    width: '100%', height: '46px', border: 'none', borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+    background: '#ECE8FF', color: '#3F34C4', fontSize: 'var(--font-sm)', fontWeight: 800,
+  };
+  const noteStyle: React.CSSProperties = { margin: '0.6rem 0 0', fontSize: '11px', lineHeight: 1.5, color: 'var(--color-text-muted)' };
+
+  const sheetShell = (onClose: () => void, children: React.ReactNode) => createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, backgroundColor: 'rgba(23,20,58,0.5)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000, animation: 'setupFade 0.2s ease',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '500px', maxHeight: '94vh', overflowY: 'auto', borderRadius: '28px 28px 0 0',
+          backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', boxShadow: '0 -12px 40px rgba(63,52,196,0.25)',
+          padding: '0.75rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom))', animation: 'setupSheetUp 0.28s ease',
+          display: 'flex', flexDirection: 'column', gap: '1rem',
+        }}
+      >
+        <div style={{ width: '44px', height: '5px', borderRadius: '999px', background: 'var(--color-border)', alignSelf: 'center' }} />
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+
+  const sheetHeader = (title: string, onClose: () => void) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <h2 style={{ margin: 0, fontSize: 'var(--font-lg)', fontWeight: 800 }}>{title}</h2>
+      <button type="button" onClick={onClose} aria-label="Schließen" style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#ECE8FF', color: '#3F34C4', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+        <X size={18} />
+      </button>
+    </div>
+  );
+
+  const message = (text: string, kind: 'error' | 'success') => (
+    <div style={{
+      marginTop: '0.75rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-sm)', fontWeight: 700,
+      color: kind === 'error' ? PINK_TEXT : GREEN_TEXT, background: kind === 'error' ? '#FDE8EF' : '#E3F6EF', overflowWrap: 'anywhere',
+    }}>
+      {text}
+    </div>
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
-          <Palette size={20} /> Design & Darstellung
-        </h3>
-        
-        <div style={{ marginBottom: '1.25rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            <Type size={16} /> Schriftgröße
-          </label>
-          <select value={settings.fontSize} onChange={handleFontSizeChange} className="input-field">
-            <option value="small">Klein</option>
-            <option value="base">Normal</option>
-            <option value="large">Groß</option>
-          </select>
+    <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '2rem' }}>
+      {/* Hero */}
+      <div style={{ background: HERO_GRADIENT, borderRadius: 'var(--radius-xl)', padding: '1.3rem 1.25rem', color: 'white', boxShadow: '0 12px 28px rgba(63,52,196,0.28)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Settings size={19} />
+          </span>
+          <div>
+            <div style={{ fontSize: 'var(--font-base)', fontWeight: 800 }}>Setup</div>
+            <div style={{ fontSize: 'var(--font-xs)', opacity: 0.85, fontWeight: 600 }}>Einstellungen & System</div>
+          </div>
+        </div>
+        <div style={{ marginTop: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+          <span style={{
+            width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user?.avatarColor || '#6366f1',
+            border: '3px solid rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <AvatarEmoji emoji={user?.avatar || '❓'} size={60} />
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-xl)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.id}</div>
+            <div style={{ fontSize: 'var(--font-xs)', opacity: 0.85, fontWeight: 600, overflowWrap: 'anywhere' }}>{auth.currentUser?.email || 'Nicht mit E-Mail verknüpft'}</div>
+            <span style={{ display: 'inline-flex', marginTop: '0.4rem', padding: '0.25rem 0.7rem', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', fontSize: '11px', fontWeight: 800 }}>
+              {roleLabel}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Darstellung */}
+      <Section icon={Palette} color={PRIMARY} title="Design & Darstellung" subtitle="Schriftgröße und Sterne">
+        <label style={fieldLabel}><Type size={12} style={{ verticalAlign: '-1px' }} /> Schriftgröße</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', padding: '4px', borderRadius: '999px', background: 'var(--color-surface-muted)' }}>
+          {([['small', 'Klein'], ['base', 'Normal'], ['large', 'Groß']] as const).map(([value, label]) => {
+            const active = settings.fontSize === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => updateSettings({ fontSize: value })}
+                style={{
+                  height: '38px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'var(--font-sm)', fontWeight: 800,
+                  background: active ? 'linear-gradient(135deg, #3F34C4, #6D5DF0)' : 'transparent', color: active ? 'white' : 'var(--color-text-muted)',
+                  boxShadow: active ? '0 4px 12px rgba(63,52,196,0.3)' : 'none', transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        {(user?.isAdmin || user?.id === 'Falko') && (
-          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)', fontSize: 'var(--font-sm)', fontWeight: 600 }}>
-              Aufgaben-Punkte (Sterne)
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+        {isAdmin && (
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.1rem', borderTop: '1px solid var(--color-border)' }}>
+            <label style={fieldLabel}><Star size={12} style={{ verticalAlign: '-1px' }} /> Aufgaben-Punkte (Sterne)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
               {[1, 2, 3].map((prio) => (
-                <div key={prio}>
-                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Prio {prio}</label>
-                  <input 
-                    type="number" 
-                    className="input-field" 
-                    value={settings.prioPoints[prio]} 
+                <div key={prio} style={{ padding: '0.7rem 0.5rem', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-hover)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.05em', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>Prio {prio}</div>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={settings.prioPoints[prio]}
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 0;
                       updateSettings({ prioPoints: { ...settings.prioPoints, [prio]: val } });
                     }}
-                    style={{ padding: '0.5rem', textAlign: 'center' }}
+                    style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800, width: '100%', fontFamily: 'inherit' }}
                   />
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
-              Lege fest, wie viele Sterne die Kinder für jede Aufgaben-Priorität erhalten.
-            </p>
+            <p style={noteStyle}>Lege fest, wie viele Sterne die Kinder für jede Aufgaben-Priorität erhalten.</p>
           </div>
         )}
-      </div>
+      </Section>
 
-      {(user?.isAdmin || user?.id === 'Falko') && (
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
-            <Luggage size={20} /> Urlaub
-          </h3>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)', marginBottom: '0.6rem' }}>
-            <input
-              type="checkbox"
-              checked={settings.showPacklist}
-              onChange={e => updateSettings({ showPacklist: e.target.checked })}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
-            />
-            Packliste im Menü anzeigen
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
-            <input
-              type="checkbox"
-              checked={settings.showHolidayBudget}
-              onChange={e => updateSettings({ showHolidayBudget: e.target.checked })}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
-            />
-            Urlaubsbudget im Menü anzeigen
-          </label>
-          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
-            Wenn deaktiviert, werden die Menüpunkte ausgeblendet — z. B. außerhalb der Urlaubszeit. Die Daten bleiben erhalten.
-          </p>
-        </div>
+      {/* Menü */}
+      {isAdmin && (
+        <Section icon={Eye} color={ORANGE} title="Menü & Sichtbarkeit" subtitle="Gilt global für alle Nutzer">
+          <div style={{ margin: '-0.4rem 0' }}>
+            <Toggle checked={settings.showTasks} onChange={value => updateSettings({ showTasks: value })} label="Aufgaben" hint="Im Menü anzeigen" />
+            <div style={{ height: '1px', background: 'var(--color-border)' }} />
+            <Toggle checked={settings.showPacklist} onChange={value => updateSettings({ showPacklist: value })} label="Packliste" hint="Im Menü anzeigen" />
+            <div style={{ height: '1px', background: 'var(--color-border)' }} />
+            <Toggle checked={settings.showHolidayBudget} onChange={value => updateSettings({ showHolidayBudget: value })} label="Urlaubsbudget" hint="Im Menü anzeigen" />
+          </div>
+          <p style={noteStyle}>Deaktivierte Bereiche werden im Menü ausgeblendet – z. B. außerhalb der Urlaubszeit. Die Daten bleiben erhalten.</p>
+        </Section>
       )}
 
-      {(user?.isAdmin || user?.id === 'Falko') && (
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
-            <CheckSquare size={20} /> Sichtbarkeit
-          </h3>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
-            <input
-              type="checkbox"
-              checked={settings.showTasks}
-              onChange={e => updateSettings({ showTasks: e.target.checked })}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
-            />
-            <CheckSquare size={16} /> Aufgaben im Menü anzeigen
-          </label>
-          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
-            Gilt global für alle Nutzer — ideal für Bereiche, die kaum genutzt werden. Die Daten bleiben erhalten.
-          </p>
-        </div>
-      )}
-
-      {(user?.isAdmin || user?.id === 'Falko') && (
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
-            <Users size={20} /> Nutzerverwaltung
-          </h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-            {dbUsers.map(u => {
-                return (
-              <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: '32px', height: '32px', borderRadius: '50%',
-                    background: u.avatarColor || '#6366f1',
-                    flexShrink: 0, overflow: 'hidden',
-                  }}><AvatarEmoji emoji={u.avatar} size={32} /></span>
-                  <strong>{u.id}</strong>
-                  {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: '#B8BAC2' }}>(Admin)</span>}
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+      {/* Nutzer */}
+      {isAdmin && (
+        <Section icon={Users} color={BLUE} title="Nutzerverwaltung" subtitle={`${dbUsers.length} Nutzer`}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {dbUsers.map(u => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0', borderTop: '1px solid var(--color-border)' }}>
+                <span style={{
+                  width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: u.avatarColor || '#6366f1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <AvatarEmoji emoji={u.avatar} size={40} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800, overflowWrap: 'anywhere' }}>{u.id}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                    {(u.isAdmin || u.id === 'Falko') ? 'Administrator' : u.isChild ? 'Kind' : 'Erwachsener'}
+                  </div>
                   {u.id !== user!.id && u.id !== 'Falko' && !u.isAdmin && (
-                    <button 
-                      onClick={() => handleToggleChild(u)} 
-                      className="btn" 
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    <button
+                      onClick={() => handleToggleChild(u)}
+                      style={{ marginTop: '0.4rem', height: '28px', padding: '0 0.7rem', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: '#ECE8FF', color: '#3F34C4', fontSize: '11px', fontWeight: 800, whiteSpace: 'nowrap' }}
                     >
-                      {u.isChild ? 'Erwachsene' : 'Kind'}
-                    </button>
-                  )}
-                  {u.id !== user!.id && (
-                    <button onClick={() => handleDeleteUser(u.id)} style={{ color: 'var(--color-danger)', border: 'none', background: 'none', cursor: 'pointer', display: 'flex' }}>
-                      <Trash2 size={18} />
+                      {u.isChild ? 'Zu Erwachsener ändern' : 'Zu Kind ändern'}
                     </button>
                   )}
                 </div>
+                {u.id !== user!.id && (
+                  <button
+                    onClick={() => handleDeleteUser(u.id)}
+                    aria-label={`${u.id} löschen`}
+                    style={{ width: '34px', height: '34px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#FDE8EF', color: PINK_TEXT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
-                );
-            })}
+            ))}
           </div>
 
-          <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Neuen Nutzer anlegen</h4>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input 
-                type="text" 
-                value={newUserId}
-                onChange={e => setNewUserId(e.target.value)}
-                className="input-field" 
-                placeholder="Anzeigename (z.B. Anna)" 
-                required 
-              />
-              <input 
-                type="email" 
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                className="input-field" 
-                placeholder="E-Mail Adresse" 
-                required 
-              />
-              <input 
-                type="password" 
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                className="input-field" 
-                placeholder="Initiales Passwort (min. 6 Zeichen)" 
-                required 
-              />
-            </div>
+          {lastCreatedUser && message(`Profil ${lastCreatedUser.id} angelegt – der Nutzer kann sich nun mit seiner E-Mail anmelden.`, 'success')}
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
-              <input 
-                type="checkbox" 
-                checked={newUserIsChild} 
-                onChange={e => setNewUserIsChild(e.target.checked)} 
-              />
-              Als Kinderaccount anlegen
-            </label>
-
-            {createError && (
-              <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-sm)' }}>{createError}</p>
-            )}
-
-            <button type="submit" className="btn btn-primary" disabled={isCreating} style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-              {isCreating ? 'Wird erstellt...' : <><Plus size={20} /> Nutzer Account erstellen</>}
-            </button>
-
-            {lastCreatedUser && (
-              <div style={{ padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-success)', fontSize: 'var(--font-sm)', lineHeight: 1.5 }}>
-                Profil <strong>{lastCreatedUser.id}</strong> erfolgreich angelegt!<br/>
-                Der Nutzer kann sich nun mit seiner E-Mail anmelden.
-              </div>
-            )}
-          </form>
-        </div>
+          <button onClick={() => { setCreateError(''); setShowCreate(true); }} style={{ ...softBtn, marginTop: '1rem' }}>
+            <Plus size={18} /> Neuen Nutzer anlegen
+          </button>
+        </Section>
       )}
 
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Konto-Profileinstellungen</h4>
-          
+      {/* Konto */}
+      <Section icon={KeyRound} color={GREEN} title="Mein Konto" subtitle="Startseite und Passwort">
+        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
           {!user?.isChild && (
-            <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-                Bevorzugte Startseite beim Öffnen
-              </label>
-              <select 
-                value={user?.defaultPath || '/'} 
+            <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
+              <label style={fieldLabel}>Startseite beim Öffnen</label>
+              <select
+                value={user?.defaultPath || '/'}
                 onChange={(e) => {
                   if (user) {
                     mockDb.updateUser({ ...user, defaultPath: e.target.value });
                   }
-                }} 
+                }}
                 className="input-field"
+                style={{ width: '100%' }}
               >
                 {navItems.map(item => (
                   <option key={item.to} value={item.to}>
@@ -478,240 +510,179 @@ export const Setup = () => {
                   </option>
                 ))}
               </select>
-
-              <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.4rem' }}>
-                Wähle aus, auf welcher Seite du nach dem Login landen möchtest.
-              </p>
+              <p style={noteStyle}>Wähle aus, auf welcher Seite du nach dem Login landen möchtest.</p>
             </div>
           )}
 
-          <h4 style={{ color: 'var(--color-text)', fontSize: '1rem' }}>Passwort ändern</h4>
-          
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-              Aktuelles Passwort (zur Bestätigung)
-            </label>
-            <input 
-              type="password" 
-              value={changePwOld}
-              onChange={e => setChangePwOld(e.target.value)}
-              className="input-field" 
-              required 
-            />
-          </div>
+          <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>Passwort ändern</div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-              Neues Passwort
-            </label>
-            <input 
-              type="password" 
-              value={changePwNew}
-              onChange={e => setChangePwNew(e.target.value)}
-              className="input-field" 
-              required 
-            />
+            <label style={fieldLabel}>Aktuelles Passwort</label>
+            <input type="password" value={changePwOld} onChange={e => setChangePwOld(e.target.value)} className="input-field" style={{ width: '100%' }} required />
           </div>
-
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-              Neues Passwort bestätigen
-            </label>
-            <input 
-              type="password" 
-              value={changePwConfirm}
-              onChange={e => setChangePwConfirm(e.target.value)}
-              className="input-field" 
-              required 
-            />
+            <label style={fieldLabel}>Neues Passwort</label>
+            <input type="password" value={changePwNew} onChange={e => setChangePwNew(e.target.value)} className="input-field" style={{ width: '100%' }} required />
+          </div>
+          <div>
+            <label style={fieldLabel}>Neues Passwort bestätigen</label>
+            <input type="password" value={changePwConfirm} onChange={e => setChangePwConfirm(e.target.value)} className="input-field" style={{ width: '100%' }} required />
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={isChangingPw} style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
-            {isChangingPw ? 'Wird aktualisiert...' : 'Passwort in Firebase aktualisieren'}
+          <button type="submit" disabled={isChangingPw} style={{ ...primaryBtn, opacity: isChangingPw ? 0.7 : 1 }}>
+            <Check size={18} /> {isChangingPw ? 'Wird aktualisiert...' : 'Passwort aktualisieren'}
           </button>
         </form>
-      </div>
+      </Section>
 
-      {(user?.isAdmin || user?.id === 'Falko') && (
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
-            <Database size={20} /> System & Backup
-          </h3>
-
-          {/* Google Drive Verbindung */}
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', marginBottom: '0.75rem', color: 'var(--color-text)' }}>
-              <HardDrive size={18} /> Google Drive Backup
-            </h4>
-
-            {!driveConnected ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>
-                    Google OAuth 2.0 Client ID
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={googleClientId}
-                      onChange={e => setGoogleClientIdLocal(e.target.value)}
-                      placeholder="123456789-xxx.apps.googleusercontent.com"
-                      style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                    />
-                    <button onClick={handleSaveClientId} className="btn btn-secondary" style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      Speichern
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                    Erstelle eine OAuth 2.0 Client ID in der Google Cloud Console (Webanwendung). Authorized origins: http://localhost:5173
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleConnectDrive}
-                  disabled={!googleClientId.trim() || isConnectingDrive}
-                  className="btn btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: !googleClientId.trim() ? 0.5 : 1 }}
-                >
-                  <Cloud size={18} /> {isConnectingDrive ? 'Verbinde...' : 'Mit Google Drive verbinden'}
-                </button>
-              </div>
-            ) : (
+      {/* Backup */}
+      {isAdmin && (
+        <Section icon={Database} color={LILAC} title="System & Backup" subtitle="Google Drive">
+          {!driveConnected ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               <div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.6rem 0.75rem',
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  marginBottom: '0.75rem',
-                }}>
-                  <Cloud size={18} color="var(--color-success)" />
-                  <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-success)' }}>Google Drive verbunden</span>
-                  <button onClick={handleDisconnectDrive} style={{ marginLeft: 'auto', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}>
-                    <CloudOff size={14} /> Trennen
+                <label style={fieldLabel}>Google OAuth 2.0 Client ID</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={googleClientId}
+                    onChange={e => setGoogleClientIdLocal(e.target.value)}
+                    placeholder="123456789-xxx.apps.googleusercontent.com"
+                    style={{ flex: 1, minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
+                  />
+                  <button onClick={handleSaveClientId} style={{ height: '44px', padding: '0 1rem', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: '#ECE8FF', color: '#3F34C4', fontSize: 'var(--font-sm)', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                    Speichern
                   </button>
                 </div>
-
-                {lastBackup && (
-                  <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-                    Letztes Backup: {new Date(lastBackup.timestamp).toLocaleString('de-DE')}
-                    {isBackupDue() && <span style={{ color: 'var(--color-primary)', marginLeft: '0.5rem' }}>– Neues Backup fällig</span>}
-                  </p>
-                )}
-
-                <button
-                  onClick={handleManualBackup}
-                  disabled={isRunningBackup}
-                  className="btn btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                >
-                  <RotateCw size={16} style={isRunningBackup ? { animation: 'spin 1s linear infinite' } : {}} />
-                  {isRunningBackup ? 'Läuft...' : 'Jetzt Backup durchführen'}
+                <p style={noteStyle}>Erstelle eine OAuth 2.0 Client ID in der Google Cloud Console (Webanwendung). Authorized origins: http://localhost:5173</p>
+              </div>
+              <button
+                onClick={handleConnectDrive}
+                disabled={!googleClientId.trim() || isConnectingDrive}
+                style={{ ...primaryBtn, opacity: !googleClientId.trim() ? 0.5 : 1 }}
+              >
+                <Cloud size={18} /> {isConnectingDrive ? 'Verbinde...' : 'Mit Google Drive verbinden'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.85rem', borderRadius: 'var(--radius-lg)', background: '#E3F6EF' }}>
+                <HardDrive size={18} color={GREEN_TEXT} />
+                <span style={{ flex: 1, fontSize: 'var(--font-sm)', fontWeight: 800, color: GREEN_TEXT }}>Google Drive verbunden</span>
+                <button onClick={handleDisconnectDrive} style={{ border: 'none', background: 'none', cursor: 'pointer', color: PINK_TEXT, display: 'flex', alignItems: 'center', gap: '0.25rem', fontFamily: 'inherit', fontSize: 'var(--font-xs)', fontWeight: 800 }}>
+                  <CloudOff size={14} /> Trennen
                 </button>
               </div>
-            )}
 
-            {driveError && (
-              <p style={{ color: 'var(--color-danger)', fontSize: '0.75rem', marginTop: '0.5rem' }}>{driveError}</p>
-            )}
-            {driveSuccess && (
-              <p style={{ color: 'var(--color-success)', fontSize: '0.75rem', marginTop: '0.5rem' }}>{driveSuccess}</p>
-            )}
-          </div>
+              {lastBackup && (
+                <p style={{ margin: 0, fontSize: 'var(--font-xs)', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                  Letztes Backup: {new Date(lastBackup.timestamp).toLocaleString('de-DE')}
+                  {isBackupDue() && <span style={{ color: '#3F34C4', fontWeight: 800, marginLeft: '0.4rem' }}>– Neues Backup fällig</span>}
+                </p>
+              )}
 
-          {/* Restore aus Google Drive */}
-          <div>
-            <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: 'var(--color-text)' }}>Backup wiederherstellen</h4>
-            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', margin: '0 0 0.75rem 0' }}>
-              Wähle eines der letzten 5 Backups aus Google Drive zum Wiederherstellen aus.
-            </p>
+              <button onClick={handleManualBackup} disabled={isRunningBackup} style={{ ...primaryBtn, opacity: isRunningBackup ? 0.7 : 1 }}>
+                <RotateCw size={18} style={isRunningBackup ? { animation: 'spin 1s linear infinite' } : {}} />
+                {isRunningBackup ? 'Läuft...' : 'Jetzt Backup durchführen'}
+              </button>
+            </div>
+          )}
 
-            <button
-              onClick={handleOpenRestore}
-              disabled={!driveConnected}
-              className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', width: '100%', opacity: driveConnected ? 1 : 0.5 }}
-            >
-              <Database size={18} /> {driveConnected ? 'Backup aus Google Drive wiederherstellen' : 'Nicht mit Drive verbunden'}
+          {driveError && message(driveError, 'error')}
+          {driveSuccess && message(driveSuccess, 'success')}
+
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.1rem', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>Backup wiederherstellen</div>
+            <p style={{ ...noteStyle, marginTop: '0.2rem', marginBottom: '0.75rem' }}>Wähle eines der letzten 5 Backups aus Google Drive zum Wiederherstellen aus.</p>
+            <button onClick={handleOpenRestore} disabled={!driveConnected} style={{ ...softBtn, opacity: driveConnected ? 1 : 0.5 }}>
+              <Database size={17} /> {driveConnected ? 'Aus Google Drive wiederherstellen' : 'Nicht mit Drive verbunden'}
             </button>
-
-            {/* Restore Dialog */}
-            {showRestoreDialog && (
-              <div style={{
-                position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
-                alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000
-              }} onClick={() => setShowRestoreDialog(false)}>
-                <div style={{
-                  backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
-                  width: '100%', maxWidth: '500px', maxHeight: '70vh', overflow: 'auto', padding: '1.5rem'
-                }} onClick={e => e.stopPropagation()}>
-                  <h4 style={{ color: 'var(--color-text)', marginBottom: '1rem' }}>Backup auswählen</h4>
-
-                  {isLoadingBackups ? (
-                    <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem' }}>
-                      <RotateCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> Backups werden geladen...
-                    </p>
-                  ) : restoreError ? (
-                    <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{restoreError}</p>
-                  ) : driveBackups.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem' }}>
-                      Keine Backups in Google Drive gefunden.
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {driveBackups.map(backup => (
-                        <button
-                          key={backup.id}
-                          onClick={() => handleRestoreBackup(backup.id, backup.name)}
-                          disabled={isRestoring}
-                          className="btn btn-secondary"
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '0.75rem 1rem', textAlign: 'left', width: '100%',
-                            opacity: isRestoring ? 0.5 : 1
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--color-text)' }}>{backup.name}</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
-                              {new Date(backup.createdTime).toLocaleString('de-DE')}
-                            </div>
-                          </div>
-                          {isRestoring && <RotateCw size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => setShowRestoreDialog(false)}
-                    className="btn"
-                    style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', backgroundColor: 'var(--color-surface-hover)' }}
-                  >
-                    Abbrechen
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        </Section>
       )}
+
+      <button
+        onClick={logout}
+        style={{
+          width: '100%', height: '50px', borderRadius: '999px', border: `1.5px solid ${PINK}`, cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          background: 'var(--color-surface)', color: PINK_TEXT, fontSize: 'var(--font-base)', fontWeight: 800,
+        }}
+      >
+        <LogOut size={19} /> Abmelden ({user?.id})
+      </button>
+
+      {/* Sheet: Nutzer anlegen */}
+      {showCreate && sheetShell(() => setShowCreate(false), (
+        <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {sheetHeader('Neuen Nutzer anlegen', () => setShowCreate(false))}
+          <div>
+            <label style={fieldLabel}>Anzeigename</label>
+            <input type="text" value={newUserId} onChange={e => setNewUserId(e.target.value)} className="input-field" style={{ width: '100%' }} placeholder="z. B. Anna" required />
+          </div>
+          <div>
+            <label style={fieldLabel}>E-Mail-Adresse</label>
+            <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="input-field" style={{ width: '100%' }} placeholder="anna@example.com" required />
+          </div>
+          <div>
+            <label style={fieldLabel}>Initiales Passwort</label>
+            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="input-field" style={{ width: '100%' }} placeholder="min. 6 Zeichen" required />
+          </div>
+          <Toggle checked={newUserIsChild} onChange={setNewUserIsChild} label="Als Kinderaccount anlegen" hint="Kinder sehen nur ausgewählte Bereiche" />
+          {createError && message(createError, 'error')}
+          <button type="submit" disabled={isCreating} style={{ ...primaryBtn, opacity: isCreating ? 0.7 : 1 }}>
+            {isCreating ? 'Wird erstellt...' : <><Plus size={18} /> Nutzer erstellen</>}
+          </button>
+        </form>
+      ))}
+
+      {/* Sheet: Restore */}
+      {showRestoreDialog && sheetShell(() => setShowRestoreDialog(false), (
+        <>
+          {sheetHeader('Backup auswählen', () => setShowRestoreDialog(false))}
+          {isLoadingBackups ? (
+            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem 0', margin: 0, fontWeight: 700 }}>
+              <RotateCw size={20} style={{ animation: 'spin 1s linear infinite', verticalAlign: '-4px' }} /> Backups werden geladen...
+            </p>
+          ) : restoreError ? (
+            message(restoreError, 'error')
+          ) : driveBackups.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem 0', margin: 0 }}>Keine Backups in Google Drive gefunden.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {driveBackups.map(backup => (
+                <button
+                  key={backup.id}
+                  onClick={() => handleRestoreBackup(backup.id, backup.name)}
+                  disabled={isRestoring}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.8rem 0.9rem', width: '100%', textAlign: 'left',
+                    borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    background: 'var(--color-surface-hover)', color: 'var(--color-text)', opacity: isRestoring ? 0.5 : 1,
+                  }}
+                >
+                  <span style={iconChip(LILAC, 36)}><Database size={17} /></span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 'var(--font-sm)', fontWeight: 700, overflowWrap: 'anywhere' }}>{backup.name}</span>
+                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{new Date(backup.createdTime).toLocaleString('de-DE')}</span>
+                  </span>
+                  {isRestoring && <RotateCw size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ))}
 
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes setupFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes setupSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
-
-      <button onClick={logout} className="btn" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
-        <LogOut size={20} /> Abmelden ({user?.id})
-      </button>
-
     </div>
   );
 };
