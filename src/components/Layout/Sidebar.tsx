@@ -18,7 +18,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { settings } = useSettings();
   const [showChangelog, setShowChangelog] = useState(false);
 
-  const navItems = getNavItems(user, settings.showPacklist, settings.showHolidayBudget, settings.showTasks);
+  const navItems = getNavItems(user, settings.showPacklist, settings.showHolidayBudget);
   const recentChangelog = getRecentChangelog(2);
 
   const groupOf = (to: string) =>

@@ -431,8 +431,6 @@ export const Setup = () => {
       {isAdmin && (
         <Section icon={Eye} color={ORANGE} title="Menü & Sichtbarkeit" subtitle="Gilt global für alle Nutzer">
           <div style={{ margin: '-0.4rem 0' }}>
-            <Toggle checked={settings.showTasks} onChange={value => updateSettings({ showTasks: value })} label="Aufgaben" hint="Im Menü anzeigen" />
-            <div style={{ height: '1px', background: 'var(--color-border)' }} />
             <Toggle checked={settings.showPacklist} onChange={value => updateSettings({ showPacklist: value })} label="Packliste" hint="Im Menü anzeigen" />
             <div style={{ height: '1px', background: 'var(--color-border)' }} />
             <Toggle checked={settings.showHolidayBudget} onChange={value => updateSettings({ showHolidayBudget: value })} label="Urlaubsbudget" hint="Im Menü anzeigen" />

@@ -65,7 +65,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
 
   if (!user) return null;
 
-  const pageTitle = getNavItems(user, true, true, true).find(i => i.to === location.pathname && i.to !== '/')?.label || 'Family Hub';
+  const pageTitle = getNavItems(user, true, true).find(i => i.to === location.pathname && i.to !== '/')?.label || 'Family Hub';
 
   const handleSaveProfile = () => {
     if (!editName.trim()) return;

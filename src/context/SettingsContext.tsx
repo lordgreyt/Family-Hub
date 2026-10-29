@@ -8,7 +8,6 @@ interface AppSettings {
   prioPoints: Record<number, number>;
   showPacklist: boolean;
   showHolidayBudget: boolean;
-  showTasks: boolean;
 }
 
 interface SettingsContextType {
@@ -21,7 +20,6 @@ const defaultSettings: AppSettings = {
   prioPoints: { 1: 5, 2: 10, 3: 15 },
   showPacklist: true,
   showHolidayBudget: true,
-  showTasks: true,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
