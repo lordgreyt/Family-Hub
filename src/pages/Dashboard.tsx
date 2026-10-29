@@ -51,7 +51,8 @@ const sectionHeader = (icon: React.ReactNode, color: string, title: string, righ
 );
 
 const TASKS_PREVIEW = 6;
-const EVENTS_LIMIT = 5;
+const EVENTS_LIMIT = 50;
+const EVENTS_PER_PAGE = 5;
 
 export const Dashboard = () => {
   const { user } = useAuth();
@@ -63,6 +64,7 @@ export const Dashboard = () => {
   const [expenseStats, setExpenseStats] = useState({ total: 0, topCategory: '' });
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [showAllTasks, setShowAllTasks] = useState(false);
+  const [eventPage, setEventPage] = useState(0);
 
   useEffect(() => {
     const loadData = () => {
@@ -140,6 +142,9 @@ export const Dashboard = () => {
   );
   const visibleTasks = showAllTasks ? filteredTasks : filteredTasks.slice(0, TASKS_PREVIEW);
   const now = Date.now();
+  const eventPageCount = Math.max(1, Math.ceil(events.length / EVENTS_PER_PAGE));
+  const currentEventPage = Math.min(eventPage, eventPageCount - 1);
+  const visibleEvents = events.slice(currentEventPage * EVENTS_PER_PAGE, (currentEventPage + 1) * EVENTS_PER_PAGE);
 
   const moreButton = (open: boolean, hidden: number, onClick: () => void) => (
     <button
@@ -201,23 +206,6 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Ausgaben diesen Monat — nur für Eltern */}
-      {user && !isChild && (
-        <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem' }}>
-          <span style={iconChip(PINK, 42)}><Wallet size={20} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>AUSGABEN DIESEN MONAT</div>
-            <div style={{ fontSize: 'var(--font-xl)', fontWeight: 800, lineHeight: 1.25, whiteSpace: 'nowrap' }}>
-              {expenseStats.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-            </div>
-            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Top: {expenseStats.topCategory}
-            </div>
-          </div>
-          <Link to="/expenses" aria-label="Ausgaben öffnen" style={{ ...softLink, width: '36px', height: '36px', padding: 0, justifyContent: 'center' }}><ChevronRight size={18} /></Link>
-        </div>
-      )}
-
       {/* Letzte Ereignisse */}
       <div style={CARD}>
         {sectionHeader(<History size={18} />, GREEN_TEXT, 'Letzte Ereignisse')}
@@ -226,7 +214,7 @@ export const Dashboard = () => {
             Noch keine Aktivität – sobald etwas eingetragen wird, erscheint es hier.
           </div>
         ) : (
-          events.map(ev => {
+          visibleEvents.map(ev => {
             const { icon: Icon, color } = KIND_STYLE[ev.kind];
             const who = ev.userId ? users.find(u => u.id === ev.userId) : undefined;
             return (
@@ -258,6 +246,33 @@ export const Dashboard = () => {
               </Link>
             );
           })
+        )}
+        {eventPageCount > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
+            {([-1, 1] as const).map(dir => {
+              const disabled = dir === -1 ? currentEventPage === 0 : currentEventPage >= eventPageCount - 1;
+              return (
+                <button
+                  key={dir}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setEventPage(currentEventPage + dir)}
+                  aria-label={dir === -1 ? 'Vorherige Seite' : 'Nächste Seite'}
+                  style={{
+                    order: dir === -1 ? 0 : 2, width: '40px', height: '40px', borderRadius: '50%', border: 'none', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
+                    cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1,
+                    background: '#ECE8FF', color: PRIMARY,
+                  }}
+                >
+                  <ChevronRight size={20} style={{ transform: dir === -1 ? 'rotate(180deg)' : 'none' }} />
+                </button>
+              );
+            })}
+            <span style={{ order: 1, fontSize: 'var(--font-xs)', fontWeight: 800, color: 'var(--color-text-muted)' }}>
+              Seite {currentEventPage + 1} von {eventPageCount}
+            </span>
+          </div>
         )}
       </div>
 
