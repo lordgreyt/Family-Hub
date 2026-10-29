@@ -3,16 +3,6 @@ import { Check, CircleDashed } from 'lucide-react';
 import type { TaskItem, User } from '../services/mockDb';
 import { AvatarEmoji } from './AvatarEmoji';
 
-export interface NeonCardStyle {
-  color1: string;
-  color2: string;
-  backgroundImage: string;
-  backgroundOrigin: 'border-box';
-  backgroundClip: string;
-  border: string;
-  boxShadow: string;
-}
-
 interface TaskCardProps {
   task: TaskItem;
   /** All users this task is assigned to (for stacked avatar display). Falls back to creator if empty. */
@@ -21,14 +11,6 @@ interface TaskCardProps {
   showToggle?: boolean;
   /** Whether the user can toggle */
   canToggle?: boolean;
-  /** Neon border color for the card outline */
-  neonBorder?: string;
-  /** Neon box-shadow for multi-color glow */
-  neonShadow?: string;
-  /** Neon background gradient for directional glow */
-  neonBg?: string;
-  /** Gradient-border neon card style (takes precedence over individual neon props) */
-  neonCardStyle?: NeonCardStyle;
   onToggle?: (task: TaskItem) => void;
   onEdit?: (task: TaskItem) => void;
   onDelete?: (task: TaskItem) => void;
@@ -41,10 +23,6 @@ export const TaskCard = ({
   assignees,
   showToggle = false,
   canToggle = false,
-  neonBorder,
-  neonShadow,
-  neonBg,
-  neonCardStyle,
   onToggle,
   onEdit,
   onDelete,
@@ -212,19 +190,9 @@ export const TaskCard = ({
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           opacity: task.isDone ? 0.6 : 1,
           userSelect: 'none',
-          // Gradient-border neon card style (new)
-          ...(neonCardStyle ? {
-            backgroundImage: neonCardStyle.backgroundImage,
-            backgroundOrigin: neonCardStyle.backgroundOrigin,
-            backgroundClip: neonCardStyle.backgroundClip,
-            border: neonCardStyle.border,
-            boxShadow: neonCardStyle.boxShadow,
-          } : {
-            // Legacy neon props
-            background: neonBg || 'var(--color-surface)',
-            boxShadow: neonShadow || 'var(--shadow-md)',
-            border: neonBorder ? `1px solid ${neonBorder}` : '1px solid var(--color-border)',
-          }),
+          background: 'var(--color-surface)',
+          boxShadow: 'var(--shadow-md)',
+          border: '1px solid var(--color-border)',
         }}
       >
         {/* Left: Stacked user avatars */}
@@ -248,7 +216,6 @@ export const TaskCard = ({
                 marginLeft: i > 0 ? '-10px' : 0,
                 border: assignees.length > 1 ? '2px solid var(--color-surface)' : 'none',
                 zIndex: assignees.length - i,
-                boxShadow: neonBorder ? `0 0 8px ${neonBorder}66, 0 0 18px ${neonBorder}22` : 'none',
               }}>
                 {u.avatar ? (
                   <AvatarEmoji emoji={u.avatar} size={assignees.length === 1 ? 42 : 28} />

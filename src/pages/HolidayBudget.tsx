@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { HolidayBudgetData, HolidayBudgetEntry } from '../services/mockDb';
-import { getNeonCardStyle } from '../utils/neon';
 import { Plus, X, RotateCcw, Euro, Settings2, Save, Pencil, CalendarDays, ChevronDown } from 'lucide-react';
 
 // ─── Datums-Helfer ───
@@ -226,7 +224,6 @@ const EntryModal = ({ initialDate, editing, onSave, onClose }: EntryModalProps) 
 // ─── Hauptseite ───
 export const HolidayBudget = () => {
   const { user } = useAuth();
-  const { settings: appSettings } = useSettings();
   const [data, setData] = useState<HolidayBudgetData>(EMPTY);
   const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -285,7 +282,6 @@ export const HolidayBudget = () => {
   if (!user || user.isChild || !dataLoaded) return null;
 
   const { settings, entries } = data;
-  const isNeon = appSettings.designMode === 'neon';
 
   // ── Berechnungen ──
   const totalBudget = settings.days * settings.dailyGoal;
@@ -485,7 +481,6 @@ export const HolidayBudget = () => {
               const daySpent = dayEntries.reduce((s, e) => s + e.amount, 0);
               const isToday = sameDay(day, today);
               const col = ampel(daySpent, settings.dailyGoal);
-              const ncs = isNeon ? getNeonCardStyle(dateStr) : undefined;
               const dayPct = settings.dailyGoal > 0 ? Math.min(100, (daySpent / settings.dailyGoal) * 100) : 0;
 
               return (
@@ -496,13 +491,6 @@ export const HolidayBudget = () => {
                     borderRadius: 'var(--radius-md)',
                     border: isToday ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                     backgroundColor: isToday ? 'var(--color-primary-transparent)' : 'var(--color-surface)',
-                    ...(isNeon && ncs && !isToday ? {
-                      backgroundImage: ncs.backgroundImage,
-                      backgroundOrigin: ncs.backgroundOrigin as any,
-                      backgroundClip: ncs.backgroundClip,
-                      border: ncs.border,
-                      boxShadow: ncs.boxShadow,
-                    } : {}),
                   }}
                 >
                   {/* Tageskopf */}

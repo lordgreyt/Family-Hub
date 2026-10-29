@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
+import { BottomBarSlotContext } from './PageBottomBar';
 import { NotificationManager } from '../NotificationManager';
 import { UpdateNotification } from '../UpdateNotification';
 import { RequestPopup } from '../RequestPopup';
@@ -12,6 +13,7 @@ export const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [bottomSlot, setBottomSlot] = useState<HTMLDivElement | null>(null);
   const redirectionPerformed = useRef(false);
 
   useEffect(() => {
@@ -53,10 +55,17 @@ export const MainLayout = () => {
   return (
     <>
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <TopBar onMenuClick={() => setIsSidebarOpen(true)} />
-      <main className="app-content">
-        <Outlet />
-      </main>
+      <div className="app-shell">
+        <BottomBarSlotContext.Provider value={bottomSlot}>
+          <TopBar onMenuClick={() => setIsSidebarOpen(true)} />
+          <div className="app-layer">
+            <main className="app-content">
+              <Outlet />
+            </main>
+          </div>
+        </BottomBarSlotContext.Provider>
+        <div ref={setBottomSlot} className="bottom-slot" />
+      </div>
       <NotificationManager />
       <UpdateNotification />
       <RequestPopup />

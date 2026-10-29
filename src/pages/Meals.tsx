@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { MealTemplate, MealPlanItem, User } from '../services/mockDb';
 import { Plus, Check, X, Calendar, Utensils, Trash2 } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { getNeonColor } from '../utils/neon';
 
 export const Meals = () => {
   const { user } = useAuth();
-  const { settings } = useSettings();
 
   const [templates, setTemplates] = useState<MealTemplate[]>([]);
   const [planItems, setPlanItems] = useState<MealPlanItem[]>([]);
@@ -32,12 +29,12 @@ export const Meals = () => {
     const load = () => {
       setTemplates(mockDb.getMealTemplates());
       setPlanItems(mockDb.getMealPlanItems());
-      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+      setUsers(mockDb.getUsers());
     };
     load();
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, [settings.designMode]);
+  }, []);
 
   const isChild = user?.isChild || false;
 
@@ -167,7 +164,7 @@ export const Meals = () => {
               return (
                 <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                   <div>
-                    <strong>{reqUser && (() => { const rg = getNeonColor(reqUser.id); const rn = settings.designMode === 'neon'; return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden', boxShadow: rn ? `0 0 6px ${rg.color}88, 0 0 14px ${rg.color2}44` : 'none' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>; })()} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
+                    <strong>{reqUser && (() => { return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: reqUser.avatarColor || '#6366f1', marginRight: '0.2rem', verticalAlign: 'middle', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={22} /></span>; })()} {reqUser?.id}</strong> wünscht sich <span style={{ fontSize: '1.2rem' }}>{template.emoji}</span> <strong>{template.title}</strong> am {getDayName(d)}.
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => handleDeleteItem(req.id)} className="btn btn-secondary" style={{ padding: '0.5rem', color: 'var(--color-danger)' }}>
@@ -369,8 +366,6 @@ export const Meals = () => {
 
             if (dayItems.length === 0) {
               return (() => {
-                const nGlow = getNeonColor(dateStr);
-                const isNeon = settings.designMode === 'neon';
                 return (
                 <div
                   key={dateStr}
@@ -379,10 +374,10 @@ export const Meals = () => {
                     alignItems: 'center',
                     gap: '0.65rem',
                     padding: '0.75rem 0.85rem',
-                    background: isNeon ? nGlow.background : 'var(--color-surface)',
+                    background: 'var(--color-surface)',
                     borderRadius: 'var(--radius-lg)',
-                    boxShadow: isNeon ? nGlow.boxShadow : 'var(--shadow-md)',
-                    border: isNeon ? `1px solid ${nGlow.borderColor}33` : '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)',
+                    border: '1px solid var(--color-border)',
                   }}
                 >
                   <span style={{
@@ -433,8 +428,6 @@ export const Meals = () => {
               if (!template) return null;
 
               return (() => {
-                const nGlow = getNeonColor(item.id);
-                const isNeon = settings.designMode === 'neon';
                 return (
                 <div
                   key={item.id}
@@ -443,10 +436,10 @@ export const Meals = () => {
                     alignItems: 'center',
                     gap: '0.65rem',
                     padding: '0.75rem 0.85rem',
-                    background: isNeon ? nGlow.background : 'var(--color-surface)',
+                    background: 'var(--color-surface)',
                     borderRadius: 'var(--radius-lg)',
-                    boxShadow: isNeon ? nGlow.boxShadow : 'var(--shadow-md)',
-                    border: isNeon ? `1px solid ${nGlow.borderColor}33` : '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)',
+                    border: '1px solid var(--color-border)',
                     opacity: isPending ? 0.55 : 1,
                   }}
                 >
@@ -462,7 +455,6 @@ export const Meals = () => {
                     flexShrink: 0,
                     border: isPending ? '1.5px dashed var(--color-border)' : 'none',
                     overflow: 'hidden',
-                    boxShadow: isNeon && !isPending ? `0 0 10px ${nGlow.color}88, 0 0 22px ${nGlow.color2}44` : 'none',
                   }}>
                     <AvatarEmoji emoji={template.emoji} size={42} />
                   </span>
@@ -479,7 +471,7 @@ export const Meals = () => {
                     </span>
                     {isPending && (
                       <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        Anfrage von {reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', background: reqUser.avatarColor || '#6366f1', overflow: 'hidden', boxShadow: isNeon ? `0 0 5px ${nGlow.color}88, 0 0 10px ${nGlow.color2}44` : 'none' }}><AvatarEmoji emoji={reqUser.avatar} size={14} /></span>}
+                        Anfrage von {reqUser && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', background: reqUser.avatarColor || '#6366f1', overflow: 'hidden' }}><AvatarEmoji emoji={reqUser.avatar} size={14} /></span>}
                       </span>
                     )}
                   </div>

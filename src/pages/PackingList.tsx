@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { PackCategory, PackItem, PacklistData } from '../services/mockDb';
-import { getNeonColor, getNeonCardStyle } from '../utils/neon';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { Plus, X, Trash2, RotateCcw, Luggage, List, LayoutGrid } from 'lucide-react';
 
@@ -201,7 +199,6 @@ const CategoryModal = ({ value, onChange, onSave, onClose }: CategoryModalProps)
 // ─── Hauptseite ───
 export const PackingList = () => {
   const { user } = useAuth();
-  const { settings } = useSettings();
   const [data, setData] = useState<PacklistData>(EMPTY);
   const [users, setUsers] = useState<{ id: string; avatar: string; avatarColor?: string }[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -226,20 +223,18 @@ export const PackingList = () => {
         .map(u => ({
           id: u.id,
           avatar: u.avatar,
-          avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor,
+          avatarColor: u.avatarColor,
         })));
       setDataLoaded(true);
     };
     load();
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, [user, settings.designMode]);
+  }, [user]);
 
   const people = useMemo(() => users, [users]);
 
   if (!user || user.isChild || !dataLoaded) return null;
-
-  const isNeon = settings.designMode === 'neon';
 
   // ── Mutationen ──
   const persist = (next: PacklistData) => mockDb.savePacklist(next);
@@ -508,7 +503,6 @@ export const PackingList = () => {
           const catItems = [...data.items.filter(i => i.categoryId === cat.id)].sort((a, b) => Number(a.isPacked) - Number(b.isPacked));
           const catPacked = catItems.filter(i => i.isPacked).length;
           const done = catItems.length > 0 && catPacked === catItems.length;
-          const ncs = isNeon ? getNeonCardStyle(cat.id) : undefined;
 
           return (
             <div
@@ -516,13 +510,6 @@ export const PackingList = () => {
               className="glass-panel"
               style={{
                 padding: '1rem',
-                ...(isNeon && ncs ? {
-                  backgroundImage: ncs.backgroundImage,
-                  backgroundOrigin: ncs.backgroundOrigin as any,
-                  backgroundClip: ncs.backgroundClip,
-                  border: ncs.border,
-                  boxShadow: ncs.boxShadow,
-                } : {}),
               }}
             >
               {/* Kategorie-Header */}

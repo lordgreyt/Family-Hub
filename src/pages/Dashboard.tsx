@@ -1,35 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
-import type { NoteItem, TaskItem, User, RewardRequest } from '../services/mockDb';
+import type { TaskItem, User, RewardRequest } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { Filter, Star, X, Save, Trash2, Wallet, TrendingDown } from 'lucide-react';
-import { RichTextEditor } from '../components/RichTextEditor';
+import { Filter, Star, Wallet, TrendingDown } from 'lucide-react';
 import { TaskCard } from '../components/TaskCard';
-import { getNeonColor, getNeonCardStyle } from '../utils/neon';
-
-const LONG_PRESS_MS = 500;
 
 export const Dashboard = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
-  const [recentNotes, setRecentNotes] = useState<NoteItem[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<TaskItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [rewardRequests, setRewardRequests] = useState<RewardRequest[]>([]);
   const [taskAssigneeFilter, setTaskAssigneeFilter] = useState<string>('');
-  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
-  const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
   const [expenseStats, setExpenseStats] = useState({ total: 0, topCategory: '' });
-
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadData = () => {
-      const allNotes = mockDb.getNotes().filter(note => note.isShared);
-      setRecentNotes(allNotes.slice(0, 3));
-
       const fourWeeksFromNow = new Date();
       fourWeeksFromNow.setDate(fourWeeksFromNow.getDate() + 28);
       fourWeeksFromNow.setHours(23, 59, 59, 999);
@@ -49,7 +37,7 @@ export const Dashboard = () => {
       });
 
       setUpcomingTasks(tasks);
-      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+      setUsers(mockDb.getUsers());
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
 
       try {
@@ -82,32 +70,7 @@ export const Dashboard = () => {
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
-  }, [user, settings.designMode]);
-
-  const startPress = (note: NoteItem) => {
-    pressTimer.current = setTimeout(() => {
-      setEditingNote({ ...note });
-      setExpandedNotes(prev => { const n = new Set(prev); n.delete(note.id); return n; });
-    }, LONG_PRESS_MS);
-  };
-
-  const cancelPress = () => {
-    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
-  };
-
-  const handleSaveEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingNote || !editingNote.content.trim()) return;
-    mockDb.updateNote(editingNote);
-    setEditingNote(null);
-  };
-
-  const handleDeleteNote = (id: string) => {
-    if (confirm('Notiz wirklich löschen?')) {
-      mockDb.deleteNote(id);
-      setEditingNote(null);
-    }
-  };
+  }, [user]);
 
   const handleToggleTask = (task: TaskItem) => {
     const points = settings.prioPoints[task.priority] || 0;
@@ -424,8 +387,6 @@ export const Dashboard = () => {
               Alle
             </button>
             {users.map(u => {
-                const uNeon = getNeonColor(u.id);
-                const uIsNeon = settings.designMode === 'neon';
                 return (
               <button
                 key={u.id}
@@ -441,7 +402,6 @@ export const Dashboard = () => {
                   borderRadius: '50%',
                   background: u.avatarColor || 'var(--color-primary)',
                   overflow: 'hidden',
-                  boxShadow: uIsNeon ? `0 0 6px ${uNeon.color}88, 0 0 14px ${uNeon.color2}44` : 'none',
                 }}><AvatarEmoji emoji={u.avatar} size={20} /></span>
                 {u.id}
               </button>
@@ -461,8 +421,6 @@ export const Dashboard = () => {
                 const taskAssignees = task.assignedTo?.length
                   ? users.filter(u => task.assignedTo!.includes(u.id))
                   : [];
-                const isNeon = settings.designMode === 'neon';
-                const ncs = isNeon ? getNeonCardStyle(task.id) : undefined;
                 return (
                   <TaskCard
                     key={task.id}
@@ -470,8 +428,6 @@ export const Dashboard = () => {
                     assignees={taskAssignees.length > 0 ? taskAssignees : undefined}
                     showToggle
                     canToggle={!user?.isChild}
-                    neonCardStyle={ncs}
-                    neonBorder={ncs ? ncs.color1 : undefined}
                     onToggle={handleToggleTask}
                   />
                 );
@@ -479,189 +435,6 @@ export const Dashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Letzte Notizen */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: 'var(--font-lg)', fontWeight: 700 }}>
-            Letzte Notizen
-          </h3>
-          {recentNotes.length > 0 && (
-            <a
-              href="/notes"
-              style={{
-                fontSize: 'var(--font-xs)',
-                color: 'var(--color-primary)',
-                fontWeight: 600,
-              }}
-            >
-              Alle ansehen
-            </a>
-          )}
-        </div>
-
-        {recentNotes.length === 0 ? (
-          <div className="glass-panel" style={{ padding: '2rem 1.25rem', textAlign: 'center' }}>
-            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-              Noch keine geteilten Notizen.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            {recentNotes.map(note => {
-              const author = users.find(u => u.id === note.createdBy);
-              const isExpanded = expandedNotes.has(note.id);
-
-              if (editingNote?.id === note.id) {
-                return (
-                  <form
-                    key={note.id}
-                    onSubmit={handleSaveEdit}
-                    className="glass-panel"
-                    style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '2px solid var(--color-primary)' }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Überschrift (optional)"
-                      className="input-field"
-                      style={{ fontSize: 'var(--font-sm)' }}
-                      value={editingNote.title || ''}
-                      onChange={e => setEditingNote({ ...editingNote, title: e.target.value || undefined })}
-                    />
-                    <RichTextEditor
-                      placeholder="Notiz bearbeiten..."
-                      value={editingNote.content}
-                      initialValue={editingNote.content}
-                      onChange={val => setEditingNote({ ...editingNote, content: val })}
-                    />
-                    <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: 600 }}>{author?.id || note.createdBy}</span>
-                      <span>&bull;</span>
-                      <span>{new Date(note.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <button type="button" onClick={() => setEditingNote(null)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-sm)' }}>
-                        <X size={16} /> Abbrechen
-                      </button>
-                      <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-sm)' }}>
-                        <Save size={16} /> Speichern
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteNote(note.id)}
-                      style={{
-                        color: 'var(--color-danger)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        fontSize: 'var(--font-sm)',
-                        alignSelf: 'flex-start',
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Trash2 size={16} /> Löschen
-                    </button>
-                  </form>
-                );
-              }
-
-              return (() => {
-                const isNeon = settings.designMode === 'neon';
-                const ncs = isNeon ? getNeonCardStyle(note.id) : null;
-                return (
-                <div
-                  key={note.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.65rem',
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: 'var(--radius-lg)',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    ...(ncs ? {
-                      backgroundImage: ncs.backgroundImage,
-                      backgroundOrigin: ncs.backgroundOrigin,
-                      backgroundClip: ncs.backgroundClip,
-                      border: ncs.border,
-                      boxShadow: ncs.boxShadow,
-                    } : {
-                      background: 'var(--color-surface)',
-                      boxShadow: 'var(--shadow-md)',
-                      border: '1px solid var(--color-border)',
-                    }),
-                  }}
-                  onMouseDown={() => startPress(note)}
-                  onMouseUp={e => {
-                    cancelPress();
-                    setExpandedNotes(prev => {
-                      const next = new Set(prev);
-                      if (next.has(note.id)) { next.delete(note.id); } else { next.add(note.id); }
-                      return next;
-                    });
-                  }}
-                  onMouseLeave={cancelPress}
-                  onTouchStart={() => startPress(note)}
-                  onTouchEnd={cancelPress}
-                  onTouchMove={cancelPress}
-                  onContextMenu={e => e.preventDefault()}
-                >
-                  {/* Author avatar */}
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    background: author?.avatarColor || 'var(--color-primary)',
-                    flexShrink: 0,
-                    overflow: 'hidden',
-                    boxShadow: ncs ? `0 0 10px ${ncs.color1}88, 0 0 22px ${ncs.color2}44` : 'none',
-                  }}>
-                    {author?.avatar ? <AvatarEmoji emoji={author.avatar} size={42} /> : '📝'}
-                  </span>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    {note.title && (
-                      <span style={{
-                        fontSize: 'var(--font-xs)',
-                        fontWeight: 700,
-                        color: 'var(--color-text)',
-                        lineHeight: 1.3,
-                      }}>
-                        {note.title}
-                      </span>
-                    )}
-                    <div
-                      className="rich-text-content"
-                      style={{
-                        color: 'var(--color-text-muted)',
-                        fontSize: 'var(--font-xs)',
-                        lineHeight: 1.4,
-                        ...(isExpanded ? {} : {
-                          overflow: 'hidden',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical' as const,
-                        })
-                      }}
-                      dangerouslySetInnerHTML={{ __html: note.content }}
-                    />
-                  </div>
-                </div>
-                );
-              })();
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

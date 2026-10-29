@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { X, LogOut, Info } from 'lucide-react';
+import { AvatarEmoji } from '../AvatarEmoji';
 import { getNavItems } from '../../utils/navigation';
 import { APP_VERSION, getRecentChangelog } from '../../data/changelog';
 import type { ChangelogEntry } from '../../data/changelog';
@@ -17,8 +18,18 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { settings } = useSettings();
   const [showChangelog, setShowChangelog] = useState(false);
 
-  const navItems = getNavItems(user, settings.showPacklist, settings.showHolidayBudget, settings.showTasks, settings.showNotes);
+  const navItems = getNavItems(user, settings.showPacklist, settings.showHolidayBudget, settings.showTasks);
   const recentChangelog = getRecentChangelog(2);
+
+  const groupOf = (to: string) =>
+    ['/expenses', '/op-finanzen', '/budget', '/n26', '/packliste', '/urlaubsbudget'].includes(to)
+      ? 'Geld & Reisen'
+      : ['/smart-home', '/setup'].includes(to)
+        ? 'Zuhause'
+        : 'Alltag';
+  const groups = ['Alltag', 'Geld & Reisen', 'Zuhause']
+    .map(label => ({ label, items: navItems.filter(i => groupOf(i.to) === label) }))
+    .filter(g => g.items.length > 0);
 
   return (
     <>
@@ -32,7 +43,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(23,20,58,0.5)',
             backdropFilter: 'blur(4px)',
             zIndex: 900,
             animation: 'fadeIn 0.2s ease',
@@ -41,26 +52,32 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       )}
 
       {/* Sidebar Panel */}
-      <aside style={{
-        position: 'fixed',
-        top: 0,
-        left: isOpen ? 0 : '-100%',
-        width: '240px',
-        height: '100%',
-        backgroundColor: 'var(--color-surface)',
-        boxShadow: isOpen ? '10px 0 30px rgba(0,0,0,0.1)' : 'none',
-        zIndex: 1000,
-        transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '1rem',
-        overflow: 'hidden',
-      }}>
+      <aside
+        className="drawer"
+        aria-hidden={!isOpen}
+        style={{
+          left: isOpen ? 0 : '-100%',
+          boxShadow: isOpen ? '10px 0 30px rgba(23,20,58,0.18)' : 'none',
+          visibility: isOpen ? 'visible' : 'hidden',
+          transitionProperty: 'left, visibility',
+        }}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexShrink: 0 }}>
-          <h2 style={{ fontSize: 'var(--font-xl)', color: 'var(--color-primary)', margin: 0 }}>Menü</h2>
-          <button onClick={onClose} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-            <X size={24} />
+        <div className="drawer-head">
+          <span style={{
+            width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
+            background: user?.avatarColor || '#FFD9C2',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', border: '2px solid rgba(255,255,255,0.7)',
+          }}>
+            {user && <AvatarEmoji emoji={user.avatar} size={52} />}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '1.125rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.id}</div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--on-gradient-muted)' }}>Family Hub</div>
+          </div>
+          <button className="glass-btn" onClick={onClose} aria-label="Menü schließen">
+            <X size={22} />
           </button>
         </div>
 
@@ -68,41 +85,36 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         <nav style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.3rem',
+          gap: '0.15rem',
           flex: 1,
           overflowY: 'auto',
-          paddingBottom: '0.5rem',
+          padding: '0.25rem 0.75rem 0.5rem',
           WebkitOverflowScrolling: 'touch',
           minHeight: 0,
         }}>
-          {navItems.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onClose}
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.6rem 0.85rem',
-                borderRadius: 'var(--radius-md)',
-                color: isActive ? 'white' : 'var(--color-text)',
-                backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
-                textDecoration: 'none',
-                fontWeight: isActive ? 600 : 500,
-                transition: 'all 0.2s ease',
-              })}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-            </NavLink>
+          {groups.map(group => (
+            <div key={group.label} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+              <div className="drawer-group-label">{group.label}</div>
+              {group.items.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  onClick={onClose}
+                  className={({ isActive }) => `drawer-link${isActive ? ' drawer-link--on' : ''}`}
+                >
+                  <Icon size={20} />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
         {/* Footer Info */}
         <div style={{
           marginTop: 'auto',
-          paddingTop: '0.75rem',
+          padding: '0.75rem 1.25rem max(1rem, env(safe-area-inset-bottom))',
           borderTop: '1px solid var(--color-border)',
           color: 'var(--color-text-muted)',
           fontSize: 'var(--font-xs)',
@@ -123,10 +135,9 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 border: 'none',
                 color: 'var(--color-danger)',
                 cursor: 'pointer',
-                padding: '0.4rem 0',
-                fontSize: '0.75rem',
-                opacity: 0.8,
-                fontWeight: 500,
+                padding: '0.5rem 0',
+                fontSize: '0.875rem',
+                fontWeight: 700,
                 marginTop: '0.25rem'
               }}
             >

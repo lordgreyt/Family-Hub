@@ -4,7 +4,6 @@ import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/d
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
-export type DesignMode = 'classic' | 'neon';
 
 // Types
 export interface User {
@@ -12,7 +11,6 @@ export interface User {
   uid?: string; // Firebase Authentication UID
   avatar: string; // Emoji
   avatarColor?: string; // Hintergrundfarbe für den Avatar-Kreis (klassisch)
-  avatarColorNeon?: string; // Hintergrundfarbe für den Avatar-Kreis (Neon-Modus)
   isAdmin?: boolean;
   isSetupComplete?: boolean;
   isChild?: boolean;
@@ -129,29 +127,6 @@ export interface N26Settings {
   closedYears?: number[];
 }
 
-export interface MoodEntry {
-  id: string; // Same as date
-  date: string; // YYYY-MM-DD
-  userId: string; // Jeder Nutzer hat eigene Einträge
-  mentalMood: number; // 1-5 (1 = worst, 5 = best)
-  physicalMood: number; // 1-5
-  tags?: string[]; // Context-Tags (z.B. "schule", "sport", "freunde")
-  comment?: string; // Freitext-Kommentar (nur in Listenansicht + Edit-Dialog sichtbar)
-  createdAt: number;
-}
-
-export interface Reminder {
-  id: string;
-  text: string;
-  childId: string;
-  dayOfWeek: number; // 0=So, 1=Mo, ..., 6=Sa → always set (derived from date for one-time)
-  date?: string;     // YYYY-MM-DD for one-time; undefined for recurring
-  isRecurring: boolean;
-  recurrence?: 'weekly' | 'biweekly' | 'monthly-first' | 'monthly-last'; // only for recurring; undefined = wöchentlich
-  createdAt: number;
-  createdBy: string;
-}
-
 // Packliste (Urlaub)
 export interface PackCategory {
   id: string;
@@ -265,7 +240,6 @@ export interface VocabularySet {
 
 export type VocabularyStore = Record<string, VocabularySet>;
 
-export interface TagOption { id: string; emoji: string; label: string; }
 
 // Initial Data
 const INITIAL_USERS: User[] = [
@@ -1111,109 +1085,6 @@ export const mockDb = {
   },
   saveVictronSettings: (settings: any) => {
     set(DB_KEYS.VICTRON_SETTINGS, settings);
-  },
-
-  // E-Diary
-  getMoodEntries: (userId?: string): MoodEntry[] => {
-    const raw = get<any[]>(DB_KEYS.EDIARY, []);
-    // Migration: convert old {mood} entries to new {mentalMood, physicalMood} format
-    const allEntries = raw.map((e: any) => {
-      if (e.mentalMood !== undefined && e.physicalMood !== undefined) {
-        return { ...e, userId: e.userId || 'Falko', tags: e.tags || [] } as MoodEntry;
-      }
-      // Legacy entry with single 'mood' field
-      return {
-        id: e.id || e.date,
-        date: e.date,
-        userId: e.userId || 'Falko',
-        mentalMood: e.mood || 3,
-        physicalMood: e.mood || 3,
-        tags: [],
-        createdAt: e.createdAt || Date.now(),
-      } as MoodEntry;
-    });
-    if (userId) {
-      return allEntries.filter(e => e.userId === userId);
-    }
-    return allEntries;
-  },
-  addOrUpdateMoodEntry: (entry: Omit<MoodEntry, 'createdAt' | 'id'>) => {
-    updateCollection<MoodEntry>(DB_KEYS.EDIARY, entries => {
-      const existing = entries.findIndex(e => e.date === entry.date);
-      const newEntry = { ...entry, id: entry.date, createdAt: Date.now() };
-      if (existing > -1) {
-        const newEntries = [...entries];
-        newEntries[existing] = newEntry;
-        return newEntries;
-      }
-      return [...entries, newEntry];
-    });
-  },
-
-  // Custom Tags (für E-Diary Kontext — Firebase-synced, pro Nutzer in einem Key)
-  getCustomTags: (userId: string): TagOption[] => {
-    const raw = get<any>(DB_KEYS.CUSTOM_TAGS, null);
-    // Migration: alte flache TagOption[] Struktur → neue Record<string, TagOption[]>
-    if (Array.isArray(raw)) {
-      const migrated: Record<string, TagOption[]> = {};
-      // Alte Tags dem ersten verfügbaren User zuweisen
-      migrated[userId] = raw as TagOption[];
-      set(DB_KEYS.CUSTOM_TAGS, migrated);
-      return raw as TagOption[];
-    }
-    const allTags: Record<string, TagOption[]> = raw && typeof raw === 'object' ? raw : {};
-    if (allTags[userId] && allTags[userId].length > 0) return allTags[userId];
-    // Migration von altem localStorage-Key
-    try {
-      const oldRaw = localStorage.getItem('ediary_custom_tags');
-      if (oldRaw) {
-        const oldTags = JSON.parse(oldRaw);
-        if (Array.isArray(oldTags) && oldTags.length > 0) {
-          allTags[userId] = oldTags;
-          set(DB_KEYS.CUSTOM_TAGS, allTags);
-          return oldTags;
-        }
-      }
-    } catch {}
-    // Default-Tags
-    const defaults: TagOption[] = [
-      { id: 'schule', emoji: '📚', label: 'Schule / Arbeit' },
-      { id: 'sport', emoji: '⚽', label: 'Sport / Bewegung' },
-      { id: 'freunde', emoji: '👫', label: 'Freunde / Soziales' },
-      { id: 'krank', emoji: '🤒', label: 'Krank / Unwohl' },
-      { id: 'familie', emoji: '👨‍👩‍👧‍👦', label: 'Familie' },
-      { id: 'wetter', emoji: '☀️', label: 'Wetter / Draußen' },
-      { id: 'hobby', emoji: '🎨', label: 'Hobby / Kreativ' },
-      { id: 'ruhe', emoji: '🧘', label: 'Ruhe / Entspannung' },
-    ];
-    allTags[userId] = defaults;
-    set(DB_KEYS.CUSTOM_TAGS, allTags);
-    return defaults;
-  },
-
-  saveCustomTags: (userId: string, tags: TagOption[]) => {
-    const raw = get<any>(DB_KEYS.CUSTOM_TAGS, null);
-    const allTags: Record<string, TagOption[]> = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-    allTags[userId] = tags;
-    set(DB_KEYS.CUSTOM_TAGS, allTags);
-  },
-
-  // Reminders (Denk dran)
-  getReminders: (): Reminder[] => {
-    const data: any = get(DB_KEYS.REMINDERS, []);
-    const result = Array.isArray(data) ? data : Object.values(data || {});
-    console.log(`🔔 getReminders: ${result.length} items, source format: ${Array.isArray(data) ? 'array' : typeof data === 'object' && data !== null ? 'object' : 'empty'}, localStorage key present: ${localStorage.getItem(DB_KEYS.REMINDERS) !== null}`);
-    return result;
-  },
-  addReminder: (item: Omit<Reminder, 'id' | 'createdAt'>) => {
-    const newItem: Reminder = { ...item, id: uuidv4(), createdAt: Date.now() };
-    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => [newItem, ...items]);
-  },
-  updateReminder: (updatedItem: Reminder) => {
-    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
-  },
-  deleteReminder: (id: string) => {
-    updateCollection<Reminder>(DB_KEYS.REMINDERS, items => items.filter(i => i.id !== id));
   },
 
   // Packliste (Urlaub)

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import {
   LayoutDashboard, Landmark, History, Settings,
   Plus, Trash2, X, Delete, ArrowRight, Calendar, FileText, ChevronRight,
@@ -9,7 +8,7 @@ import {
 } from 'lucide-react';
 import { mockDb } from '../services/mockDb';
 import type { Depot, DepotTransaction, ExpenseItem } from '../services/mockDb';
-import { getNeonColor, getNeonCardStyle } from '../utils/neon';
+import { PageBottomBar } from '../components/Layout/PageBottomBar';
 
 type Tab = 'dashboard' | 'depots' | 'historie' | 'settings';
 
@@ -101,7 +100,7 @@ export const N26 = () => {
       flexDirection: 'column', 
       height: '100%', 
       position: 'relative',
-      paddingBottom: '90px', 
+      paddingBottom: 'calc(var(--tabbar-height) + 1.5rem)', 
       overflowY: 'auto'
     }}>
       {/* Content Area */}
@@ -170,77 +169,15 @@ export const N26 = () => {
         />
       )}
 
-      {/* Bottom Navigation */}
-      <nav style={{
-        position: 'fixed',
-        bottom: '1.5rem',
-        left: '1rem',
-        right: '1rem',
-        height: '70px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 1rem',
-        zIndex: 1000,
-        maxWidth: '568px',
-        margin: '0 auto'
-      }}>
-        {/* Left Tabs */}
-        <div style={{ display: 'flex', flex: 1, justifyContent: 'space-around' }}>
-          {tabs.slice(0, 2).map(({ id, label, icon: Icon }) => (
-            <NavButton 
-              key={id} 
-              active={activeTab === id} 
-              onClick={() => setActiveTab(id as Tab)} 
-              icon={Icon} 
-              label={label} 
-            />
-          ))}
-        </div>
-
-        {/* Central Plus Button */}
-        <button
-          onClick={() => setShowBookingForm(true)}
-          style={{
-            width: '64px',
-            height: '64px',
-            flexShrink: 0,
-            backgroundColor: 'var(--color-primary)',
-            color: 'white',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: '-40px',
-            boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
-            border: '4px solid #fff',
-            cursor: 'pointer',
-            transition: 'transform 0.2s ease',
-          }}
-          onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
-          onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <Plus size={32} strokeWidth={3} />
-        </button>
-
-        {/* Right Tabs */}
-        <div style={{ display: 'flex', flex: 1, justifyContent: 'space-around' }}>
-          {tabs.slice(2).map(({ id, label, icon: Icon }) => (
-            <NavButton 
-              key={id} 
-              active={activeTab === id} 
-              onClick={() => setActiveTab(id as Tab)} 
-              icon={Icon} 
-              label={label} 
-            />
-          ))}
-        </div>
-      </nav>
+      <PageBottomBar
+        left={tabs.slice(0, 2).map(({ id, label, icon }) => ({
+          key: id, label, icon, active: activeTab === id, onClick: () => setActiveTab(id as Tab),
+        }))}
+        right={tabs.slice(2).map(({ id, label, icon }) => ({
+          key: id, label, icon, active: activeTab === id, onClick: () => setActiveTab(id as Tab),
+        }))}
+        fab={{ label: 'Neue Buchung', icon: Plus, onClick: () => setShowBookingForm(true) }}
+      />
     </div>
   );
 };
@@ -250,19 +187,6 @@ export const N26 = () => {
 // --- Sub-Views ---
 
 const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { depots: Depot[], calculateBalance: (d: Depot) => number, surplus: number | null, transactions: DepotTransaction[] }) => {
-  const { settings } = useSettings();
-  const isNeon = settings.designMode === 'neon';
-  /** Returns neon style overrides matching the Meals card effect — or null in classic mode */
-  const neonStyle = (key: string) => {
-    if (!isNeon) return null;
-    const g = getNeonColor(key);
-    return {
-      background: g.background,
-      border: `1px solid ${g.borderColor}33`,
-      boxShadow: g.boxShadow,
-    } as const;
-  };
-
   const totalBalance = depots.reduce((sum, d) => sum + (calculateBalance(d) || 0), 0);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -304,13 +228,23 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Monthly Expenses Chart */}
+      <div className="glass-panel" style={{ ...chartCardStyle, }}>
+        <ChartHeader
+          title="Ausgaben Übersicht"
+          subtitle={`Monatliche Ausgaben im Jahr ${currentYear}`}
+          right={<Pill color="var(--color-danger)">Ø {Math.round(yearlyData.reduce((s, d) => s + d.value, 0) / (new Date().getMonth() + 1)).toLocaleString('de-DE')}€</Pill>}
+        />
+        <BarChart data={yearlyData} />
+      </div>
+
       {/* Metrics Row */}
       <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
         <div className="glass-panel" style={{ 
           flex: 1, minWidth: 0, padding: '1.25rem', 
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', 
-          color: 'white', border: 'none' 
+          background: 'linear-gradient(135deg, #3F34C4 0%, #6D5DF0 55%, #F2A9BE 130%)', 
+          color: 'white', border: 'none', boxShadow: '0 10px 24px rgba(63, 52, 196, 0.28)' 
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: 0.8, fontSize: 'var(--font-xs)', fontWeight: 600, marginBottom: '0.4rem' }}>
             <Landmark size={12} /> RÜCKLAGEN
@@ -323,7 +257,6 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
           flex: 1, minWidth: 0, padding: '1.25rem',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          ...(neonStyle('n26-dash-surplus') || {}),
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--color-primary)', fontSize: 'var(--font-xs)', fontWeight: 600, marginBottom: '0.4rem' }}>
             {surplus !== null && surplus >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />} ÜBERSCHUSS
@@ -334,48 +267,24 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', ...(neonStyle('n26-dash-einzahlung') || {}) }}>
-          <h3 style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Monatl. Einzahlung</h3>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginBottom: '0.5rem' }}>
-            <span>{depots.reduce((s, d) => s + (d.monthlyAmount || 0), 0).toLocaleString('de-DE')}€</span>
-            <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 }}>{depots.length} Depots</span>
-          </div>
-          <div style={{ height: '110px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <PieChart data={depotData} size={110} />
-          </div>
-        </div>
-        <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', ...(neonStyle('n26-dash-buchungen') || {}) }}>
-          <h3 style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Buchungen (Ausgaben)</h3>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-danger)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginBottom: '0.5rem' }}>
-            <span>{Math.abs(monthTransactions.reduce((s, t) => s + t.amount, 0)).toLocaleString('de-DE')}€</span>
-            <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 }}>{monthTransactions.length} Buchungen</span>
-          </div>
-          <div style={{ height: '110px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <PieChart data={bookingData} size={110} />
-          </div>
-        </div>
-      </div>
-
       {/* Depot Balance Chart */}
       <DepotBalanceChart depots={depots} calculateBalance={calculateBalance} />
 
-      {/* Monthly Expenses Chart */}
-      <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', ...(neonStyle('n26-dash-ausgaben') || {}) }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausgaben Übersicht</h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Monatliche Ausgaben im Jahr {currentYear}</p>
-          </div>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--color-danger)' }}>
-            Ø {Math.round(yearlyData.reduce((s, d) => s + d.value, 0) / (new Date().getMonth() + 1)).toLocaleString('de-DE')}€
-          </div>
-        </div>
-        <div style={{ height: '160px', width: '100%', marginTop: '0.5rem' }}>
-          <BarChart data={yearlyData} />
-        </div>
-      </div>
+      {/* Buchungen */}
+      <DonutCard
+        title="Buchungen (Ausgaben)"
+        subtitle={`${monthTransactions.length} Buchungen in diesem Monat`}
+        pill={`${Math.abs(monthTransactions.reduce((s, t) => s + t.amount, 0)).toLocaleString('de-DE')}€`}
+        data={bookingData}
+      />
+
+      {/* Monatliche Einzahlung */}
+      <DonutCard
+        title="Monatliche Einzahlung"
+        subtitle={`${depots.length} Depots`}
+        pill={`${depots.reduce((s, d) => s + (d.monthlyAmount || 0), 0).toLocaleString('de-DE')}€`}
+        data={depotData}
+      />
     </div>
   );
 };
@@ -480,14 +389,12 @@ const DepotsView = ({ depots, transactions, calculateBalance, onDelete, onAdd, o
 };
 
 const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: Depot, balance: number, transactions: DepotTransaction[], onDelete: (id: string) => void, onEdit: () => void }) => {
-  const { settings } = useSettings();
   const [isPressing, setIsPressing] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const wasLongPress = useRef(false);
-  const ncs = settings.designMode === 'neon' ? getNeonCardStyle(depot.id) : null;
 
   const recentTransactions = useMemo(() => {
     return transactions
@@ -606,23 +513,7 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
         onPointerUp={endPress}
         onPointerLeave={endPress}
         onClick={handleClick}
-        style={ncs ? {
-          padding: '0.75rem 1.25rem',
-          borderRadius: expanded ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
-          borderBottom: expanded ? 'none' : undefined,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem',
-          transition: 'all 0.2s ease',
-          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
-          cursor: 'pointer',
-          userSelect: 'none',
-          backgroundImage: ncs.backgroundImage,
-          backgroundOrigin: ncs.backgroundOrigin,
-          backgroundClip: ncs.backgroundClip,
-          border: isPressing || expanded ? `2px solid var(--color-primary)` : ncs.border,
-          boxShadow: ncs.boxShadow,
-        } : {
+        style={{
           padding: '0.75rem 1.25rem',
           backgroundColor: 'var(--color-surface)',
           borderRadius: expanded ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
@@ -668,7 +559,7 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
       {/* Expanded Transactions */}
       {expanded && recentTransactions.length > 0 && (
         <div style={{
-          backgroundColor: '#FAFAFB',
+          backgroundColor: 'var(--color-background)',
           borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
           border: '1px solid var(--color-primary)',
           borderTop: 'none',
@@ -711,7 +602,7 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
 
       {expanded && recentTransactions.length === 0 && (
         <div style={{
-          backgroundColor: '#FAFAFB',
+          backgroundColor: 'var(--color-background)',
           borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
           border: '1px solid var(--color-primary)',
           borderTop: 'none',
@@ -799,12 +690,10 @@ const HistorieView = ({ transactions, depots, onDelete }: { transactions: DepotT
 };
 
 const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?: Depot, onDelete: (id: string) => void }) => {
-  const { settings } = useSettings();
   const [isPressing, setIsPressing] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const ncs = settings.designMode === 'neon' ? getNeonCardStyle(tx.id) : null;
 
   const startPress = () => {
     setIsPressing(true);
@@ -863,20 +752,7 @@ const TransactionCard = ({ tx, depot, onDelete }: { tx: DepotTransaction, depot?
         onPointerUp={cancelPress}
         onPointerLeave={cancelPress}
         onClick={() => showActions && setShowActions(false)}
-        style={ncs ? {
-          padding: '0.75rem 1.25rem',
-          borderRadius: 'var(--radius-lg)',
-          display: 'flex', flexDirection: 'column', gap: '0.25rem',
-          transition: 'all 0.2s ease',
-          transform: isPressing ? 'scale(0.98)' : 'scale(1)',
-          cursor: 'pointer', userSelect: 'none',
-          opacity: (tx.isAutomated || tx.note?.includes('Sparrate')) ? 0.7 : 1,
-          backgroundImage: ncs.backgroundImage,
-          backgroundOrigin: ncs.backgroundOrigin,
-          backgroundClip: ncs.backgroundClip,
-          border: isPressing ? `2px solid var(--color-primary)` : ncs.border,
-          boxShadow: isPressing ? `0 0 8px var(--color-primary)66, 0 0 16px var(--color-primary)33` : ncs.boxShadow,
-        } : {
+        style={{
           padding: '0.75rem 1.25rem', backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-lg)', border: '1px solid',
           borderColor: isPressing ? 'var(--color-primary)' : 'var(--color-border)',
@@ -948,10 +824,8 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
 };
 
 const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) => {
-  const { settings: appSettings } = useSettings();
   const [settings, setSettings] = useState(mockDb.getN26Settings());
   const [isManualBookingLoading, setIsManualBookingLoading] = useState(false);
-  const ncs = appSettings.designMode === 'neon' ? getNeonCardStyle('n26-settings-btn') : null;
 
   const lastBookingDate = useMemo(() => {
     const routineTxs = transactions.filter(t => t.note?.includes('Sparrate'));
@@ -1033,14 +907,7 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
         <button
           onClick={handleManualBooking}
           disabled={isManualBookingLoading}
-          style={ncs ? {
-            width: '100%', padding: '1rem', borderRadius: 'var(--radius-md)', border: '2px solid transparent',
-            color: 'white', fontWeight: 700, fontSize: '14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            cursor: 'pointer', opacity: isManualBookingLoading ? 0.7 : 1,
-            backgroundImage: `linear-gradient(135deg, ${ncs.color1}, ${ncs.color2})`,
-            boxShadow: `0 0 8px ${ncs.color1}66, 0 0 20px ${ncs.color2}33`,
-          } : {
+          style={{
             width: '100%', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none',
             backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 700, fontSize: '14px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
@@ -1098,29 +965,6 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
 };
 
 // --- Sub-Components ---
-
-const NavButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) => (
-  <button
-    onClick={onClick}
-    style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '4px',
-      color: active ? 'var(--color-primary)' : 'var(--color-text-muted)',
-      padding: '8px',
-      borderRadius: 'var(--radius-md)',
-      backgroundColor: 'transparent',
-      transition: 'all 0.2s ease',
-      border: 'none',
-      flex: 1,
-      cursor: 'pointer'
-    }}
-  >
-    <Icon size={22} strokeWidth={active ? 2.5 : 2} />
-    <span style={{ fontSize: '9px', fontWeight: active ? 700 : 500, textTransform: 'uppercase', letterSpacing: '0.02em' }}>{label}</span>
-  </button>
-);
 
 const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void }) => {
   const [type, setType] = useState<'deposit' | 'withdrawal' | 'transfer'>('deposit');
@@ -1338,52 +1182,6 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
 };
 
 
-const PieChart = ({ data, size = 80 }: { data: { label: string, value: number }[], size?: number }) => {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-  
-  if (total === 0 || isNaN(total)) return <div style={{ color: 'var(--color-text-muted)', fontSize: '8px' }}>N/A</div>;
-
-  let cumulativePercent = 0;
-  const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
-
-  return (
-    <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg viewBox="-1.1 -1.1 2.2 2.2" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%', overflow: 'visible', cursor: 'pointer' }}>
-        {data.map((slice, i) => {
-          const slicePercent = slice.value / total;
-          const [startX, startY] = [Math.cos(2 * Math.PI * cumulativePercent), Math.sin(2 * Math.PI * cumulativePercent)];
-          cumulativePercent += slicePercent;
-          const [endX, endY] = [Math.cos(2 * Math.PI * cumulativePercent), Math.sin(2 * Math.PI * cumulativePercent)];
-          const largeArcFlag = slicePercent > 0.5 ? 1 : 0;
-          const isActive = activeIndex === i;
-          
-          const pathData = [`M ${startX} ${startY}`, `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`, `L 0 0`].join(' ');
-          
-          return (
-            <path 
-              key={slice.label} 
-              d={pathData} 
-              fill={colors[i % colors.length]} 
-              stroke="#fff" 
-              strokeWidth="0.02"
-              onClick={(e) => { e.stopPropagation(); setActiveIndex(isActive ? null : i); }}
-              style={{ transition: 'all 0.3s ease', transform: isActive ? 'scale(1.1)' : 'scale(1)', transformOrigin: 'center', opacity: activeIndex === null || isActive ? 1 : 0.6 }}
-            />
-          );
-        })}
-        <circle cx="0" cy="0" r="0.65" fill="#fff" />
-      </svg>
-      {activeIndex !== null && (
-        <div style={{ position: 'absolute', textAlign: 'center', width: '70%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: '7px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', lineHeight: 1, WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', display: '-webkit-box', overflow: 'hidden' }}>{data[activeIndex].label}</span>
-          <span style={{ fontSize: '10px', fontWeight: 900, color: colors[activeIndex % colors.length] }}>{Math.round(data[activeIndex].value)}€</span>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const DepotForm = ({ onClose, onSave, initialDepot }: { onClose: () => void, onSave: (name: string, monthly: number, start: number) => void, initialDepot?: Depot }) => {
   const [name, setName] = useState(initialDepot?.name || '');
   const [monthly, setMonthly] = useState(initialDepot?.monthlyAmount?.toString() || '');
@@ -1412,62 +1210,201 @@ const DepotForm = ({ onClose, onSave, initialDepot }: { onClose: () => void, onS
     </div>
   );
 };
-const BarChart = ({ data }: { data: { label: string, value: number }[] }) => {
-  const maxVal = Math.max(...data.map(d => d.value), 100);
-  const currentMonthIdx = new Date().getMonth();
+
+
+/* ── Diagramme im Verlaufs-Design ── */
+const CHART_COLORS = ['#6D5DF0', '#F27A9B', '#F5A06B', '#4FC3A1', '#4B8DFF', '#C7B6F7'];
+const CHART_REST_COLOR = '#CFC7F5';
+const fmtEuro = (v: number) => `${Math.round(v).toLocaleString('de-DE')}€`;
+
+const chartCardStyle: React.CSSProperties = {
+  padding: '1.25rem',
+  backgroundColor: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-lg)',
+};
+
+const ChartHeader = ({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+    <div style={{ minWidth: 0 }}>
+      <h3 style={{ margin: 0, fontSize: 'var(--font-sm)', fontWeight: 800, color: 'var(--color-text)' }}>{title}</h3>
+      {subtitle && <p style={{ margin: '0.15rem 0 0 0', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 500 }}>{subtitle}</p>}
+    </div>
+    {right}
+  </div>
+);
+
+const Pill = ({ children, color = 'var(--color-primary)' }: { children: React.ReactNode; color?: string }) => (
+  <span style={{ flex: 'none', padding: '0.3rem 0.7rem', borderRadius: '999px', background: 'var(--color-surface-muted)', color, fontSize: 'var(--font-xs)', fontWeight: 800, whiteSpace: 'nowrap' }}>
+    {children}
+  </span>
+);
+
+/** Ring-Diagramm mit Legende (die größten 5 Einträge, der Rest wird zusammengefasst) */
+const DonutCard = ({ title, subtitle, pill, data, style }: {
+  title: string;
+  subtitle: string;
+  pill: React.ReactNode;
+  data: { label: string; value: number }[];
+  style?: React.CSSProperties;
+}) => {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const slices = useMemo(() => {
+    const sorted = data.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+    const top = sorted.slice(0, 5);
+    const rest = sorted.slice(5);
+    const result = top.map((d, i) => ({ ...d, color: CHART_COLORS[i] }));
+    if (rest.length > 0) {
+      result.push({ label: `Weitere (${rest.length})`, value: rest.reduce((s, d) => s + d.value, 0), color: CHART_REST_COLOR });
+    }
+    return result;
+  }, [data]);
+
+  const total = slices.reduce((s, d) => s + d.value, 0);
+  const active = activeIndex !== null ? slices[activeIndex] : null;
+
+  const R = 38;
+  const C = 2 * Math.PI * R;
+  const GAP = slices.length > 1 ? 1.6 : 0;
+  let offset = 0;
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '4px', paddingBottom: '20px', position: 'relative' }}>
-      {data.map((item, i) => {
-        const heightPercent = (item.value / maxVal) * 100;
-        const isCurrent = i === currentMonthIdx;
-        const isFuture = i > currentMonthIdx;
-
-        return (
-          <div key={item.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-            <div 
-              title={`${item.label}: ${item.value.toFixed(2)}€`}
-              style={{ 
-                width: '100%', 
-                height: `${Math.max(heightPercent, 2)}%`, 
-                background: isCurrent 
-                  ? 'linear-gradient(to top, var(--color-danger), #ff8080)' 
-                  : isFuture ? 'var(--color-border)' : 'rgba(239, 68, 68, 0.15)',
-                borderRadius: '4px 4px 0 0',
-                transition: 'all 0.4s ease',
-                cursor: 'help',
-                position: 'relative'
-              }} 
-            >
-              {item.value > 0 && item.value > maxVal * 0.2 && (
-                <div style={{ 
-                  position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', 
-                  fontSize: '8px', fontWeight: 700, color: isCurrent ? 'var(--color-danger)' : 'var(--color-text-muted)' 
-                }}>
-                  {Math.round(item.value)}
-                </div>
-              )}
+    <div className="glass-panel" style={{ ...chartCardStyle, ...style }}>
+      <ChartHeader title={title} subtitle={subtitle} right={<Pill>{pill}</Pill>} />
+      {total === 0 ? (
+        <p style={{ margin: '1rem 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>Keine Daten</p>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ position: 'relative', width: '104px', height: '104px', flex: 'none' }}>
+            <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-surface-muted)" strokeWidth="13" />
+              {slices.map((s, i) => {
+                const len = (s.value / total) * C;
+                const dash = Math.max(len - GAP, 0.5);
+                const el = (
+                  <circle
+                    key={s.label}
+                    cx="50" cy="50" r={R}
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={activeIndex === i ? 16 : 13}
+                    strokeDasharray={`${dash} ${C - dash}`}
+                    strokeDashoffset={-offset}
+                    onClick={() => setActiveIndex(activeIndex === i ? null : i)}
+                    style={{ cursor: 'pointer', transition: 'stroke-width 0.2s ease, opacity 0.2s ease', opacity: activeIndex === null || activeIndex === i ? 1 : 0.35 }}
+                  />
+                );
+                offset += len;
+                return el;
+              })}
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 20px', pointerEvents: 'none' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {active ? active.label : 'Gesamt'}
+              </span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: active ? active.color : 'var(--color-text)', lineHeight: 1.2 }}>
+                {fmtEuro(active ? active.value : total)}
+              </span>
+              {active && <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)' }}>{Math.round((active.value / total) * 100)} %</span>}
             </div>
-            <span style={{ 
-              position: 'absolute', bottom: '0', fontSize: '9px', fontWeight: 600, 
-              color: isCurrent ? 'var(--color-danger)' : 'var(--color-text-muted)',
-              opacity: isFuture ? 0.4 : 1
-            }}>
-              {item.label}
-            </span>
           </div>
-        );
-      })}
+
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {slices.map((s, i) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setActiveIndex(activeIndex === i ? null : i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%',
+                  padding: '0.25rem 0.35rem', border: 'none', borderRadius: '999px', cursor: 'pointer', textAlign: 'left',
+                  fontFamily: 'inherit', fontSize: 'var(--font-xs)', color: 'var(--color-text)',
+                  background: activeIndex === i ? 'var(--color-surface-muted)' : 'transparent',
+                  opacity: activeIndex === null || activeIndex === i ? 1 : 0.55,
+                }}
+              >
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: s.color, flex: 'none' }} />
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{s.label}</span>
+                <span style={{ fontWeight: 800 }}>{fmtEuro(s.value)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
+/** Monatliche Ausgaben als abgerundete Säulen */
+const BarChart = ({ data }: { data: { label: string, value: number }[] }) => {
+  const currentMonthIdx = new Date().getMonth();
+  const [selected, setSelected] = useState<number>(currentMonthIdx);
+  const maxVal = Math.max(...data.map(d => d.value), 100);
+  const monthsSoFar = data.slice(0, currentMonthIdx + 1);
+  const avg = monthsSoFar.reduce((s, d) => s + d.value, 0) / Math.max(monthsSoFar.length, 1);
+  const sel = data[selected];
+  const CHART_H = 150;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <span style={{ fontSize: 'var(--font-xl)', fontWeight: 800, color: 'var(--color-text)' }}>{fmtEuro(sel.value)}</span>
+        <span style={{ fontSize: 'var(--font-xs)', fontWeight: 600, color: 'var(--color-text-muted)' }}>{sel.label}</span>
+      </div>
+      <div style={{ position: 'relative', height: `${CHART_H}px` }}>
+        {[0, 0.5, 1].map(f => (
+          <div key={f} style={{ position: 'absolute', left: 0, right: 0, bottom: `${f * 100}%`, borderTop: '1px dashed var(--color-border)' }} />
+        ))}
+        {avg > 0 && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(avg / maxVal) * 100}%`, borderTop: '1.5px dashed #F27A9B', zIndex: 1, pointerEvents: 'none' }}>
+            <span style={{ position: 'absolute', right: 0, top: '-16px', fontSize: '9px', fontWeight: 800, color: '#F27A9B', background: 'var(--color-surface)', padding: '0 4px', borderRadius: '999px' }}>Ø {fmtEuro(avg)}</span>
+          </div>
+        )}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: '4px', zIndex: 2 }}>
+          {data.map((item, i) => {
+            const isFuture = i > currentMonthIdx;
+            const isSel = i === selected;
+            const h = item.value > 0 ? Math.max((item.value / maxVal) * 100, 3) : 0;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                title={`${item.label}: ${item.value.toFixed(2)}€`}
+                onClick={() => setSelected(i)}
+                style={{ flex: 1, minWidth: 0, height: '100%', padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+              >
+                <div style={{
+                  width: '100%', maxWidth: '22px', height: `${h}%`,
+                  borderRadius: '999px 999px 6px 6px',
+                  background: isSel
+                    ? 'linear-gradient(180deg, #6D5DF0, #3F34C4)'
+                    : isFuture ? 'var(--color-surface-muted)' : 'linear-gradient(180deg, #DCD3FA, #C7B6F7)',
+                  boxShadow: isSel ? '0 6px 14px rgba(63, 52, 196, 0.35)' : 'none',
+                  transition: 'all 0.3s ease',
+                }} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '4px', marginTop: '0.4rem' }}>
+        {data.map((item, i) => (
+          <span key={item.label} style={{
+            flex: 1, minWidth: 0, textAlign: 'center', fontSize: '9px',
+            fontWeight: i === selected ? 800 : 600,
+            color: i === selected ? 'var(--color-primary)' : 'var(--color-text-muted)',
+            opacity: i > currentMonthIdx ? 0.45 : 1,
+          }}>{item.label}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/** Alle Depots kompakt auf einen Blick: Anteilsleiste + Zeilen mit Balken im Hintergrund */
 const DepotBalanceChart = ({ depots, calculateBalance }: { depots: Depot[], calculateBalance: (d: Depot) => number }) => {
-  const { settings } = useSettings();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const isNeon = settings.designMode === 'neon';
-  const ng = isNeon ? getNeonColor('n26-depot-chart') : null;
-  
+
   const balanceData = useMemo(() => {
     return depots.map(d => ({
       id: d.id,
@@ -1476,72 +1413,37 @@ const DepotBalanceChart = ({ depots, calculateBalance }: { depots: Depot[], calc
     })).sort((a, b) => b.balance - a.balance);
   }, [depots, calculateBalance]);
 
-  const maxAbsBalance = Math.max(...balanceData.map(d => Math.abs(d.balance)), 100);
-  const selectedDepot = balanceData.find(d => d.id === selectedId);
+  const maxAbs = Math.max(...balanceData.map(d => Math.abs(d.balance)), 1);
+  const total = balanceData.reduce((s, d) => s + d.balance, 0);
+  const positiveTotal = balanceData.reduce((s, d) => s + Math.max(d.balance, 0), 0) || 1;
+  const colorOf = (i: number) => CHART_COLORS[i % CHART_COLORS.length];
 
   return (
-    <div className="glass-panel" style={{ padding: '1.25rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', ...(ng ? { background: ng.background, border: `1px solid ${ng.borderColor}33`, boxShadow: ng.boxShadow } : {}) }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Depotübersicht</h3>
-          <p style={{ margin: '0.2rem 0 0 0', fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Alle Depotstände im Vergleich</p>
-        </div>
-        {selectedDepot && (
-          <div style={{ textAlign: 'right', animation: 'fadeIn 0.2s ease' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)' }}>{selectedDepot.name}</div>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: selectedDepot.balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-              {selectedDepot.balance.toLocaleString('de-DE')}€
-            </div>
-          </div>
-        )}
+    <div className="glass-panel" style={chartCardStyle}>
+      <ChartHeader title="Depotübersicht" subtitle={`${balanceData.length} Depots`} right={<Pill color={total >= 0 ? 'var(--color-primary)' : 'var(--color-danger)'}>{fmtEuro(total)}</Pill>} />
+
+      {/* Anteilsleiste */}
+      <div style={{ display: 'flex', height: '12px', borderRadius: '999px', overflow: 'hidden', gap: '2px', marginBottom: '1rem' }}>
+        {balanceData.filter(d => d.balance > 0).map(d => {
+          const i = balanceData.indexOf(d);
+          return <div key={d.id} title={`${d.name}: ${fmtEuro(d.balance)}`} style={{ flex: d.balance / positiveTotal, minWidth: '2px', background: colorOf(i) }} />;
+        })}
       </div>
 
-      <div style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', position: 'relative', gap: '2px' }}>
-        {/* Zero Line */}
-        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', backgroundColor: 'var(--color-border)', opacity: 0.5, zIndex: 1 }} />
-        
-        {balanceData.map(d => {
-          const heightPercent = (Math.abs(d.balance) / maxAbsBalance) * 50;
-          const isPositive = d.balance >= 0;
-          const isSelected = selectedId === d.id;
-
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        {balanceData.map((d, i) => {
+          const positive = d.balance >= 0;
+          const pct = Math.max((Math.abs(d.balance) / maxAbs) * 100, 1.5);
           return (
-            <div 
-              key={d.id} 
-              onClick={() => setSelectedId(isSelected ? null : d.id)}
-              style={{ 
-                flex: 1, 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                justifyContent: isPositive ? 'flex-end' : 'flex-start',
-                cursor: 'pointer',
-                position: 'relative',
-                zIndex: 2
-              }}
-            >
-              <div 
-                style={{ 
-                  width: '100%', 
-                  height: `${Math.max(heightPercent, 2)}%`, 
-                  backgroundColor: isPositive ? 'var(--color-success)' : 'var(--color-danger)',
-                  opacity: isSelected ? 1 : 0.6,
-                  borderRadius: isPositive ? '2px 2px 0 0' : '0 0 2px 2px',
-                  transition: 'all 0.3s ease',
-                  marginTop: isPositive ? 0 : '1px', // Account for zero line
-                  transform: isSelected ? 'scaleX(1.5)' : 'scaleX(1)',
-                  boxShadow: isSelected ? `0 0 12px ${isPositive ? 'var(--color-success)' : 'var(--color-danger)'}` : 'none'
-                }} 
-              />
-              {/* Invisible touch target extension */}
-              <div style={{ position: 'absolute', top: 0, bottom: 0, left: '-2px', right: '-2px' }} />
+            <div key={d.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.6rem', borderRadius: '10px', overflow: 'hidden', fontSize: 'var(--font-xs)' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: positive ? 'var(--color-surface-muted)' : 'rgba(242, 169, 190, 0.35)', borderRadius: '10px' }} />
+              <span style={{ position: 'relative', width: '8px', height: '8px', borderRadius: '50%', flex: 'none', background: positive ? colorOf(i) : '#F27A9B' }} />
+              <span style={{ position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--color-text)' }}>{d.name}</span>
+              <span style={{ position: 'relative', fontWeight: 800, whiteSpace: 'nowrap', color: positive ? 'var(--color-text)' : 'var(--color-danger)' }}>{d.balance.toLocaleString('de-DE', { maximumFractionDigits: 0 })}€</span>
             </div>
           );
         })}
       </div>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
     </div>
   );
 };

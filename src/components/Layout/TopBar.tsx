@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
+import { getNavItems } from '../../utils/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { useSettings } from '../../context/SettingsContext';
 import { mockDb } from '../../services/mockDb';
 import { useVictron } from '../../context/VictronContext';
 import { auth } from '../../services/firebase';
 import { AvatarEmoji } from '../AvatarEmoji';
-import { getNeonColor } from '../../utils/neon';
 import { X, Camera, Check, Menu, Zap } from 'lucide-react';
 import { AVATAR_CATEGORIES } from '../../data/avatarEmojis';
 
@@ -17,13 +17,12 @@ const AVATAR_COLORS = [
 
 export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { user, updateUser } = useAuth();
-  const { settings } = useSettings();
+  const location = useLocation();
   const { state: victron } = useVictron();
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editAvatarColor, setEditAvatarColor] = useState(AVATAR_COLORS[0]);
-  const [editAvatarColorNeon, setEditAvatarColorNeon] = useState('linear-gradient(135deg, #00D9FF, #7A3CFF)');
   const [avatarCategory, setAvatarCategory] = useState(0);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -32,7 +31,6 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
       setEditName(user.id);
       setEditAvatar(user.avatar);
       setEditAvatarColor(user.avatarColor || AVATAR_COLORS[0]);
-      setEditAvatarColorNeon(user.avatarColorNeon || 'linear-gradient(135deg, #00D9FF, #7A3CFF)');
       setSaveMessage('');
     }
   }, [showProfile, user]);
@@ -53,22 +51,12 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const myEntry = leaderboard.find((e: any) => e.userId === user.id);
     const stars = myEntry ? (myEntry.total || myEntry.stars || myEntry.points || 0) : 0;
 
-    const entries = mockDb.getMoodEntries(user.id);
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const ds = d.toISOString().split('T')[0];
-      if (entries.find(e => e.date === ds)) streak++;
-      else break;
-    }
-
-    return { tasksThisWeek, tasksTotal, stars, streak };
+    return { tasksThisWeek, tasksTotal, stars };
   }, [user]);
 
   if (!user) return null;
+
+  const pageTitle = getNavItems(user, true, true, true).find(i => i.to === location.pathname && i.to !== '/')?.label || 'Family Hub';
 
   const handleSaveProfile = () => {
     if (!editName.trim()) return;
@@ -76,7 +64,7 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const currentDbUser = mockDb.getUsers().find(u => u.id === user.id);
     if (!currentDbUser) return;
 
-    const updatedUser = { ...currentDbUser, id: editName.trim(), avatar: editAvatar, avatarColor: editAvatarColor, avatarColorNeon: editAvatarColorNeon };
+    const updatedUser = { ...currentDbUser, id: editName.trim(), avatar: editAvatar, avatarColor: editAvatarColor };
     
     // If name changed, we need to delete old and add new (since id is the key)
     if (editName.trim() !== user.id) {
@@ -103,74 +91,36 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
 
   return (
     <>
-      <header style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '1rem',
-        backgroundColor: 'var(--color-primary)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            onClick={onMenuClick}
-            style={{
-              padding: '0.25rem',
-              color: 'white',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex'
-            }}
-          >
-            <Menu size={24} />
+      <header className="app-header">
+        <div className="app-header-row">
+          <button className="glass-btn" onClick={onMenuClick} aria-label="Menü öffnen">
+            <Menu size={22} />
           </button>
-          <h1 style={{ fontSize: 'var(--font-xl)', margin: 0, color: 'white' }}>
-            Family Hub
-          </h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {user && !user.isChild && (
-            <Zap
-              size={18}
-              color="white"
-              fill={victron.state === 2 ? 'white' : 'none'}
+          <h1 className="app-header-title">{pageTitle}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 'none' }}>
+            {user && !user.isChild && (
+              <Zap
+                size={18}
+                color="white"
+                fill={victron.state === 2 ? 'white' : 'none'}
+                aria-label="Victron-Status"
+                style={{
+                  transition: 'all 0.3s ease',
+                  opacity: victron.isConnected ? 1 : 0.5
+                }}
+              />
+            )}
+            <button
+              className="app-avatar-btn"
+              onClick={() => setShowProfile(true)}
+              aria-label={`Profil von ${user.id} bearbeiten`}
               style={{
-                transition: 'all 0.3s ease',
-                opacity: victron.isConnected ? 1 : 0.4
+                background: user.avatarColor || AVATAR_COLORS[0],
               }}
-            />
-          )}
-          <button
-            onClick={() => setShowProfile(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              padding: '0.25rem 0.75rem',
-              borderRadius: 'var(--radius-xl)',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              color: 'white',
-            }}
-          >
-            <span style={{
-              width: '28px', height: '28px', borderRadius: '50%',
-              background: settings.designMode === 'neon'
-                ? (user.avatarColorNeon || getNeonColor(user.id).color)
-                : (user.avatarColor || AVATAR_COLORS[0]),
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden',
-              boxShadow: settings.designMode === 'neon' ? `0 0 8px ${getNeonColor(user.id).color}88, 0 0 18px ${getNeonColor(user.id).color2}44` : 'none',
-            }}>
-              <AvatarEmoji emoji={user.avatar} size={28} />
-            </span>
-            <span style={{ fontWeight: 500 }}>{user.id}</span>
-          </button>
+            >
+              <AvatarEmoji emoji={user.avatar} size={40} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -343,43 +293,6 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
               </div>
             </div>
 
-            {/* Avatar Color Picker Neon (Gradients) */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                Avatar-Farbe (Neon)
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {(() => {
-                  const NEON_GRADIENTS = [
-                    { value: 'linear-gradient(135deg, #00D9FF, #7A3CFF)', label: 'Cyan-Violett' },
-                    { value: 'linear-gradient(135deg, #FF2BD6, #FF66E3)', label: 'Magenta-Pink' },
-                    { value: 'linear-gradient(135deg, #B6FF3D, #39FF88)', label: 'Lime-Grün' },
-                    { value: 'linear-gradient(135deg, #FF9F1C, #FF2BD6)', label: 'Amber-Magenta' },
-                    { value: 'linear-gradient(135deg, #168BFF, #00D9FF)', label: 'Blau-Cyan' },
-                  ];
-                  return NEON_GRADIENTS.map(g => {
-                    const isSelected = editAvatarColorNeon === g.value;
-                    return (
-                      <button
-                        key={g.label}
-                        onClick={() => setEditAvatarColorNeon(g.value)}
-                        title={g.label}
-                        style={{
-                          width: '36px', height: '36px', borderRadius: '50%',
-                          background: g.value,
-                          border: isSelected ? '3px solid var(--color-text)' : '2px solid transparent',
-                          cursor: 'pointer', transition: 'transform 0.1s',
-                          transform: isSelected ? 'scale(1.15)' : 'scale(1)',
-                          outline: 'none',
-                          boxShadow: isSelected ? '0 0 8px rgba(255,255,255,0.3)' : 'none',
-                        }}
-                      />
-                    );
-                  });
-                })()}
-              </div>
-            </div>
-
             {/* Statistics */}
             {stats && (
               <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
@@ -398,10 +311,6 @@ export const TopBar = ({ onMenuClick }: { onMenuClick: () => void }) => {
                   <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>⭐ {stats.stars}</div>
                     <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Sterne gesammelt</div>
-                  </div>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>🔥 {stats.streak}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Tagebuch-Serie</div>
                   </div>
                 </div>
               </div>

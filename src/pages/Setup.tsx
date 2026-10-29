@@ -1,54 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, ChevronDown, Luggage, CheckSquare, BookOpen } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Luggage, CheckSquare } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { getNeonColor } from '../utils/neon';
-import type { ThemeColor } from '../services/mockDb';
-
-const THEME_COLORS: Record<ThemeColor, string> = {
-  indigo: '#5B3FD6',
-  rose: '#F06292',
-  emerald: '#43C773',
-  amber: '#FF9F2D',
-  cyan: '#20BFA9',
-  violet: '#6C4DE6',
-  blue: '#4B8DFF',
-  slate: '#64748B',
-  teal: '#0D9488',
-  pink: '#DB2777',
-  coral: '#FF6B6B',
-  lime: '#84CC16',
-  grape: '#A855F7',
-  ocean: '#0EA5E9',
-  sunset: '#F97316',
-  mint: '#10B981',
-  crimson: '#DC2626',
-  gold: '#D97706',
-};
-
-const THEME_LABELS: Record<ThemeColor, string> = {
-  indigo: 'Indigo (Standard)',
-  rose: 'Rose',
-  emerald: 'Smaragd (Emerald)',
-  amber: 'Bernstein (Amber)',
-  cyan: 'Cyan',
-  violet: 'Violett',
-  blue: 'Blau (Blue)',
-  slate: 'Schiefergrau (Slate)',
-  teal: 'Petrol (Teal)',
-  pink: 'Pink',
-  coral: 'Koralle (Coral)',
-  lime: 'Limette (Lime)',
-  grape: 'Traube (Grape)',
-  ocean: 'Ozean (Ocean)',
-  sunset: 'Sonnenuntergang (Sunset)',
-  mint: 'Minze (Mint)',
-  crimson: 'Karminrot (Crimson)',
-  gold: 'Gold',
-};
-
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -66,7 +21,7 @@ export const Setup = () => {
   
   const navItems = getNavItems(user);
   
-  const [dbUsers, setDbUsers] = useState(() => mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+  const [dbUsers, setDbUsers] = useState(() => mockDb.getUsers());
 
   const [newUserId, setNewUserId] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -80,30 +35,6 @@ export const Setup = () => {
   const [changePwNew, setChangePwNew] = useState('');
   const [changePwConfirm, setChangePwConfirm] = useState('');
   const [isChangingPw, setIsChangingPw] = useState(false);
-
-  const [showColorDropdown, setShowColorDropdown] = useState(false);
-  const colorDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!showColorDropdown) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target as Node)) {
-        setShowColorDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [showColorDropdown]);
-
-  const handleThemeSelect = useCallback((color: ThemeColor) => {
-    updateSettings({ themeColor: color });
-    setShowColorDropdown(false);
-  }, [updateSettings]);
 
   // Google Drive State
   const [driveConnected, setDriveConnected] = useState(isDriveConnected());
@@ -122,10 +53,10 @@ export const Setup = () => {
   const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
-    const load = () => setDbUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+    const load = () => setDbUsers(mockDb.getUsers());
     window.addEventListener('db_updated', load);
     return () => window.removeEventListener('db_updated', load);
-  }, [settings.designMode]);
+  }, []);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,74 +268,6 @@ export const Setup = () => {
         </h3>
         
         <div style={{ marginBottom: '1.25rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            Design-Farben
-          </label>
-          <div ref={colorDropdownRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setShowColorDropdown(v => !v)}
-              className="input-field"
-              style={{
-                backgroundColor: THEME_COLORS[settings.themeColor],
-                color: 'white',
-                fontWeight: 600,
-                borderColor: THEME_COLORS[settings.themeColor],
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <span>{THEME_LABELS[settings.themeColor] || settings.themeColor}</span>
-              <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: showColorDropdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-            </button>
-            {showColorDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                marginTop: '0.25rem',
-                backgroundColor: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 50,
-                maxHeight: '260px',
-                overflowY: 'auto',
-              }}>
-                {(Object.keys(THEME_COLORS) as ThemeColor[]).map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => handleThemeSelect(color)}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '0.6rem 1rem',
-                      backgroundColor: THEME_COLORS[color],
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: 'var(--font-sm)',
-                      textAlign: 'left',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'opacity 0.15s',
-                    }}
-                    onPointerEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                    onPointerLeave={e => (e.currentTarget.style.opacity = '1')}
-                  >
-                    {THEME_LABELS[color] || color}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '1.25rem' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
             <Type size={16} /> Schriftgröße
           </label>
@@ -413,50 +276,6 @@ export const Setup = () => {
             <option value="base">Normal</option>
             <option value="large">Groß</option>
           </select>
-        </div>
-
-        <div style={{ marginBottom: '1.25rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)' }}>
-            Design
-          </label>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-            <button
-              type="button"
-              onClick={() => updateSettings({ designMode: 'classic' })}
-              style={{
-                flex: 1,
-                padding: '0.55rem 0.85rem',
-                fontSize: 'var(--font-sm)',
-                fontWeight: 600,
-                textAlign: 'center',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: settings.designMode === 'classic' ? 'var(--color-primary)' : 'var(--color-surface)',
-                color: settings.designMode === 'classic' ? 'white' : 'var(--color-text-muted)',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              Klassisch
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSettings({ designMode: 'neon' })}
-              style={{
-                flex: 1,
-                padding: '0.55rem 0.85rem',
-                fontSize: 'var(--font-sm)',
-                fontWeight: 600,
-                textAlign: 'center',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: settings.designMode === 'neon' ? 'var(--color-primary)' : 'var(--color-surface)',
-                color: settings.designMode === 'neon' ? 'white' : 'var(--color-text-muted)',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              Neon
-            </button>
-          </div>
         </div>
 
         {(user?.isAdmin || user?.id === 'Falko') && (
@@ -522,7 +341,7 @@ export const Setup = () => {
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
             <CheckSquare size={20} /> Sichtbarkeit
           </h3>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)', marginBottom: '0.6rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
             <input
               type="checkbox"
               checked={settings.showTasks}
@@ -530,15 +349,6 @@ export const Setup = () => {
               style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
             />
             <CheckSquare size={16} /> Aufgaben im Menü anzeigen
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none', fontSize: 'var(--font-sm)', color: 'var(--color-text)' }}>
-            <input
-              type="checkbox"
-              checked={settings.showNotes}
-              onChange={e => updateSettings({ showNotes: e.target.checked })}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
-            />
-            <BookOpen size={16} /> Notizen im Menü anzeigen
           </label>
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
             Gilt global für alle Nutzer — ideal für Bereiche, die kaum genutzt werden. Die Daten bleiben erhalten.
@@ -554,8 +364,6 @@ export const Setup = () => {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
             {dbUsers.map(u => {
-                const uGlow = getNeonColor(u.id);
-                const uNeon = settings.designMode === 'neon';
                 return (
               <div key={u.id} style={{ padding: '0.75rem', margin: 0, backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -564,7 +372,6 @@ export const Setup = () => {
                     width: '32px', height: '32px', borderRadius: '50%',
                     background: u.avatarColor || '#6366f1',
                     flexShrink: 0, overflow: 'hidden',
-                    boxShadow: uNeon ? `0 0 7px ${uGlow.color}88, 0 0 16px ${uGlow.color2}44` : 'none',
                   }}><AvatarEmoji emoji={u.avatar} size={32} /></span>
                   <strong>{u.id}</strong>
                   {(u.isAdmin || u.id === 'Falko') && <span style={{ fontSize: 'var(--font-xs)', color: '#B8BAC2' }}>(Admin)</span>}

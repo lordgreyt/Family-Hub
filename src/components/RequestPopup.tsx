@@ -1,15 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { MealPlanItem, RewardRequest, User, MealTemplate } from '../services/mockDb';
 import { Utensils, Star, Check, X, Bell } from 'lucide-react';
 import { AvatarEmoji } from './AvatarEmoji';
-import { getNeonColor } from '../utils/neon';
 
 export const RequestPopup = () => {
   const { user } = useAuth();
-  const { settings } = useSettings();
   const [mealRequests, setMealRequests] = useState<MealPlanItem[]>([]);
   const [starRequests, setStarRequests] = useState<RewardRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -23,7 +20,7 @@ export const RequestPopup = () => {
     const loadData = () => {
       setMealRequests(mockDb.getMealPlanItems().filter(i => i.status === 'PENDING'));
       setStarRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
-      setUsers(mockDb.getUsers().map(u => ({ ...u, avatarColor: settings.designMode === 'neon' ? (u.avatarColorNeon || getNeonColor(u.id).color) : u.avatarColor })));
+      setUsers(mockDb.getUsers());
       setTemplates(mockDb.getMealTemplates());
       setDataLoaded(true);
     };
@@ -31,7 +28,7 @@ export const RequestPopup = () => {
     loadData();
     window.addEventListener('db_updated', loadData);
     return () => window.removeEventListener('db_updated', loadData);
-  }, [user, settings.designMode]);
+  }, [user]);
 
   const allRequests = useMemo(() => {
     return [
@@ -140,8 +137,6 @@ export const RequestPopup = () => {
         }}>
           {allRequests.map((req) => {
             const reqUser = users.find(u => u.id === (req.type === 'meal' ? (req as MealPlanItem).requestedBy : (req as RewardRequest).childId));
-            const reqGlow = reqUser ? getNeonColor(reqUser.id) : null;
-            const reqNeon = settings.designMode === 'neon';
 
             if (req.type === 'meal') {
               const mealReq = req as MealPlanItem;
@@ -159,7 +154,7 @@ export const RequestPopup = () => {
                   gap: '0.75rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: reqUser?.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden', boxShadow: reqNeon && reqGlow ? `0 0 8px ${reqGlow.color}88, 0 0 18px ${reqGlow.color2}44` : 'none' }}>{reqUser?.avatar ? <AvatarEmoji emoji={reqUser.avatar} size={36} /> : '👤'}</span>
+                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: reqUser?.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}>{reqUser?.avatar ? <AvatarEmoji emoji={reqUser.avatar} size={36} /> : '👤'}</span>
                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                        <span style={{ fontWeight: 700, fontSize: 'var(--font-sm)' }}>{reqUser?.id}</span>
                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Mahlzeiten-Anfrage</span>
@@ -212,7 +207,7 @@ export const RequestPopup = () => {
                   gap: '0.75rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: reqUser?.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden', boxShadow: reqNeon && reqGlow ? `0 0 8px ${reqGlow.color}88, 0 0 18px ${reqGlow.color2}44` : 'none' }}>{reqUser?.avatar ? <AvatarEmoji emoji={reqUser.avatar} size={36} /> : '👤'}</span>
+                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: reqUser?.avatarColor || '#6366f1', flexShrink: 0, overflow: 'hidden' }}>{reqUser?.avatar ? <AvatarEmoji emoji={reqUser.avatar} size={36} /> : '👤'}</span>
                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                        <span style={{ fontWeight: 700, fontSize: 'var(--font-sm)' }}>{reqUser?.id}</span>
                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Medienzeit / Sterne</span>

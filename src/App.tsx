@@ -7,15 +7,11 @@ import { MainLayout } from './components/Layout/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Budget } from './pages/Budget';
-import { Notes } from './pages/Notes';
 import { Tasks } from './pages/Tasks';
 import { Rewards } from './pages/Rewards';
 import { Setup } from './pages/Setup';
 import { Expenses } from './pages/Expenses';
 import { N26 } from './pages/N26';
-import { Wallbox } from './pages/Wallbox';
-import { EDiary } from './pages/EDiary';
-import { DenkDran } from './pages/DenkDran';
 import { PackingList } from './pages/PackingList';
 import { HolidayBudget } from './pages/HolidayBudget';
 import { SmartHome } from './pages/SmartHome';
@@ -24,19 +20,17 @@ import { Grades } from './pages/Grades';
 import { Vocabulary } from './pages/Vocabulary';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
-import { initNotificationService } from './services/notificationService';
 
 
 
 import './index.css';
-import './styles/neon.css';
+import './styles/gradient.css';
 
 function App() {
 
   useEffect(() => {
     const cleanupBackup = initBackupService();
-    const cleanupNotify = initNotificationService();
-    return () => { cleanupBackup(); cleanupNotify(); };
+    return () => { cleanupBackup(); };
   }, []);
 
   return (
@@ -49,17 +43,13 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/budget" element={<Budget />} />
-              <Route path="/notes" element={<Notes />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/rewards" element={<Rewards />} />
               <Route path="/setup" element={<Setup />} />
               <Route path="/n26" element={<N26 />} />
-              <Route path="/wallbox" element={<Wallbox />} />
               <Route path="/smart-home" element={<SmartHome />} />
               <Route path="/grades" element={<Grades />} />
               <Route path="/vokabeln" element={<Vocabulary />} />
-              <Route path="/e-diary" element={<EDiary />} />
-              <Route path="/denk-dran" element={<DenkDran />} />
               <Route path="/packliste" element={<PackingList />} />
               <Route path="/urlaubsbudget" element={<HolidayBudget />} />
               <Route path="/op-finanzen" element={<SurgeryFinance />} />
