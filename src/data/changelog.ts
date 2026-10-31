@@ -5,9 +5,21 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.4.1';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.1',
+    date: '2026-10-31',
+    title: 'Vokabeln: Lernleiter',
+    changes: [
+      'Drei Lernmethoden statt nur Umblättern: Auswahl aus drei Antworten, selbst schreiben, Hören und Diktat',
+      'Die Methode richtet sich nach dem Lernstand: neue Wörter erkennen, gefestigte Wörter schreiben und hören',
+      'Nie zweimal dieselbe Methode hintereinander, damit kein Wort wie Papier wirkt',
+      'Beim Schreiben zählen kleine Tippfehler nicht, Umlaute und Akzente werden verziehen',
+      'Wörter werden auf Wunsch vorgelesen (Sprachausgabe des Geräts)',
+    ],
+  },
   {
     version: '1.4.0',
     date: '2026-05-07',

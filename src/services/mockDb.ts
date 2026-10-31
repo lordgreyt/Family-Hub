@@ -217,12 +217,16 @@ export interface VocabularyEntry {
   back: string;
 }
 
+export type VocabularyLearnMode = 'choice' | 'type' | 'audio' | 'dictation';
+
 export interface VocabularyProgress {
   correctCount: number;
   wrongCount: number;
   streak: number;
   lastReviewedAt: number;
   nextReviewAt: number;
+  /** Zuletzt verwendete Lernmethode – verhindert zweimal dieselbe Methode hintereinander. */
+  lastMode?: VocabularyLearnMode;
 }
 
 export interface VocabularySet {
@@ -1164,7 +1168,7 @@ export const mockDb = {
     delete store[id];
     set(DB_KEYS.VOCABULARY, store);
   },
-  recordVocabularyAnswer: (setId: string, userId: string, entryId: string, correct: boolean) => {
+  recordVocabularyAnswer: (setId: string, userId: string, entryId: string, correct: boolean, mode?: VocabularyLearnMode) => {
     const store = mockDb.getVocabularyStore();
     const vocabularySet = store[setId];
     if (!vocabularySet || !vocabularySet.entries.some(entry => entry.id === entryId)) return;
@@ -1179,6 +1183,7 @@ export const mockDb = {
       streak,
       lastReviewedAt: now,
       nextReviewAt: now + (correct ? intervalDays * 24 * 60 * 60 * 1000 : 10 * 60 * 1000),
+      lastMode: mode || previous?.lastMode,
     };
 
     store[setId] = {

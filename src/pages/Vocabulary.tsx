@@ -1,8 +1,34 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { BookOpen, Check, ChevronLeft, Clock3, Eye, Languages, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, CircleCheck, Clock3, Ear, Eye, Keyboard, Languages, ListChecks, Plus, RotateCcw, Sparkles, Trash2, Volume2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import type { VocabularyEntry, VocabularySet } from '../services/mockDb';
+import type { VocabularyEntry, VocabularyLearnMode, VocabularySet } from '../services/mockDb';
+import { MODE_HINT, MODE_LABEL, buildChoiceOptions, isAnswerClose, isGermanLanguage, normalizeAnswer, pickLearnMode, speechLangFor } from './vocabularyLearn';
+
+type LearnMode = VocabularyLearnMode;
+
+function canSpeak() {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+}
+
+function speakText(text: string, language: string, onError?: () => void) {
+  if (!canSpeak() || !text.trim()) return false;
+  try {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const lang = speechLangFor(language);
+    utterance.lang = lang;
+    utterance.rate = 0.92;
+    if (onError) utterance.onerror = () => onError();
+    const voice = synth.getVoices().find(candidate => candidate.lang?.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+    if (voice) utterance.voice = voice;
+    synth.speak(utterance);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function createId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -17,8 +43,183 @@ function parsePairs(text: string): Array<{ front: string; back: string }> {
   });
 }
 
+function stopSpeaking() {
+  if (!canSpeak()) return;
+  try { window.speechSynthesis.cancel(); } catch { /* nicht verfügbar */ }
+}
+
 const panel = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' };
 const actionButton = { minHeight: 46, borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', fontWeight: 700, cursor: 'pointer', padding: '0.7rem 0.9rem' };
+
+function optionStyle(state: 'idle' | 'correct' | 'wrong') {
+  const base = {
+    minHeight: 54,
+    width: '100%',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    fontSize: 'clamp(1rem, 3.6vw, 1.15rem)',
+    fontWeight: 700,
+    padding: '0.7rem 0.9rem',
+    cursor: 'pointer',
+    transition: 'background 140ms ease, border-color 140ms ease',
+  } as const;
+  if (state === 'correct') return { ...base, background: 'var(--color-success)', borderColor: 'var(--color-success)', color: 'white' };
+  if (state === 'wrong') return { ...base, background: 'var(--color-danger)', borderColor: 'var(--color-danger)', color: 'white' };
+  return base;
+}
+
+interface StudyCardProps {
+  mode: LearnMode;
+  options: string[];
+  prompt: string;
+  answer: string;
+  promptLanguage: string;
+  answerLanguage: string;
+  onAnswer: (correct: boolean, mode: LearnMode) => void;
+}
+
+function StudyCard({ mode, options, prompt, answer, promptLanguage, answerLanguage, onAnswer }: StudyCardProps) {
+  const [typed, setTyped] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [result, setResult] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [plays, setPlays] = useState(0);
+  const [ttsBroken, setTtsBroken] = useState(false);
+  const answerRef = useRef(onAnswer);
+  answerRef.current = onAnswer;
+
+  const listening = mode === 'audio' || mode === 'dictation';
+  const ttsAvailable = canSpeak() && !ttsBroken;
+  const spokenText = mode === 'dictation' ? answer : prompt;
+  const spokenLanguage = mode === 'dictation' ? answerLanguage : promptLanguage;
+
+  const play = () => {
+    if (plays >= 3) return;
+    if (speakText(spokenText, spokenLanguage, () => setTtsBroken(true))) setPlays(value => value + 1);
+  };
+
+  useEffect(() => {
+    if (!listening) return;
+    const timer = window.setTimeout(() => {
+      if (speakText(spokenText, spokenLanguage, () => setTtsBroken(true))) setPlays(value => value + 1);
+    }, 320);
+    return () => window.clearTimeout(timer);
+    // Karte ist pro Runde neu gemountet – Startwerte reichen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => () => stopSpeaking(), []);
+
+  useEffect(() => {
+    if (result !== 'correct') return;
+    const timer = window.setTimeout(() => answerRef.current(true, mode), 950);
+    return () => window.clearTimeout(timer);
+  }, [result, mode]);
+
+  const choose = (value: string) => {
+    if (result !== 'idle') return;
+    setSelected(value);
+    setResult(normalizeAnswer(value) === normalizeAnswer(answer) ? 'correct' : 'wrong');
+  };
+
+  const submitTyped = (event: FormEvent) => {
+    event.preventDefault();
+    if (result !== 'idle' || !typed.trim()) return;
+    setResult(isAnswerClose(typed, answer) ? 'correct' : 'wrong');
+  };
+
+  return (
+    <div style={{ ...panel, padding: 'clamp(1rem, 3.5vw, 1.6rem)', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.6rem', borderRadius: 999, background: 'var(--color-primary-transparent)', color: 'var(--color-primary)', fontSize: 'var(--font-xs)', fontWeight: 800 }}>
+          {mode === 'choice' ? <ListChecks size={14} /> : mode === 'type' ? <Keyboard size={14} /> : <Ear size={14} />}
+          {MODE_LABEL[mode]}
+        </span>
+        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{MODE_HINT[mode]}</span>
+      </div>
+
+      {listening ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.55rem', padding: '0.2rem 0 0.4rem', textAlign: 'center' }}>
+          {mode === 'dictation' || !ttsAvailable ? (
+            <>
+              <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{promptLanguage}</div>
+              <div style={{ fontSize: 'clamp(1.7rem, 6.5vw, 2.6rem)', fontWeight: 800, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{prompt}</div>
+            </>
+          ) : (
+            <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Wort wird vorgelesen …</div>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.3rem' }}>
+            {ttsAvailable && (
+              <button type="button" onClick={play} disabled={plays >= 3} style={{ ...actionButton, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'var(--color-primary-transparent)', color: 'var(--color-primary)', borderColor: 'transparent', opacity: plays >= 3 ? 0.45 : 1 }}>
+                <Volume2 size={18} /> {plays ? 'Nochmal hören' : 'Anhören'}
+              </button>
+            )}
+            {!ttsAvailable && <span style={{ alignSelf: 'center', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Vorlesen nicht verfügbar – Wort steht oben</span>}
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: 'clamp(0.6rem, 3vw, 1.2rem) 0' }}>
+          <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>{promptLanguage}</div>
+          <div style={{ fontSize: 'clamp(1.9rem, 7.5vw, 3.2rem)', lineHeight: 1.12, fontWeight: 800, color: 'var(--color-text)', marginTop: '0.3rem', overflowWrap: 'anywhere' }}>{prompt}</div>
+        </div>
+      )}
+
+      {mode === 'choice' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {options.map(option => {
+            const isCorrect = normalizeAnswer(option) === normalizeAnswer(answer);
+            const state = result === 'idle' ? 'idle' : isCorrect ? 'correct' : selected === option ? 'wrong' : 'idle';
+            return (
+              <button key={option} type="button" onClick={() => choose(option)} disabled={result !== 'idle'} style={optionStyle(state)}>
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <form onSubmit={submitTyped} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <input
+            className="input-field"
+            value={typed}
+            onChange={event => setTyped(event.target.value)}
+            placeholder="Antwort eingeben …"
+            aria-label="Antwort"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            disabled={result !== 'idle'}
+            style={{ fontSize: 'clamp(1.05rem, 4vw, 1.3rem)', textAlign: 'center', fontWeight: 600 }}
+          />
+          {result === 'idle' && (
+            <button type="submit" className="btn btn-primary" disabled={!typed.trim()} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+              <Check size={17} /> Prüfen
+            </button>
+          )}
+        </form>
+      )}
+
+      {result !== 'idle' && (
+        <div role="status" style={{ textAlign: 'center', fontWeight: 700, color: result === 'correct' ? 'var(--color-success)' : 'var(--color-danger)', fontSize: 'var(--font-base)' }}>
+          {result === 'correct' ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><CircleCheck size={18} /> Richtig!</span>) : <>Richtig ist: <strong style={{ color: 'var(--color-text)' }}>{answer}</strong></>}
+        </div>
+      )}
+
+      {result === 'wrong' && (
+        <button type="button" onClick={() => answerRef.current(false, mode)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+          Weiter <ArrowRight size={17} />
+        </button>
+      )}
+
+      {plays >= 3 && result === 'idle' && (
+        <button type="button" onClick={() => setResult('wrong')} style={{ background: 'transparent', border: 0, color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', textDecoration: 'underline', cursor: 'pointer' }}>
+          Lösung zeigen
+        </button>
+      )}
+    </div>
+  );
+}
 
 export const Vocabulary = () => {
   const { user } = useAuth();
@@ -33,10 +234,10 @@ export const Vocabulary = () => {
   const [direction, setDirection] = useState<'forward' | 'reverse'>('forward');
   const [queue, setQueue] = useState<string[]>([]);
   const [requeued, setRequeued] = useState<Record<string, number>>({});
-  const [showAnswer, setShowAnswer] = useState(false);
   const [sessionAnswered, setSessionAnswered] = useState(0);
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionSeq, setSessionSeq] = useState(0);
   const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
@@ -57,25 +258,43 @@ export const Vocabulary = () => {
   const currentEntry: VocabularyEntry | null = activeSet && queue.length ? activeSet.entries.find(entry => entry.id === queue[0]) || null : null;
   const sessionPercent = sessionTotal ? Math.min(100, Math.round(sessionAnswered / sessionTotal * 100)) : 0;
 
+  const promptLanguage = direction === 'forward' ? activeSet?.languageFrom || '' : activeSet?.languageTo || '';
+  const answerLanguage = direction === 'forward' ? activeSet?.languageTo || '' : activeSet?.languageFrom || '';
+  const prompt = currentEntry ? (direction === 'forward' ? currentEntry.front : currentEntry.back) : '';
+  const answer = currentEntry ? (direction === 'forward' ? currentEntry.back : currentEntry.front) : '';
+  const currentProgress = activeSet && currentEntry ? activeSet.progressByUser?.[user?.id || '']?.[currentEntry.id] : undefined;
+  const learnMode: LearnMode = currentEntry && activeSet
+    ? pickLearnMode({
+      streak: currentProgress?.streak || 0,
+      lastMode: currentProgress?.lastMode,
+      canChoose: activeSet.entries.length > 1,
+      canDictate: !isGermanLanguage(answerLanguage),
+    })
+    : 'choice';
+  const choiceOptions = currentEntry && activeSet && learnMode === 'choice'
+    ? buildChoiceOptions(currentEntry, activeSet.entries, direction === 'forward' ? entry => entry.back : entry => entry.front, `${currentEntry.id}:${sessionSeq}`)
+    : [];
+
   const startStudy = (set: VocabularySet, nextDirection = direction) => {
     const progress = set.progressByUser?.[user?.id || ''] || {};
     const due = set.entries.filter(entry => !progress[entry.id]?.nextReviewAt || progress[entry.id].nextReviewAt <= nowMs);
     const firstRound = due.length ? due : set.entries;
+    stopSpeaking();
     setStudySetId(set.id);
     setDirection(nextDirection);
     setQueue(firstRound.map(entry => entry.id));
     setRequeued({});
-    setShowAnswer(false);
     setSessionAnswered(0);
     setSessionCorrect(0);
     setSessionTotal(firstRound.length);
+    setSessionSeq(value => value + 1);
   };
 
-  const finishStudy = () => { setStudySetId(null); setQueue([]); setShowAnswer(false); };
+  const finishStudy = () => { stopSpeaking(); setStudySetId(null); setQueue([]); };
 
-  const answerCard = (correct: boolean) => {
+  const answerCard = (correct: boolean, answeredMode: LearnMode) => {
     if (!activeSet || !currentEntry || !user) return;
-    mockDb.recordVocabularyAnswer(activeSet.id, user.id, currentEntry.id, correct);
+    mockDb.recordVocabularyAnswer(activeSet.id, user.id, currentEntry.id, correct, answeredMode);
     setSessionAnswered(value => value + 1);
     if (correct) setSessionCorrect(value => value + 1);
     let nextQueue = queue.slice(1);
@@ -84,7 +303,7 @@ export const Vocabulary = () => {
       setRequeued(previous => ({ ...previous, [currentEntry.id]: (previous[currentEntry.id] || 0) + 1 }));
     }
     setQueue(nextQueue);
-    setShowAnswer(false);
+    setSessionSeq(value => value + 1);
   };
 
   const handleCreateSet = (event: FormEvent) => {
@@ -112,8 +331,6 @@ export const Vocabulary = () => {
 
   if (studySetId && activeSet) {
     const completed = queue.length === 0;
-    const prompt = currentEntry ? (direction === 'forward' ? currentEntry.front : currentEntry.back) : '';
-    const answer = currentEntry ? (direction === 'forward' ? currentEntry.back : currentEntry.front) : '';
     return (
       <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 680, margin: '0 auto', paddingBottom: '2rem' }}>
         <button onClick={finishStudy} style={{ ...actionButton, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'transparent', color: 'var(--color-text)' }}><ChevronLeft size={18} /> Zurück</button>
@@ -133,19 +350,16 @@ export const Vocabulary = () => {
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}><button onClick={() => startStudy(activeSet)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><RotateCcw size={16} /> Nochmal üben</button><button onClick={finishStudy} className="btn btn-secondary">Fertig</button></div>
           </div>
         ) : currentEntry ? (
-          <div style={{ ...panel, minHeight: 280, padding: 'clamp(1.2rem, 5vw, 2.4rem)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)', marginBottom: '1rem' }}>{direction === 'forward' ? activeSet.languageFrom : activeSet.languageTo}</div>
-            <div style={{ fontSize: 'clamp(2rem, 8vw, 3.5rem)', lineHeight: 1.15, fontWeight: 800, color: 'var(--color-text)', overflowWrap: 'anywhere' }}>{prompt}</div>
-            {showAnswer ? <>
-              <div style={{ height: 1, width: 'min(100%, 260px)', background: 'var(--color-border)', margin: '1.5rem 0' }} />
-              <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-sm)', marginBottom: '0.4rem' }}>{direction === 'forward' ? activeSet.languageTo : activeSet.languageFrom}</div>
-              <div style={{ fontSize: 'clamp(1.5rem, 6vw, 2.5rem)', fontWeight: 750, color: 'var(--color-primary)', overflowWrap: 'anywhere' }}>{answer}</div>
-              <div style={{ display: 'flex', width: '100%', gap: '0.7rem', marginTop: '2rem' }}>
-                <button onClick={() => answerCard(false)} style={{ ...actionButton, flex: 1, color: 'var(--color-text)', background: 'var(--color-surface-muted)' }}><RotateCcw size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />Nochmal</button>
-                <button onClick={() => answerCard(true)} style={{ ...actionButton, flex: 1, color: 'white', background: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}><Check size={17} style={{ verticalAlign: 'middle', marginRight: 6 }} />Gewusst</button>
-              </div>
-            </> : <button onClick={() => setShowAnswer(true)} className="btn btn-primary" style={{ marginTop: '2rem', minWidth: 160, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}><Eye size={18} /> Lösung zeigen</button>}
-          </div>
+          <StudyCard
+            key={`${currentEntry.id}:${sessionSeq}`}
+            mode={learnMode}
+            options={choiceOptions}
+            prompt={prompt}
+            answer={answer}
+            promptLanguage={promptLanguage}
+            answerLanguage={answerLanguage}
+            onAnswer={answerCard}
+          />
         ) : (
           <div style={{ ...panel, padding: '1.5rem', textAlign: 'center' }}><p style={{ margin: 0, color: 'var(--color-text-muted)' }}>Dieses Lernset enthält noch keine Vokabeln.</p><button onClick={finishStudy} className="btn btn-secondary" style={{ marginTop: '1rem' }}>Zur Übersicht</button></div>
         )}
@@ -192,7 +406,10 @@ export const Vocabulary = () => {
           })}
         </div>
       </>}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}><Clock3 size={14} /> Gewusste Wörter kommen später wieder; schwierige nach kurzer Zeit.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)', textAlign: 'center' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Eye size={14} /> Erkennen → Schreiben → Hören/Diktat</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> Gewusste Wörter kommen später wieder; schwierige nach kurzer Zeit.</span>
+      </div>
     </section>
   );
 };
