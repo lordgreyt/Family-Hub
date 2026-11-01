@@ -3,32 +3,10 @@ import { ArrowRight, BookOpen, Check, ChevronLeft, CircleCheck, Clock3, Ear, Eye
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { VocabularyEntry, VocabularyLearnMode, VocabularySet } from '../services/mockDb';
-import { MODE_HINT, MODE_LABEL, answerVariants, buildChoiceOptions, isAnswerCorrect, isGermanLanguage, pickLearnMode, primaryVariant, speechLangFor } from './vocabularyLearn';
+import { MODE_HINT, MODE_LABEL, answerVariants, buildChoiceOptions, isAnswerCorrect, isGermanLanguage, pickLearnMode, primaryVariant } from './vocabularyLearn';
+import { canSpeak, speakText, stopSpeaking } from './speech';
 
 type LearnMode = VocabularyLearnMode;
-
-function canSpeak() {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
-}
-
-function speakText(text: string, language: string, onError?: () => void) {
-  if (!canSpeak() || !text.trim()) return false;
-  try {
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    const lang = speechLangFor(language);
-    utterance.lang = lang;
-    utterance.rate = 0.92;
-    if (onError) utterance.onerror = () => onError();
-    const voice = synth.getVoices().find(candidate => candidate.lang?.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
-    if (voice) utterance.voice = voice;
-    synth.speak(utterance);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function createId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -41,11 +19,6 @@ function parsePairs(text: string): Array<{ front: string; back: string }> {
       ? [{ front: parts[0], back: parts.slice(1).join(' ').trim() }]
       : [];
   });
-}
-
-function stopSpeaking() {
-  if (!canSpeak()) return;
-  try { window.speechSynthesis.cancel(); } catch { /* nicht verfügbar */ }
 }
 
 const panel = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' };

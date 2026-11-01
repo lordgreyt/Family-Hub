@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "lint": "eslint .",
     "test:security": "node --test tests/*.test.cjs",
+    "test:vocabulary": "node --experimental-strip-types --test tests/vocabularyVariants.test.mjs tests/vocabularySpeech.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
