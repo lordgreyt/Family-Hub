@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, Check, ChevronLeft, CircleCheck, Clock3, Ear, Eye
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { VocabularyEntry, VocabularyLearnMode, VocabularySet } from '../services/mockDb';
-import { MODE_HINT, MODE_LABEL, buildChoiceOptions, isAnswerClose, isGermanLanguage, normalizeAnswer, pickLearnMode, speechLangFor } from './vocabularyLearn';
+import { MODE_HINT, MODE_LABEL, answerVariants, buildChoiceOptions, isAnswerCorrect, isGermanLanguage, pickLearnMode, primaryVariant, speechLangFor } from './vocabularyLearn';
 
 type LearnMode = VocabularyLearnMode;
 
@@ -91,7 +91,8 @@ function StudyCard({ mode, options, prompt, answer, promptLanguage, answerLangua
 
   const listening = mode === 'audio' || mode === 'dictation';
   const ttsAvailable = canSpeak() && !ttsBroken;
-  const spokenText = mode === 'dictation' ? answer : prompt;
+  const acceptedAnswers = answerVariants(answer);
+  const spokenText = primaryVariant(mode === 'dictation' ? answer : prompt);
   const spokenLanguage = mode === 'dictation' ? answerLanguage : promptLanguage;
 
   const play = () => {
@@ -120,13 +121,13 @@ function StudyCard({ mode, options, prompt, answer, promptLanguage, answerLangua
   const choose = (value: string) => {
     if (result !== 'idle') return;
     setSelected(value);
-    setResult(normalizeAnswer(value) === normalizeAnswer(answer) ? 'correct' : 'wrong');
+    setResult(isAnswerCorrect(value, answer) ? 'correct' : 'wrong');
   };
 
   const submitTyped = (event: FormEvent) => {
     event.preventDefault();
     if (result !== 'idle' || !typed.trim()) return;
-    setResult(isAnswerClose(typed, answer) ? 'correct' : 'wrong');
+    setResult(isAnswerCorrect(typed, answer) ? 'correct' : 'wrong');
   };
 
   return (
@@ -168,7 +169,7 @@ function StudyCard({ mode, options, prompt, answer, promptLanguage, answerLangua
       {mode === 'choice' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {options.map(option => {
-            const isCorrect = normalizeAnswer(option) === normalizeAnswer(answer);
+            const isCorrect = isAnswerCorrect(option, answer);
             const state = result === 'idle' ? 'idle' : isCorrect ? 'correct' : selected === option ? 'wrong' : 'idle';
             return (
               <button key={option} type="button" onClick={() => choose(option)} disabled={result !== 'idle'} style={optionStyle(state)}>
@@ -202,7 +203,7 @@ function StudyCard({ mode, options, prompt, answer, promptLanguage, answerLangua
 
       {result !== 'idle' && (
         <div role="status" style={{ textAlign: 'center', fontWeight: 700, color: result === 'correct' ? 'var(--color-success)' : 'var(--color-danger)', fontSize: 'var(--font-base)' }}>
-          {result === 'correct' ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><CircleCheck size={18} /> Richtig!</span>) : <>Richtig ist: <strong style={{ color: 'var(--color-text)' }}>{answer}</strong></>}
+          {result === 'correct' ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><CircleCheck size={18} /> Richtig!</span>) : <>Richtig {acceptedAnswers.length > 1 ? 'sind' : 'ist'}: <strong style={{ color: 'var(--color-text)' }}>{acceptedAnswers.join(' · ') || answer}</strong></>}
         </div>
       )}
 
@@ -385,7 +386,7 @@ export const Vocabulary = () => {
           <input className="input-field" value={title} onChange={event => setTitle(event.target.value)} placeholder="Titel, z. B. Englisch – Unit 4" maxLength={120} required />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.6rem' }}><input className="input-field" value={languageFrom} onChange={event => setLanguageFrom(event.target.value)} placeholder="Ausgangssprache" maxLength={40} aria-label="Ausgangssprache" /><input className="input-field" value={languageTo} onChange={event => setLanguageTo(event.target.value)} placeholder="Zielsprache" maxLength={40} aria-label="Zielsprache" /></div>
           <textarea className="input-field" value={pairsText} onChange={event => setPairsText(event.target.value)} placeholder={'Ein Wortpaar pro Zeile, getrennt durch Tab, ; oder |\napple;Apfel\nquiet;ruhig'} rows={5} style={{ resize: 'vertical', lineHeight: 1.5 }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}><span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>{manualPairCount} Wortpaare erkannt</span><button type="submit" className="btn btn-primary" disabled={!title.trim() || manualPairCount === 0}>Lernset speichern</button></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}><span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-xs)' }}>{manualPairCount} Wortpaare erkannt · mehrere gültige Übersetzungen mit Komma trennen, z. B. „versuchen, probieren“</span><button type="submit" className="btn btn-primary" disabled={!title.trim() || manualPairCount === 0}>Lernset speichern</button></div>
           {message && <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: 'var(--font-sm)' }}>{message}</p>}
         </form>
       )}

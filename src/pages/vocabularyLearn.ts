@@ -62,6 +62,47 @@ export function isAnswerClose(given: string, expected: string) {
   return editDistance(a, b) <= tolerance;
 }
 
+/**
+ * Mehrere gültige Übersetzungen stehen im Feld getrennt durch , ; / | oder „oder".
+ * Beispiel: „versuchen, probieren" → ['versuchen', 'probieren'].
+ * Ein Schrägstrich trennt nur echte Wortvarianten – „km/h" bleibt eine Antwort.
+ */
+const VARIANT_SPLIT = /\s*(?:[,;|]|\soder\s)\s*/i;
+const SLASH_SPLIT = /\s*\/\s*/;
+
+function splitVariants(value: string): string[] {
+  return value.split(VARIANT_SPLIT).flatMap(part => {
+    const chunks = part.split(SLASH_SPLIT).map(chunk => chunk.trim()).filter(Boolean);
+    const letters = (text: string) => text.replace(/[^A-Za-zÄÖÜäöüß]/g, '').length;
+    return chunks.length > 1 && chunks.length <= 4 && chunks.every(chunk => letters(chunk) >= 3) ? chunks : [part];
+  });
+}
+
+/** Alle gültigen Schreibweisen einer Vokabel – erste Variante ist die gesprochene/angezeigte. */
+export function answerVariants(value: string): string[] {
+  const seen = new Set<string>();
+  return splitVariants(value)
+    .map(part => part.trim())
+    .filter(part => {
+      const key = normalizeAnswer(part);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/** Hauptvariante: wird vorgelesen und als Antwortoption angezeigt. */
+export function primaryVariant(value: string) {
+  return answerVariants(value)[0] || value.trim();
+}
+
+/** Richtig ist die Antwort, wenn sie zu irgendeiner hinterlegten Variante passt. */
+export function isAnswerCorrect(given: string, expected: string) {
+  const variants = answerVariants(expected);
+  if (!variants.length) return false;
+  return variants.some(variant => isAnswerClose(given, variant));
+}
+
 export function isGermanLanguage(value: string) {
   return /deutsch|german/i.test(value);
 }
@@ -103,13 +144,13 @@ export function seededShuffle<T>(items: T[], seed: string): T[] {
 
 /** Antwortoptionen: ähnliche Länge und gleicher Anfangsbuchstabe sind schwieriger – genau richtig. */
 export function buildChoiceOptions(entry: VocabularyEntry, entries: VocabularyEntry[], answerOf: (entry: VocabularyEntry) => string, seed: string) {
-  const correct = answerOf(entry);
-  const correctKey = normalizeAnswer(correct);
-  const seen = new Set([correctKey]);
+  const correct = primaryVariant(answerOf(entry));
+  const correctKeys = new Set(answerVariants(answerOf(entry)).map(normalizeAnswer));
+  const seen = new Set(correctKeys);
   const pool: string[] = [];
   entries.forEach(other => {
     if (other.id === entry.id) return;
-    const value = answerOf(other);
+    const value = primaryVariant(answerOf(other));
     const key = normalizeAnswer(value);
     if (!key || seen.has(key)) return;
     seen.add(key);
