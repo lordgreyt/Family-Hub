@@ -973,6 +973,36 @@ export const mockDb = {
   deleteDepotTransaction: (id: string) => {
     updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, txs => txs.filter(t => t.id !== id));
   },
+  /**
+   * Nimmt die zuletzt angelegte MANUELLE Buchung zurück (Auto-/Sparraten bleiben unberührt).
+   * Eine Umbuchung besteht aus zwei Buchungen (Quelle + Ziel) – beide werden entfernt.
+   * Gibt die entfernten Buchungen zurück (leer, wenn keine manuelle Buchung existiert).
+   */
+  revertLastManualBooking: (): DepotTransaction[] => {
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    const isManual = (t: DepotTransaction) => !t.isAutomated && !t.note?.includes('Sparrate');
+    const manual = txs.filter(isManual);
+    if (manual.length === 0) return [];
+
+    const stamp = (t: DepotTransaction) => t.createdAt || new Date(t.date).getTime();
+    const byRecency = (a: DepotTransaction, b: DepotTransaction) => stamp(b) - stamp(a);
+    const last = [...manual].sort(byRecency)[0];
+
+    const removedIds = new Set<string>([last.id]);
+    if (last.note?.startsWith('Umbuchung')) {
+      const partner = manual
+        .filter(t => t.id !== last.id)
+        .filter(t => t.date === last.date && t.note?.startsWith('Umbuchung'))
+        .filter(t => Math.abs(t.amount + last.amount) < 0.005)
+        .filter(t => Math.abs(stamp(t) - stamp(last)) < 10000)
+        .sort(byRecency)[0];
+      if (partner) removedIds.add(partner.id);
+    }
+
+    const removed = txs.filter(t => removedIds.has(t.id));
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, all => all.filter(t => !removedIds.has(t.id)));
+    return removed;
+  },
   getN26Settings: (): N26Settings => {
     const defaults: N26Settings = { autoBookingEnabled: false, bookingDay: 1, closedYears: [] };
     return get<N26Settings>(DB_KEYS.N26_SETTINGS, defaults) || defaults;

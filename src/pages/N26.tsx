@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Landmark, History, Settings,
   Plus, Trash2, X, Delete, ArrowRight, Calendar, FileText, ChevronRight,
-  TrendingDown, TrendingUp, PieChart as PieChartIcon
+  TrendingDown, TrendingUp, PieChart as PieChartIcon, AlertTriangle, Undo2
 } from 'lucide-react';
 import { mockDb } from '../services/mockDb';
 import type { Depot, DepotTransaction, ExpenseItem } from '../services/mockDb';
@@ -20,6 +20,8 @@ export const N26 = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showAddDepotForm, setShowAddDepotForm] = useState(false);
   const [editingDepot, setEditingDepot] = useState<Depot | null>(null);
+  const [confirmRevert, setConfirmRevert] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   
   // Data State
   const [depots, setDepots] = useState<Depot[]>([]);
@@ -84,6 +86,36 @@ export const N26 = () => {
     return (depot?.startBalance || 0) + txSum;
   };
 
+  const n26Settings = mockDb.getN26Settings();
+
+  const depotsById = useMemo(() => {
+    const map: Record<string, Depot> = {};
+    depots.forEach(d => { map[d.id] = d; });
+    return map;
+  }, [depots]);
+
+  /** Zuletzt angelegte manuelle Buchung (Auto-/Sparraten zählen nicht) */
+  const lastManualTx = useMemo(() => {
+    const manual = transactions.filter(t => !t.isAutomated && !t.note?.includes('Sparrate'));
+    if (manual.length === 0) return null;
+    return [...manual].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+  }, [transactions]);
+
+  const handleRevertLastManual = () => {
+    const removed = mockDb.revertLastManualBooking();
+    setConfirmRevert(false);
+    loadData();
+    setToast(removed.length > 0
+      ? `${removed.length === 1 ? 'Buchung' : 'Umbuchung'} zurückgenommen`
+      : 'Keine manuelle Buchung gefunden');
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   if (!user || user.id !== 'Falko') {
     return null;
   }
@@ -107,11 +139,13 @@ export const N26 = () => {
       {/* Content Area */}
       <div style={{ flex: 1 }}>
         {activeTab === 'dashboard' && (
-          <DashboardView 
+          <DashboardView
             depots={depots} 
             calculateBalance={calculateBalance} 
             surplus={budgetSurplus}
             transactions={transactions}
+            lastManualTx={lastManualTx}
+            onRevertLastManual={() => setConfirmRevert(true)}
           />
         )}
         {activeTab === 'depots' && (
@@ -138,6 +172,8 @@ export const N26 = () => {
       {showBookingForm && (
         <BookingForm 
           depots={depots} 
+          autoBookingEnabled={n26Settings.autoBookingEnabled}
+          autoBookingDay={n26Settings.bookingDay}
           onClose={() => setShowBookingForm(false)} 
           onSave={(data) => {
             if (Array.isArray(data)) {
@@ -148,6 +184,37 @@ export const N26 = () => {
             setShowBookingForm(false);
           }}
         />
+      )}
+
+      {/* Rücknahme der letzten manuellen Buchung bestätigen */}
+      {confirmRevert && lastManualTx && (
+        <ConfirmDialog
+          title="Letzte manuelle Buchung zurücknehmen?"
+          message={[
+            `${depotsById[lastManualTx.depotId]?.name || 'Unbekannt'} · ${Math.abs(lastManualTx.amount).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`,
+            `${new Date(lastManualTx.date).toLocaleDateString('de-DE')}${lastManualTx.note ? ` · ${lastManualTx.note}` : ''}`,
+            'Automatische Sparraten bleiben davon unberührt.',
+          ]}
+          confirmLabel="Zurücknehmen"
+          tone="danger"
+          onCancel={() => setConfirmRevert(false)}
+          onConfirm={handleRevertLastManual}
+        />
+      )}
+
+      {toast && createPortal(
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(110px + env(safe-area-inset-bottom, 0px))', zIndex: 3200,
+          padding: '0.7rem 1.1rem', borderRadius: 'var(--radius-full)',
+          backgroundColor: 'rgba(23,20,58,0.94)', color: 'white',
+          fontSize: 'var(--font-sm)', fontWeight: 600, boxShadow: 'var(--shadow-lg)',
+          whiteSpace: 'nowrap',
+          animation: 'slideUp 0.2s ease-out', pointerEvents: 'none',
+        }}>
+          {toast}
+        </div>,
+        document.body
       )}
 
       {/* Depot Form Overlay (Add/Edit) */}
@@ -187,7 +254,7 @@ export const N26 = () => {
 
 // --- Sub-Views ---
 
-const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { depots: Depot[], calculateBalance: (d: Depot) => number, surplus: number | null, transactions: DepotTransaction[] }) => {
+const DashboardView = ({ depots, calculateBalance, surplus, transactions, lastManualTx, onRevertLastManual }: { depots: Depot[], calculateBalance: (d: Depot) => number, surplus: number | null, transactions: DepotTransaction[], lastManualTx: DepotTransaction | null, onRevertLastManual: () => void }) => {
   const totalBalance = depots.reduce((sum, d) => sum + (calculateBalance(d) || 0), 0);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -270,6 +337,44 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions }: { de
 
       {/* Depot Balance Chart */}
       <DepotBalanceChart depots={depots} calculateBalance={calculateBalance} />
+
+      {/* Letzte manuelle Buchung – direkt zurücknehmbar */}
+      {lastManualTx && (
+        <div className="glass-panel" style={{
+          padding: '1rem 1.15rem', backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+          display: 'flex', alignItems: 'center', gap: '0.85rem',
+        }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '9.5px', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              LETZTE MANUELLE BUCHUNG
+            </span>
+            <span style={{ fontSize: '15px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {depots.find(d => d.id === lastManualTx.depotId)?.name || 'Unbekannt'}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {new Date(lastManualTx.date).toLocaleDateString('de-DE')}
+              {lastManualTx.note ? ` · ${lastManualTx.note}` : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem', flexShrink: 0 }}>
+            <span style={{ fontSize: '15px', fontWeight: 800, color: lastManualTx.amount >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+              {lastManualTx.amount > 0 ? '+' : ''}{lastManualTx.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+            </span>
+            <button
+              onClick={onRevertLastManual}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.45rem 0.7rem', borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-danger)', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              <Undo2 size={13} /> Zurücknehmen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Buchungen */}
       <DonutCard
@@ -967,7 +1072,7 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
 
 // --- Sub-Components ---
 
-const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void }) => {
+const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingDay }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void, autoBookingEnabled?: boolean, autoBookingDay?: number }) => {
   const [type, setType] = useState<'deposit' | 'withdrawal' | 'transfer'>('deposit');
   const [amount, setAmount] = useState('0');
   const [selectedDepotId, setSelectedDepotId] = useState(depots[0]?.id || '');
@@ -975,6 +1080,7 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [step, setStep] = useState(1); // 1: Type/Amount/Note, 2: Depot selection
+  const [pendingAutoConfirm, setPendingAutoConfirm] = useState(false);
 
   const handleKeyPress = (key: string) => {
     setAmount(prev => {
@@ -993,6 +1099,15 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
     const val = parseFloat(amount.replace(',', '.'));
     if (isNaN(val) || val === 0) return;
 
+    // Bei aktiver Auto-Buchung erst nach ausdrücklicher Bestätigung buchen
+    if (autoBookingEnabled) {
+      setPendingAutoConfirm(true);
+      return;
+    }
+    commitBooking(val);
+  };
+
+  const commitBooking = (val: number) => {
     if (type === 'transfer') {
       if (!selectedDepotId || !targetDepotId || selectedDepotId === targetDepotId) return;
       onSave([
@@ -1039,6 +1154,21 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
           <h3 style={{ margin: 0, fontSize: 'var(--font-base)', fontWeight: 700 }}>BUCHUNG ERSTELLEN</h3>
           <button onClick={onClose} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><X size={24} /></button>
         </div>
+
+        {autoBookingEnabled && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+            padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)',
+            backgroundColor: 'rgba(255, 159, 45, 0.12)', border: '1px solid rgba(255, 159, 45, 0.45)',
+            fontSize: '11px', fontWeight: 600, lineHeight: 1.35, color: 'var(--color-text)',
+          }}>
+            <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '1px', color: 'var(--color-orange)' }} />
+            <span>
+              Auto-Buchung ist aktiv (Tag {autoBookingDay} im Monat). Diese manuelle Buchung kommt zusätzlich dazu
+              und wird erst nach deiner Bestätigung gespeichert.
+            </span>
+          </div>
+        )}
 
         {step === 1 ? (
           <>
@@ -1178,6 +1308,23 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
           </div>
         )}
       </div>
+        {pendingAutoConfirm && (
+          <ConfirmDialog
+            title="Auto-Buchung ist aktiv"
+            message={[
+              `Am ${autoBookingDay}. des Monats werden die Sparraten automatisch gebucht.`,
+              `${type === 'withdrawal' ? '−' : ''}${amount} € · ${depots.find(d => d.id === (type === 'transfer' ? targetDepotId : selectedDepotId))?.name || 'Depot'}`,
+              'Diese manuelle Buchung kommt zusätzlich dazu.',
+            ]}
+            confirmLabel="Trotzdem buchen"
+            onCancel={() => setPendingAutoConfirm(false)}
+            onConfirm={() => {
+              setPendingAutoConfirm(false);
+              commitBooking(parseFloat(amount.replace(',', '.')));
+            }}
+          />
+        )}
+
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
@@ -1185,6 +1332,65 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
     document.body
   );
 };
+
+const ConfirmDialog = ({ title, message, confirmLabel, cancelLabel = 'Abbrechen', tone = 'primary', onConfirm, onCancel }: {
+  title: string;
+  message: string[];
+  confirmLabel: string;
+  cancelLabel?: string;
+  tone?: 'primary' | 'danger';
+  onConfirm: () => void;
+  onCancel: () => void;
+}) => createPortal(
+  <div style={{
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(23,20,58,0.55)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '1.25rem', zIndex: 3200,
+  }}>
+    <div className="glass-panel" style={{
+      width: '100%', maxWidth: '360px', padding: '1.35rem',
+      backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)',
+      display: 'flex', flexDirection: 'column', gap: '0.85rem',
+      boxShadow: 'var(--shadow-xl)',
+    }}>
+      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: tone === 'danger' ? 'var(--color-danger)' : 'var(--color-text)' }}>
+        {title}
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        {message.map((line, i) => (
+          <p key={i} style={{
+            margin: 0, fontSize: i === 0 ? '13px' : '12px',
+            fontWeight: i === 1 ? 700 : 500,
+            color: i === message.length - 1 ? 'var(--color-text-muted)' : 'var(--color-text)',
+          }}>
+            {line}
+          </p>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+        <button
+          onClick={onCancel}
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+        >
+          {cancelLabel}
+        </button>
+        <button
+          onClick={onConfirm}
+          style={{
+            flex: 1, padding: '0.75rem', borderRadius: 'var(--radius-md)', border: 'none',
+            backgroundColor: tone === 'danger' ? 'var(--color-danger)' : 'var(--color-primary)',
+            color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+          }}
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </div>
+  </div>,
+  document.body
+);
 
 
 const DepotForm = ({ onClose, onSave, initialDepot }: { onClose: () => void, onSave: (name: string, monthly: number, start: number) => void, initialDepot?: Depot }) => {

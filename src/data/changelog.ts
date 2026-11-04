@@ -5,9 +5,20 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.4.2';
+export const APP_VERSION = '1.4.3';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.3',
+    date: '2026-11-04',
+    title: 'N26: Buchungen zurücknehmen',
+    changes: [
+      'Neue Karte „Letzte manuelle Buchung“ auf dem Dashboard nimmt die letzte manuelle Buchung mit einem Tipp zurück',
+      'Bei Umbuchungen werden beide Zeilen (Quelle und Ziel) gemeinsam entfernt',
+      'Automatische Sparraten bleiben bei der Rücknahme unangetastet',
+      'Ist die Auto-Buchung aktiv, weist das Buchungsfenster darauf hin und fragt vor dem Speichern nach',
+    ],
+  },
   {
     version: '1.4.2',
     date: '2026-11-04',
