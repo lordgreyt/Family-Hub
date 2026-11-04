@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -1019,14 +1020,17 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
     }
   };
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 3000
     }}>
       <div className="glass-panel" style={{
         width: '100%', maxWidth: '500px', padding: '1.5rem',
+        paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+        maxHeight: 'calc(100dvh - 0.75rem)', overflowY: 'auto', overscrollBehavior: 'contain',
+        WebkitOverflowScrolling: 'touch',
         borderTopLeftRadius: 'var(--radius-xl)', borderTopRightRadius: 'var(--radius-xl)',
         backgroundColor: 'var(--color-surface)', display: 'flex', flexDirection: 'column', gap: '1rem',
         animation: 'slideUp 0.3s ease-out'
@@ -1177,7 +1181,8 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -1187,11 +1192,12 @@ const DepotForm = ({ onClose, onSave, initialDepot }: { onClose: () => void, onS
   const [monthly, setMonthly] = useState(initialDepot?.monthlyAmount?.toString() || '');
   const [start, setStart] = useState(initialDepot?.startBalance?.toString() || '');
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem'
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '1rem',
+      overflowY: 'auto'
     }}>
       <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: 'var(--color-surface)' }}>
         <h3 style={{ margin: 0, fontSize: 'var(--font-xl)', color: 'var(--color-primary)' }}>
@@ -1207,7 +1213,8 @@ const DepotForm = ({ onClose, onSave, initialDepot }: { onClose: () => void, onS
           <button onClick={() => onSave(name, parseFloat(monthly) || 0, parseFloat(start) || 0)} className="btn btn-primary" style={{ flex: 1 }} disabled={!name}>Speichern</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

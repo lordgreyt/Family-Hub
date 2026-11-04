@@ -5,9 +5,19 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.4.1';
+export const APP_VERSION = '1.4.2';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.2',
+    date: '2026-11-04',
+    title: 'N26: Buchung wieder möglich',
+    changes: [
+      'Der Weiter-Button beim Buchen liegt nicht mehr unter der unteren Leiste',
+      'Auf kleinen Displays lässt sich das Buchungsfenster scrollen, statt Inhalte abzuschneiden',
+      'Gleiches gilt für das Anlegen und Bearbeiten von Depots',
+    ],
+  },
   {
     version: '1.4.1',
     date: '2026-10-31',
