@@ -1003,6 +1003,34 @@ export const mockDb = {
     updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, all => all.filter(t => !removedIds.has(t.id)));
     return removed;
   },
+  /**
+   * Nimmt die zuletzt gelaufene MONATSBUCHUNG zurück – also den kompletten Lauf
+   * ("Monatliche Sparrate" über alle Depots, egal ob automatisch oder manuell ausgelöst).
+   * Einzige manuelle Buchungen bleiben unberührt.
+   */
+  revertLastMonthlyBooking: (): DepotTransaction[] => {
+    const txs = get<DepotTransaction[]>(DB_KEYS.DEPOT_TRANSACTIONS, []);
+    const isMonthly = (t: DepotTransaction) => !!t.isAutomated || !!t.note?.includes('Sparrate');
+    const monthly = txs.filter(isMonthly);
+    if (monthly.length === 0) return [];
+
+    const stamp = (t: DepotTransaction) => t.createdAt || new Date(t.date).getTime();
+    const byRecency = (a: DepotTransaction, b: DepotTransaction) => stamp(b) - stamp(a);
+    const last = [...monthly].sort(byRecency)[0];
+    const kind = last.note?.replace(/^Monatliche Sparrate\s*/, '') ?? '';
+
+    // Ein Lauf entsteht in einem Durchgang: gleiches Datum, gleiche Art, gleicher Zeitstempel (±15 s)
+    const batch = monthly.filter(t =>
+      t.date === last.date &&
+      (t.note?.replace(/^Monatliche Sparrate\s*/, '') ?? '') === kind &&
+      Math.abs(stamp(t) - stamp(last)) <= 15000
+    );
+
+    const removedIds = new Set(batch.map(t => t.id));
+    const removed = txs.filter(t => removedIds.has(t.id));
+    updateCollection<DepotTransaction>(DB_KEYS.DEPOT_TRANSACTIONS, all => all.filter(t => !removedIds.has(t.id)));
+    return removed;
+  },
   getN26Settings: (): N26Settings => {
     const defaults: N26Settings = { autoBookingEnabled: false, bookingDay: 1, closedYears: [] };
     return get<N26Settings>(DB_KEYS.N26_SETTINGS, defaults) || defaults;

@@ -110,6 +110,15 @@ export const N26 = () => {
       : 'Keine manuelle Buchung gefunden');
   };
 
+  const handleRevertLastMonthly = () => {
+    const removed = mockDb.revertLastMonthlyBooking();
+    loadData();
+    setToast(removed.length > 0
+      ? `Monatsbuchung zurückgenommen (${removed.length} ${removed.length === 1 ? 'Depot' : 'Depots'})`
+      : 'Keine Monatsbuchung gefunden');
+    return removed;
+  };
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -165,7 +174,7 @@ export const N26 = () => {
             onDelete={(id) => mockDb.deleteDepotTransaction(id)} 
           />
         )}
-        {activeTab === 'settings' && <SettingsView transactions={transactions} />}
+        {activeTab === 'settings' && <SettingsView transactions={transactions} onRevertLastMonthly={handleRevertLastMonthly} />}
       </div>
 
       {/* Booking Form Overlay */}
@@ -929,9 +938,30 @@ const YearGroup = ({ year, isClosed, transactions, depots, onDelete }: { year: n
   );
 };
 
-const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) => {
+const SettingsView = ({ transactions, onRevertLastMonthly }: { transactions: DepotTransaction[], onRevertLastMonthly: () => void }) => {
   const [settings, setSettings] = useState(mockDb.getN26Settings());
   const [isManualBookingLoading, setIsManualBookingLoading] = useState(false);
+  const [confirmMonthlyRevert, setConfirmMonthlyRevert] = useState(false);
+
+  /** Zuletzt gelaufene Monatsbuchung (alle Depots eines Laufs) */
+  const lastMonthlyRun = useMemo(() => {
+    const monthly = transactions.filter(t => t.isAutomated || t.note?.includes('Sparrate'));
+    if (monthly.length === 0) return null;
+    const stamp = (t: DepotTransaction) => t.createdAt || new Date(t.date).getTime();
+    const last = [...monthly].sort((a, b) => stamp(b) - stamp(a))[0];
+    const kind = last.note?.replace(/^Monatliche Sparrate\s*/, '') ?? '';
+    const batch = monthly.filter(t =>
+      t.date === last.date &&
+      (t.note?.replace(/^Monatliche Sparrate\s*/, '') ?? '') === kind &&
+      Math.abs(stamp(t) - stamp(last)) <= 15000
+    );
+    return {
+      date: last.date,
+      count: batch.length,
+      total: batch.reduce((s, t) => s + t.amount, 0),
+      automated: !!last.note?.includes('(Auto)'),
+    };
+  }, [transactions]);
 
   const lastBookingDate = useMemo(() => {
     const routineTxs = transactions.filter(t => t.note?.includes('Sparrate'));
@@ -1030,6 +1060,44 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
             Letzte Buchung am: {new Date(lastBookingDate).toLocaleDateString('de-DE')}
           </p>
         )}
+
+        {lastMonthlyRun && (
+          <>
+            <div style={{ borderTop: '1px solid var(--color-border)', margin: '1.25rem 0 1rem 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700 }}>Letzte Monatsbuchung</span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                {new Date(lastMonthlyRun.date).toLocaleDateString('de-DE')} · {lastMonthlyRun.count} {lastMonthlyRun.count === 1 ? 'Depot' : 'Depots'}
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.4rem',
+              margin: '0.6rem 0 0.85rem 0',
+            }}>
+              <span style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-0.02em' }}>
+                {lastMonthlyRun.total.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                {lastMonthlyRun.automated ? 'Auto' : 'Manuell'}
+              </span>
+            </div>
+            <button
+              onClick={() => setConfirmMonthlyRevert(true)}
+              style={{
+                width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-danger)', backgroundColor: 'transparent',
+                color: 'var(--color-danger)', fontWeight: 800, fontSize: '13px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+                cursor: 'pointer',
+              }}
+            >
+              <Undo2 size={17} /> Komplett zurücknehmen
+            </button>
+            <p style={{ margin: '0.6rem 0 0 0', fontSize: '10px', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
+              Entfernt alle {lastMonthlyRun.count} Buchungen dieses Laufs auf einen Schlag – einzeln gebuchte Beträge bleiben erhalten.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Closed Years History Card */}
@@ -1066,6 +1134,26 @@ const SettingsView = ({ transactions }: { transactions: DepotTransaction[] }) =>
           Letzte automatische Buchung: {settings.lastAutoBookingMonth || 'Nie'}
         </p>
       </div>
+
+      {confirmMonthlyRevert && lastMonthlyRun && (
+        <ConfirmDialog
+          title="Gesamte Monatsbuchung zurücknehmen?"
+          message={[
+            `${new Date(lastMonthlyRun.date).toLocaleDateString('de-DE')} · ${lastMonthlyRun.count} ${lastMonthlyRun.count === 1 ? 'Depot' : 'Depots'}`,
+            `${lastMonthlyRun.total.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € werden von den Depots abgezogen`,
+            lastMonthlyRun.automated
+              ? 'Die Auto-Buchung bleibt für diesen Monat als erledigt markiert – sie läuft nicht von selbst erneut.'
+              : 'Einzeln gebuchte Beträge bleiben erhalten.',
+          ]}
+          confirmLabel="Ja, zurücknehmen"
+          tone="danger"
+          onCancel={() => setConfirmMonthlyRevert(false)}
+          onConfirm={() => {
+            setConfirmMonthlyRevert(false);
+            onRevertLastMonthly();
+          }}
+        />
+      )}
     </div>
   );
 };

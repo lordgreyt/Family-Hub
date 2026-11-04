@@ -5,9 +5,19 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.4.3';
+export const APP_VERSION = '1.4.4';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.4',
+    date: '2026-11-04',
+    title: 'N26: Monatsbuchung komplett zurücknehmen',
+    changes: [
+      'Einstellungen zeigen die letzte Monatsbuchung mit Datum, Anzahl Depots und Gesamtbetrag',
+      'Mit „Komplett zurücknehmen“ wird der ganze Lauf über alle Depots auf einen Schlag entfernt',
+      'Einzeln gebuchte Beträge bleiben dabei erhalten',
+    ],
+  },
   {
     version: '1.4.3',
     date: '2026-11-04',
