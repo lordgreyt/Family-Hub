@@ -13,6 +13,8 @@ import { Setup } from './pages/Setup';
 import { Expenses } from './pages/Expenses';
 import { N26 } from './pages/N26';
 import { PackingList } from './pages/PackingList';
+import { Pantry } from './pages/Pantry';
+import { Shopping } from './pages/Shopping';
 import { HolidayBudget } from './pages/HolidayBudget';
 import { SmartHome } from './pages/SmartHome';
 import { SurgeryFinance } from './pages/SurgeryFinance';
@@ -50,6 +52,8 @@ function App() {
               <Route path="/smart-home" element={<SmartHome />} />
               <Route path="/grades" element={<Grades />} />
               <Route path="/vokabeln" element={<Vocabulary />} />
+              <Route path="/vorrat" element={<Pantry />} />
+              <Route path="/einkaufsliste" element={<Shopping />} />
               <Route path="/packliste" element={<PackingList />} />
               <Route path="/urlaubsbudget" element={<HolidayBudget />} />
               <Route path="/op-finanzen" element={<SurgeryFinance />} />

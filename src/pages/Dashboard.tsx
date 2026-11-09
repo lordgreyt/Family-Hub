@@ -7,13 +7,15 @@ import type { TaskItem, User, RewardRequest } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import {
   Star, Wallet, TrendingUp, TrendingDown, Calculator, Check, ClipboardList, GraduationCap, Gift, Euro, CreditCard, Languages,
-  Home as HomeIcon, ChevronRight, ChevronDown, History, ListChecks,
+  Home as HomeIcon, ChevronRight, ChevronDown, History, ListChecks, Package, AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { HERO_GRADIENT, GREEN, GREEN_TEXT, ORANGE, PINK, PINK_TEXT, PRIMARY, BLUE, CARD, sectionTitle, iconChip } from '../components/SurgeryFinance/theme';
 import { TaskRow, todayIso } from '../components/TaskParts';
 import { getRecentActivity, relativeTime } from '../utils/activity';
 import type { ActivityEvent, ActivityKind } from '../utils/activity';
+import { daysUntilExpiry, isExpiringSoon, isLowStock } from '../utils/pantry';
+import type { PantryItem } from '../services/mockDb';
 
 const chipWhite = {
   display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', borderRadius: '999px',
@@ -37,6 +39,7 @@ const KIND_STYLE: Record<ActivityKind, { icon: LucideIcon; color: string }> = {
   holiday: { icon: Euro, color: BLUE },
   depot: { icon: CreditCard, color: PRIMARY },
   vocab: { icon: Languages, color: BLUE },
+  pantry: { icon: Package, color: GREEN },
 };
 
 const fmtAmount = (n: number) =>
@@ -65,6 +68,7 @@ export const Dashboard = () => {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [eventPage, setEventPage] = useState(0);
+  const [pantry, setPantry] = useState<PantryItem[]>([]);
 
   useEffect(() => {
     const loadData = () => {
@@ -90,6 +94,7 @@ export const Dashboard = () => {
       setUsers(mockDb.getUsers());
       setRewardRequests(mockDb.getRewardRequests().filter(r => r.status === 'PENDING'));
       setEvents(getRecentActivity(user, EVENTS_LIMIT));
+      setPantry(mockDb.getPantry());
 
       try {
         const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -141,6 +146,10 @@ export const Dashboard = () => {
     (t.isShared && (!t.assignedTo || t.assignedTo.length === 0))
   );
   const visibleTasks = showAllTasks ? filteredTasks : filteredTasks.slice(0, TASKS_PREVIEW);
+  const lowStockItems = pantry.filter(isLowStock);
+  const expiringItems = pantry
+    .filter(isExpiringSoon)
+    .sort((a, b) => (daysUntilExpiry(a) ?? 0) - (daysUntilExpiry(b) ?? 0));
   const now = Date.now();
   const eventPageCount = Math.max(1, Math.ceil(events.length / EVENTS_PER_PAGE));
   const currentEventPage = Math.min(eventPage, eventPageCount - 1);
@@ -203,6 +212,28 @@ export const Dashboard = () => {
             <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Belohnungen warten auf Freigabe</div>
           </div>
           <Link to="/rewards" style={softLink}>Prüfen <ChevronRight size={14} /></Link>
+        </div>
+      )}
+
+      {/* Vorrat: wenig übrig / läuft bald ab — nur für Eltern */}
+      {!isChild && (lowStockItems.length > 0 || expiringItems.length > 0) && (
+        <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem' }}>
+          <span style={iconChip(ORANGE, 42)}><AlertTriangle size={20} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>
+              {[
+                lowStockItems.length > 0 ? `${lowStockItems.length} ${lowStockItems.length === 1 ? 'Artikel wird knapp' : 'Artikel werden knapp'}` : '',
+                expiringItems.length > 0 ? `${expiringItems.length} ${expiringItems.length === 1 ? 'läuft' : 'laufen'} bald ab` : '',
+              ].filter(Boolean).join(' · ')}
+            </div>
+            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 600, overflowWrap: 'anywhere' }}>
+              {[...expiringItems, ...lowStockItems.filter(p => !expiringItems.includes(p))]
+                .slice(0, 4)
+                .map(p => `${p.emoji || ''} ${p.name}`.trim())
+                .join(', ')}
+            </div>
+          </div>
+          <Link to="/vorrat" style={softLink}>Vorrat <ChevronRight size={14} /></Link>
         </div>
       )}
 

@@ -5,9 +5,26 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.4.4';
+export const APP_VERSION = '1.5.0';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.0',
+    date: '2026-11-09',
+    title: 'Vorrat & Einkaufslisten',
+    changes: [
+      'Neuer Vorrat: Bestand an Lebensmitteln und Haushaltsartikeln mit Lagerort, Mindestbestand, MHD und Barcode',
+      'Katalog mit knapp 200 vorbefüllten Artikeln samt Icons zum schnellen Anlegen',
+      'Mehrere Einkaufslisten, z. B. eine pro Laden, nach Kategorien sortiert',
+      'Beim Abhaken wird die gekaufte Menge abgefragt und der Vorrat automatisch aufgefüllt – inklusive Rückgängig',
+      'Artikel mit niedrigem Vorrat lassen sich mit einem Tipp auf die Einkaufsliste setzen',
+      'Unterschreitet ein Artikel den Mindestbestand, landet er automatisch auf der Einkaufsliste (Liste pro Artikel wählbar)',
+      'Verlauf im Vorrat: wer wann was eingelagert oder entnommen hat – aus der App, vom Einkauf und vom Scanner',
+      'Neu gescannt: unbekannte Barcodes vom Küchenscanner landen in einem Eingang und lassen sich anlegen oder zuordnen',
+      'Schnittstelle für den Küchenscanner (ESP32) mit Geräte-Token und doppelsicherer Buchung',
+      'Startseite zeigt knappe und bald ablaufende Artikel sowie Vorrats-Buchungen bei den letzten Ereignissen',
+    ],
+  },
   {
     version: '1.4.4',
     date: '2026-11-04',

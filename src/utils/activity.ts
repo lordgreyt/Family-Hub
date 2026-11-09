@@ -1,5 +1,6 @@
 import { mockDb } from '../services/mockDb';
 import type { User } from '../services/mockDb';
+import { formatQty, isLowStock } from './pantry';
 
 export type ActivityKind =
   | 'expense'
@@ -12,7 +13,8 @@ export type ActivityKind =
   | 'stars_request'
   | 'holiday'
   | 'depot'
-  | 'vocab';
+  | 'vocab'
+  | 'pantry';
 
 export interface ActivityEvent {
   id: string;
@@ -129,6 +131,31 @@ export const getRecentActivity = (user: User | null, limit = 30): ActivityEvent[
   }
 
   if (!isChild) {
+    // Vorrat: Buchungen (App, Einkauf, Scanner) mit Hinweis auf niedrigen Bestand
+    const pantry = mockDb.getPantry();
+    for (const l of mockDb.getPantryLog().slice(0, 60)) {
+      if (!l || l.status === 'pending') continue;
+      const rejected = l.status === 'unknown_product' || l.status === 'not_in_stock';
+      if (!rejected && !l.delta) continue;
+      const qty = formatQty(Math.abs(l.delta));
+      const item = l.pantryId ? pantry.find(p => p.id === l.pantryId) : undefined;
+      const low = !!item && l.delta < 0 && isLowStock(item);
+      const sourceLabel = l.source === 'device' ? 'Scanner' : l.source === 'shopping' ? 'Einkauf' : l.source === 'inbox' ? 'Neu gescannt' : 'Vorrat';
+      push({
+        id: `pantry-${l.id}`,
+        at: l.at,
+        kind: 'pantry',
+        title: l.status === 'unknown_product'
+          ? `Unbekannter Barcode ${l.barcode ?? ''}`.trim()
+          : l.status === 'not_in_stock'
+            ? `${l.name} nicht auf Vorrat`
+            : `${l.name} ${l.delta > 0 ? '+' : '−'}${qty}${l.unit ? ` ${l.unit}` : ''}`,
+        subtitle: low ? `${sourceLabel} · Mindestbestand erreicht` : sourceLabel,
+        userId: l.userId,
+        link: '/vorrat',
+      });
+    }
+
     // Ausgaben & Einnahmen
     for (const e of mockDb.getExpenses() || []) {
       if (!e) continue;

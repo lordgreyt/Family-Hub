@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
-import { ref, set as firebaseSet, onValue, get as firebaseGet } from 'firebase/database';
+import { ref, set as firebaseSet, update as firebaseUpdate, increment, onValue, get as firebaseGet } from 'firebase/database';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
@@ -298,7 +298,94 @@ export const DB_KEYS = {
   HOLIDAY_BUDGET: 'family_hub_holiday_budget',
   VOCABULARY: 'family_hub_vocabulary',
   UNLOCKED_VIDEOS: 'family_hub_unlocked_videos',
+  PANTRY: 'family_hub_pantry',
+  SHOPPING_LISTS: 'family_hub_shopping_lists',
+  SHOPPING_ITEMS: 'family_hub_shopping_items',
+  PANTRY_LOG: 'family_hub_pantry_log',
+  PANTRY_UNKNOWN: 'family_hub_pantry_unknown',
 };
+
+// So viele Buchungen bleiben im Verlauf; ältere werden beim Schreiben entfernt.
+// (Clients laden die gesamte Datenbank, das Protokoll muss daher klein bleiben.)
+export const PANTRY_LOG_LIMIT = 300;
+
+// Vorrat und Einkaufslisten: Objekte nach ID (statt Arrays), damit jeder Eintrag einzeln
+// geschrieben wird und gleichzeitige Änderungen (z. B. vom Küchenscanner) sich nicht überschreiben.
+export interface PantryItem {
+  id: string;
+  name: string;
+  emoji: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  minQuantity?: number;
+  location: string;
+  expiryDate?: string; // YYYY-MM-DD
+  barcode?: string;
+  catalogId?: string;
+  notes?: string;
+  restockListId?: string; // Einkaufsliste für den automatischen Nachkauf (Standard: erste Liste)
+  createdAt: number;
+  updatedAt: number;
+  createdBy?: string;
+}
+
+// Eine Bestandsänderung (aus der App, vom Einkauf oder vom Küchenscanner).
+export interface PantryLogEntry {
+  id: string;
+  at: number;
+  pantryId?: string;
+  name: string;
+  emoji: string;
+  unit: string;
+  delta: number;
+  quantityAfter: number;
+  source: 'app' | 'shopping' | 'device' | 'inbox';
+  userId?: string;
+  deviceId?: string;
+  barcode?: string;
+  status?: string; // Scanner: ok, not_in_stock, unknown_product …
+  note?: string;
+}
+
+// Vom Scanner gelesener Barcode ohne passenden Artikel – wartet auf Zuordnung.
+export interface UnknownBarcode {
+  id: string; // = Barcode (nur Ziffern)
+  barcode: string;
+  count: number;
+  pendingQty: number; // eingelagerte Menge, die bei der Zuordnung gebucht wird
+  firstSeenAt: number;
+  lastSeenAt: number;
+  deviceId?: string;
+  name?: string; // Vorschlag aus Open Food Facts
+  brand?: string;
+}
+
+export interface ShoppingList {
+  id: string;
+  name: string;
+  emoji: string;
+  createdAt: number;
+}
+
+export interface ShoppingItem {
+  id: string;
+  listId: string;
+  name: string;
+  emoji: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  checked: boolean;
+  checkedAt?: number;
+  stockedQty?: number; // beim Abhaken in den Vorrat gebuchte Menge (für „Rückgängig“)
+  pantryId?: string;
+  catalogId?: string;
+  note?: string;
+  addedBy?: string;
+  auto?: boolean; // automatisch wegen Mindestbestand ergänzt
+  createdAt: number;
+}
 
 const DEFAULT_GRADE_SETTINGS: GradeChildSettings = {
   isSecondarySchool: false,
@@ -464,6 +551,85 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
       removePending(key);
       console.log(`🔓 Released ${key} (pendingWrites count: ${pendingWrites.get(key) || 0})`);
     });
+}
+
+// --- Einträge nach ID (Vorrat, Einkaufslisten) ---------------------------------------------
+function getRecords<T extends { id: string }>(key: string): T[] {
+  const data = get<Record<string, T> | null>(key, null);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  return Object.values(data).filter(v => v && typeof v === 'object' && typeof v.id === 'string');
+}
+
+async function restoreFromServer(key: string) {
+  try {
+    const snap = await firebaseGet(ref(db, key));
+    if (snap.exists()) localStorage.setItem(key, JSON.stringify(snap.val()));
+    else localStorage.removeItem(key);
+    window.dispatchEvent(new Event('db_updated'));
+  } catch (e) {
+    console.error(`Failed to restore ${key} from server:`, e);
+  }
+}
+
+// Schreibt genau einen Eintrag (value = null löscht ihn) – lokal sofort, in der Cloud pro Pfad.
+function setRecord<T extends { id: string }>(key: string, id: string, value: T | null): void {
+  const local = get<Record<string, T>>(key, {});
+  const next: Record<string, T> = local && typeof local === 'object' && !Array.isArray(local) ? { ...local } : {};
+  if (value === null) delete next[id];
+  else next[id] = value;
+  localStorage.setItem(key, JSON.stringify(next));
+  window.dispatchEvent(new Event('db_updated'));
+
+  addPending(key);
+  firebaseSet(ref(db, `${key}/${id}`), value === null ? null : stripUndefined(value))
+    .catch(async (e) => {
+      console.error(`Firebase write error for ${key}/${id}:`, e);
+      await restoreFromServer(key);
+    })
+    .finally(() => removePending(key));
+}
+
+// Löscht mehrere Einträge in einem atomaren Schritt.
+function removeRecords(key: string, ids: string[]): void {
+  if (ids.length === 0) return;
+  const local = get<Record<string, unknown>>(key, {});
+  const next = local && typeof local === 'object' && !Array.isArray(local) ? { ...local } : {};
+  const patch: Record<string, null> = {};
+  ids.forEach(id => { delete next[id]; patch[id] = null; });
+  localStorage.setItem(key, JSON.stringify(next));
+  window.dispatchEvent(new Event('db_updated'));
+
+  addPending(key);
+  firebaseUpdate(ref(db, key), patch)
+    .catch(async (e) => {
+      console.error(`Firebase delete error for ${key}:`, e);
+      await restoreFromServer(key);
+    })
+    .finally(() => removePending(key));
+}
+
+// Ändert eine Zahl atomar per Server-Increment (kein Überschreiben bei gleichzeitigen Buchungen).
+// Gibt die tatsächlich angewendete Änderung zurück (nie unter 0).
+function adjustQuantity(key: string, id: string, delta: number): number {
+  const local = get<Record<string, { quantity?: number }>>(key, {});
+  const rec = local && typeof local === 'object' ? local[id] : undefined;
+  if (!rec) return 0;
+  const current = Number(rec.quantity) || 0;
+  const applied = Math.max(-current, delta);
+  if (applied === 0) return 0;
+  const now = Date.now();
+  const next = { ...local, [id]: { ...rec, quantity: current + applied, updatedAt: now } };
+  localStorage.setItem(key, JSON.stringify(next));
+  window.dispatchEvent(new Event('db_updated'));
+
+  addPending(key);
+  firebaseUpdate(ref(db, `${key}/${id}`), { quantity: increment(applied), updatedAt: now })
+    .catch(async (e) => {
+      console.error(`Firebase increment error for ${key}/${id}:`, e);
+      await restoreFromServer(key);
+    })
+    .finally(() => removePending(key));
+  return applied;
 }
 
 let isInitialized = false;
@@ -1163,6 +1329,43 @@ export const mockDb = {
   savePacklist: (data: PacklistData) => {
     set(DB_KEYS.PACKLIST, data);
   },
+
+  // Vorrat
+  getPantry: (): PantryItem[] => getRecords<PantryItem>(DB_KEYS.PANTRY).filter(p => p.name),
+  savePantryItem: (item: PantryItem) => setRecord(DB_KEYS.PANTRY, item.id, { ...item, updatedAt: Date.now() }),
+  deletePantryItem: (id: string) => setRecord<PantryItem>(DB_KEYS.PANTRY, id, null),
+  adjustPantryQuantity: (id: string, delta: number): number => adjustQuantity(DB_KEYS.PANTRY, id, delta),
+
+  // Einkaufslisten
+  getShoppingLists: (): ShoppingList[] =>
+    getRecords<ShoppingList>(DB_KEYS.SHOPPING_LISTS).filter(l => l.name).sort((a, b) => a.createdAt - b.createdAt),
+  saveShoppingList: (list: ShoppingList) => setRecord(DB_KEYS.SHOPPING_LISTS, list.id, list),
+  deleteShoppingList: (id: string) => {
+    const itemIds = getRecords<ShoppingItem>(DB_KEYS.SHOPPING_ITEMS).filter(i => i.listId === id).map(i => i.id);
+    removeRecords(DB_KEYS.SHOPPING_ITEMS, itemIds);
+    setRecord<ShoppingList>(DB_KEYS.SHOPPING_LISTS, id, null);
+  },
+  getShoppingItems: (): ShoppingItem[] =>
+    getRecords<ShoppingItem>(DB_KEYS.SHOPPING_ITEMS).filter(i => i.name && i.listId),
+  saveShoppingItem: (item: ShoppingItem) => setRecord(DB_KEYS.SHOPPING_ITEMS, item.id, item),
+  deleteShoppingItems: (ids: string[]) => removeRecords(DB_KEYS.SHOPPING_ITEMS, ids),
+
+  // Verlauf der Bestandsbuchungen (begrenzt auf PANTRY_LOG_LIMIT)
+  getPantryLog: (): PantryLogEntry[] =>
+    getRecords<PantryLogEntry>(DB_KEYS.PANTRY_LOG).filter(e => e.at).sort((a, b) => b.at - a.at),
+  addPantryLog: (entry: PantryLogEntry) => {
+    setRecord(DB_KEYS.PANTRY_LOG, entry.id, entry);
+    const all = getRecords<PantryLogEntry>(DB_KEYS.PANTRY_LOG).sort((a, b) => b.at - a.at);
+    if (all.length > PANTRY_LOG_LIMIT) {
+      removeRecords(DB_KEYS.PANTRY_LOG, all.slice(PANTRY_LOG_LIMIT).map(e => e.id));
+    }
+  },
+
+  // Unbekannte Barcodes vom Küchenscanner
+  getUnknownBarcodes: (): UnknownBarcode[] =>
+    getRecords<UnknownBarcode>(DB_KEYS.PANTRY_UNKNOWN).sort((a, b) => b.lastSeenAt - a.lastSeenAt),
+  saveUnknownBarcode: (entry: UnknownBarcode) => setRecord(DB_KEYS.PANTRY_UNKNOWN, entry.id, entry),
+  deleteUnknownBarcode: (id: string) => setRecord<UnknownBarcode>(DB_KEYS.PANTRY_UNKNOWN, id, null),
 
   // Urlaubsbudget
   getHolidayBudget: (): HolidayBudgetData => {

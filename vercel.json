@@ -18,6 +18,10 @@
       "memory": 256,
       "maxDuration": 10
     },
+    "api/pantry/scan.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
     "api/private/surgery-finance.js": {
       "memory": 256,
       "maxDuration": 10
