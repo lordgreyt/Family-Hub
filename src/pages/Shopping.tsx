@@ -37,6 +37,61 @@ const parseEntry = (raw: string): { name: string; quantity: number } => {
   return { quantity: 1, name: raw.trim() };
 };
 
+// Quadratische Kacheln wie bei Bring!: Icon und Name, Menge als kleine Marke in der Ecke.
+const TILE_GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))', gap: '0.55rem' } as const;
+
+const cornerBadge = {
+  position: 'absolute', top: '0.3rem', minWidth: '1.2rem', height: '1.2rem', padding: '0 0.3rem', borderRadius: '999px',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, lineHeight: 1,
+  boxSizing: 'border-box',
+} as const;
+
+// Nur anzeigen, wenn es etwas zu sagen gibt: Menge ≠ 1 oder eine Einheit außer „Stk“.
+const qtyBadge = (item: ShoppingItem): string | undefined => {
+  const unit = item.unit && item.unit !== 'Stk' ? ` ${item.unit}` : '';
+  return item.quantity !== 1 || unit ? `${formatQty(item.quantity)}${unit}` : undefined;
+};
+
+const ItemTile = ({ item, badge, title, done, onClick }: {
+  item: ShoppingItem; badge?: string; title?: string; done?: boolean; onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    aria-label={done ? `${item.name} wieder öffnen` : `${item.name} abhaken`}
+    style={{
+      position: 'relative', aspectRatio: '1 / 1', minWidth: 0, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.4rem',
+      borderRadius: 'var(--radius-lg, 16px)', border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', color: 'var(--color-text)', fontFamily: 'inherit',
+      opacity: done ? 0.6 : 1,
+    }}
+  >
+    <span style={{ fontSize: '2.1rem', lineHeight: 1 }}>{item.emoji}</span>
+    <span
+      style={{
+        maxWidth: '100%', fontSize: '0.76rem', fontWeight: 700, lineHeight: 1.2, textAlign: 'center', overflowWrap: 'anywhere',
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        textDecoration: done ? 'line-through' : 'none',
+      }}
+    >
+      {item.name}
+    </span>
+    {badge && <span style={{ ...cornerBadge, right: '0.3rem', background: 'var(--color-primary)', color: 'white' }}>{badge}</span>}
+    {done && (
+      <span style={{ ...cornerBadge, left: '0.3rem', padding: 0, width: '1.2rem', background: 'var(--color-success)', color: 'white' }}>
+        <Check size={12} />
+      </span>
+    )}
+    {!done && item.auto && (
+      <span style={{ ...cornerBadge, left: '0.3rem', padding: 0, width: '1.2rem', background: 'var(--color-surface-muted)', color: 'var(--color-text-muted)' }}>
+        <Refrigerator size={11} />
+      </span>
+    )}
+  </button>
+);
+
 export const Shopping = () => {
   const { user } = useAuth();
   const [lists, setLists] = useState<ShoppingList[]>([]);
@@ -252,32 +307,17 @@ export const Shopping = () => {
                   <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     {cat.emoji} {cat.label}
                   </div>
-                  {list.map(item => {
-                    const stock = stockOf(item);
-                    return (
-                      <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.5rem 0', borderTop: '1px solid var(--color-border)' }}>
-                        <button
-                          onClick={() => startCheck(item)} aria-label={`${item.name} abhaken`}
-                          style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--color-primary-light)', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
-                        />
-                        <button
-                          onClick={() => setEditing(item)}
-                          style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--color-text)', padding: 0 }}
-                        >
-                          <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{item.emoji}</span>
-                          <span style={{ minWidth: 0 }}>
-                            <span style={{ display: 'block', fontWeight: 700, fontSize: '0.92rem' }}>{item.name}</span>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                              {stock ? `Vorrat: ${formatQty(stock.quantity)} ${stock.unit}` : 'nicht im Vorrat'}
-                              {item.auto ? ' · Mindestbestand' : ''}
-                              {item.note ? ` · ${item.note}` : ''}
-                            </span>
-                          </span>
-                        </button>
-                        <span style={{ fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{formatQty(item.quantity)} <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>{item.unit}</span></span>
-                      </div>
-                    );
-                  })}
+                  <div style={TILE_GRID}>
+                    {list.map(item => (
+                      <ItemTile
+                        key={item.id}
+                        item={item}
+                        badge={qtyBadge(item)}
+                        title={[item.note, item.auto ? 'Mindestbestand unterschritten' : ''].filter(Boolean).join(' · ') || undefined}
+                        onClick={() => startCheck(item)}
+                      />
+                    ))}
+                  </div>
                 </div>
               );
             })
@@ -294,22 +334,25 @@ export const Shopping = () => {
                   Aufräumen
                 </button>
               </div>
-              {showDone && done.map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.45rem 0', borderTop: '1px solid var(--color-border)', opacity: 0.7 }}>
-                  <button
-                    onClick={() => uncheckAndUnstock(item, user?.id)} aria-label={`${item.name} wieder öffnen`}
-                    title={item.stockedQty ? `Abhaken rückgängig (nimmt ${formatQty(item.stockedQty)} aus dem Vorrat)` : 'Abhaken rückgängig'}
-                    style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--color-success)', background: 'var(--color-success)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                  >
-                    <Check size={15} />
-                  </button>
-                  <span style={{ fontSize: '1.3rem' }}>{item.emoji}</span>
-                  <span style={{ flex: 1, textDecoration: 'line-through', fontSize: '0.88rem' }}>{item.name}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {item.stockedQty ? `+${formatQty(item.stockedQty)} im Vorrat` : 'nicht gebucht'}
-                  </span>
-                </div>
-              ))}
+              {showDone && (
+                <>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', margin: '0.6rem 0' }}>
+                    Tippen macht das Abhaken rückgängig (eingebuchte Mengen werden wieder aus dem Vorrat genommen).
+                  </div>
+                  <div style={TILE_GRID}>
+                    {done.map(item => (
+                      <ItemTile
+                        key={item.id}
+                        item={item}
+                        done
+                        badge={item.stockedQty ? `+${formatQty(item.stockedQty)}` : undefined}
+                        title={item.stockedQty ? `Abhaken rückgängig (nimmt ${formatQty(item.stockedQty)} aus dem Vorrat)` : 'Abhaken rückgängig'}
+                        onClick={() => uncheckAndUnstock(item, user?.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>
@@ -336,6 +379,15 @@ export const Shopping = () => {
             </button>
             <button onClick={() => confirmCheck(false)} className="btn btn-secondary" style={{ width: '100%', fontSize: '0.85rem' }}>
               Nur abhaken (nicht im Vorrat führen)
+            </button>
+            {checking.note && (
+              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Notiz: {checking.note}</div>
+            )}
+            <button
+              onClick={() => { setEditing(checking); setChecking(null); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'inherit' }}
+            >
+              <Pencil size={13} /> Artikel bearbeiten oder entfernen
             </button>
           </div>
         </Modal>

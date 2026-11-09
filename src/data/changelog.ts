@@ -5,9 +5,20 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.5.1';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.1',
+    date: '2026-11-09',
+    title: 'Einkaufsliste als Kacheln',
+    changes: [
+      'Artikel erscheinen als quadratische Kacheln mit Icon und Namen, nach Kategorien gruppiert',
+      'Menge und Einheit stehen als kleine Marke in der Ecke der Kachel',
+      'Tippen auf eine Kachel fragt die Menge ab und bucht in den Vorrat; Bearbeiten und Entfernen im selben Fenster',
+      'Erledigte Artikel erscheinen ebenfalls als Kacheln, Tippen macht das Abhaken rückgängig',
+    ],
+  },
   {
     version: '1.5.0',
     date: '2026-11-09',
