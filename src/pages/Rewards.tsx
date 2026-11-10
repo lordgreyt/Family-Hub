@@ -212,6 +212,9 @@ export const WeeklyStarsManager = ({ kids, editor }: { kids: User[]; editor: str
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {kids.length === 0 && (
+          <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Keine Kinder-Accounts angelegt.</p>
+        )}
         {kids.map(child => {
           const childTasks = tasks.filter(task => task.childId === child.id);
           const weekSum = childTasks.filter(task => task.active !== false).reduce((sum, task) => sum + Math.round(task.stars), 0);
