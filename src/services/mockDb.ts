@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
 import { ref, set as firebaseSet, update as firebaseUpdate, increment, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
-import { planWeeklyStarBookings, localDateKey, lastWeeklyStarBoundary, WEEKLY_STAR_MAX } from './weeklyStars';
+import { planWeeklyStarBookings, localDateKey, lastWeeklyStarBoundary, WEEKLY_STAR_MAX, flattenWeeklyTasks } from './weeklyStars';
 import type { WeeklyStarTask } from './weeklyStars';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
@@ -20,6 +20,8 @@ export interface User {
   defaultPath?: string;
   themeColor?: ThemeColor;
   fontSize?: FontSize;
+  /** Wochenaufgaben des Kindes (werden jeden Sonntagabend gebucht). */
+  weeklyTasks?: WeeklyStarTask[];
 }
 
 export interface BudgetItem {
@@ -298,7 +300,6 @@ export const DB_KEYS = {
   MEAL_TEMPLATES: 'family_hub_meal_templates',
   MEAL_PLAN: 'family_hub_meal_plan',
   REWARDS: 'family_hub_rewards',
-  WEEKLY_STARS: 'family_hub_weekly_stars',
   LEADERBOARD: 'family_hub_leaderboard',
   EXPENSES: 'family_hub_expenses',
   EXPENSE_BUDGETS: 'family_hub_expense_budgets',
@@ -523,6 +524,27 @@ function toList<T>(value: unknown): T[] {
 // Verhindert parallele Buchungsläufe (mehrere Tabs, schnelle Refreshes).
 let weeklyBookingInFlight = false;
 
+// Im Nutzer-Datensatz steckt das Kind schon im Datensatz selbst.
+type StoredWeeklyTask = Omit<WeeklyStarTask, 'childId'> & { childId?: string };
+
+/**
+ * Schreibt die Wochenaufgaben eines Kindes in dessen Nutzer-Datensatz.
+ * Bewusst über `family_hub_users`: dieser Pfad ist öffentlich lesbar, damit das
+ * Tablet-Dashboard die aktiven Aufgaben anzeigen kann.
+ */
+function writeUserWeeklyTasks(childId: string, mutator: (tasks: StoredWeeklyTask[]) => StoredWeeklyTask[]) {
+  updateCollection<User>(DB_KEYS.USERS, users =>
+    users.map(user => {
+      if (!user || user.id !== childId) return user;
+      const current: StoredWeeklyTask[] = Array.isArray(user.weeklyTasks) ? user.weeklyTasks : [];
+      const next = mutator(current)
+        .filter(Boolean)
+        .map(task => ({ ...task, childId }));
+      return { ...user, weeklyTasks: next };
+    })
+  );
+}
+
 function addPending(key: string) {
   pendingWrites.set(key, (pendingWrites.get(key) || 0) + 1);
 }
@@ -700,7 +722,6 @@ export const initFirebase = async (force = false) => {
         ]),
         [DB_KEYS.MEAL_PLAN]: get(DB_KEYS.MEAL_PLAN, []),
         [DB_KEYS.REWARDS]: get(DB_KEYS.REWARDS, []),
-        [DB_KEYS.WEEKLY_STARS]: get(DB_KEYS.WEEKLY_STARS, []),
         [DB_KEYS.LEADERBOARD]: get(DB_KEYS.LEADERBOARD, []),
         [DB_KEYS.EXPENSES]: get(DB_KEYS.EXPENSES, []),
         [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, []),
@@ -1087,16 +1108,17 @@ export const mockDb = {
   },
 
   // --- Wochen-Sterne -----------------------------------------------------
-  getWeeklyStarTasks: (): WeeklyStarTask[] => toList<WeeklyStarTask>(get<unknown>(DB_KEYS.WEEKLY_STARS, [])),
+  // Die Aufgaben liegen direkt im Kind-Datensatz (family_hub_users), weil dieser
+  // Pfad öffentlich lesbar ist und damit auch vom Tablet-Dashboard gelesen werden kann.
+  getWeeklyStarTasks: (): WeeklyStarTask[] => flattenWeeklyTasks(mockDb.getUsers()),
   addWeeklyStarTask: (task: { childId: string; title: string; stars: number; createdBy?: string }) => {
     const title = task.title.trim();
     if (!title) return;
     const stars = Math.min(WEEKLY_STAR_MAX, Math.max(1, Math.round(task.stars)));
-    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list => [
+    writeUserWeeklyTasks(task.childId, list => [
       ...list,
       {
         id: uuidv4(),
-        childId: task.childId,
         title,
         stars,
         active: true,
@@ -1106,12 +1128,21 @@ export const mockDb = {
     ]);
   },
   updateWeeklyStarTask: (updated: WeeklyStarTask) => {
-    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list =>
-      list.map(task => (task.id === updated.id ? updated : task))
+    writeUserWeeklyTasks(updated.childId, list =>
+      list.map(task =>
+        task.id === updated.id
+          ? {
+            ...task,
+            title: (updated.title || '').trim() || task.title,
+            stars: Math.min(WEEKLY_STAR_MAX, Math.max(1, Math.round(Number(updated.stars) || 1))),
+            active: updated.active !== false,
+          }
+          : task
+      )
     );
   },
-  deleteWeeklyStarTask: (id: string) => {
-    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list => list.filter(task => task.id !== id));
+  deleteWeeklyStarTask: (task: { id: string; childId: string }) => {
+    writeUserWeeklyTasks(task.childId, list => list.filter(entry => entry.id !== task.id));
   },
 
   /**

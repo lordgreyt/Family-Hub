@@ -89,3 +89,24 @@ export function planWeeklyStarBookings({ tasks, existingIds, boundary }: WeeklyS
 
   return bookings;
 }
+
+export interface WeeklyTaskOwner {
+  id: string;
+  weeklyTasks?: WeeklyStarTask[];
+}
+
+/**
+ * Wochenaufgaben liegen im jeweiligen Kind-Datensatz (family_hub_users).
+ * Diese Funktion flacht sie zu einer Liste zusammen und setzt `childId`.
+ */
+export function flattenWeeklyTasks(users: WeeklyTaskOwner[]): WeeklyStarTask[] {
+  const tasks: WeeklyStarTask[] = [];
+  (users || []).forEach(user => {
+    if (!user || !Array.isArray(user.weeklyTasks)) return;
+    user.weeklyTasks.forEach(task => {
+      if (!task || typeof task !== 'object' || !task.id) return;
+      tasks.push({ ...task, childId: user.id });
+    });
+  });
+  return tasks;
+}

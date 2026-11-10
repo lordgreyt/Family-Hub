@@ -255,7 +255,7 @@ export const WeeklyStarsManager = ({ kids, editor }: { kids: User[]; editor: str
                           </span>
                           <button
                             type="button"
-                            onClick={() => mockDb.deleteWeeklyStarTask(task.id)}
+                            onClick={() => mockDb.deleteWeeklyStarTask(task)}
                             aria-label={`${task.title} löschen`}
                             style={{ ...roundBtn('#E5484D'), width: '30px', height: '30px', background: 'transparent', border: 'none' }}
                           >

@@ -6,6 +6,7 @@ import {
   localDateKey,
   planWeeklyStarBookings,
   weeklyStarRewardId,
+  flattenWeeklyTasks,
 } from '../src/services/weeklyStars.ts';
 
 const sunday = (day = 8) => new Date(2026, 10, day, 18, 0, 0, 0); // Sonntag, 08.11.2026, 18:00
@@ -131,4 +132,33 @@ test('Buchung: ungültige Sternwerte werden ignoriert', () => {
   });
   assert.equal(bookings.length, 1);
   assert.equal(bookings[0].stars, -2);
+});
+
+test('Wochenaufgaben werden aus den Kind-Datensätzen zusammengeführt', () => {
+  const users = [
+    { id: 'Falko' },
+    { id: 'Lennart', weeklyTasks: [{ id: 'l1', title: 'Zimmer', stars: 5, active: true, createdAt: 1 }] },
+    { id: 'Lotta', weeklyTasks: [
+      { id: 't1', title: 'Tisch decken', stars: 4, active: true, createdAt: 1 },
+      { id: 't2', title: 'Wäsche', stars: 6, active: false, createdAt: 1 },
+    ] },
+    { id: 'Oskar', weeklyTasks: [] },
+  ];
+  const tasks = flattenWeeklyTasks(users);
+  assert.equal(tasks.length, 3);
+  assert.deepEqual(tasks.map(t => `${t.childId}:${t.title}`), ['Lennart:Zimmer', 'Lotta:Tisch decken', 'Lotta:Wäsche']);
+  // Rothaut: fehlende/falsche Felder kippen nichts
+  assert.deepEqual(flattenWeeklyTasks([{ id: 'X', weeklyTasks: [null, {}, { title: 'ohne id' }] } as any]), []);
+  assert.deepEqual(flattenWeeklyTasks([]), []);
+});
+
+test('flattenWeeklyTasks + planWeeklyStarBookings ergeben eine Sammelbuchung', () => {
+  const users = [{ id: 'Lennart', weeklyTasks: [
+    { id: 'a', title: 'Zimmer', stars: 5, active: true, createdAt: sunday().getTime() - 1000 },
+    { id: 'b', title: 'Müll', stars: 3, active: true, createdAt: sunday().getTime() - 1000 },
+  ] }];
+  const bookings = planWeeklyStarBookings({ tasks: flattenWeeklyTasks(users), existingIds: [], boundary: sunday() });
+  assert.equal(bookings.length, 1);
+  assert.equal(bookings[0].stars, -8);
+  assert.equal(bookings[0].childId, 'Lennart');
 });
