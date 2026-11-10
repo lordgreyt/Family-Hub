@@ -486,6 +486,7 @@ function set<T>(key: string, data: T): void {
     .then(() => console.log(`Cloud sync success for ${key}`))
     .catch(async (e) => {
       console.error(`Firebase write error for ${key}:`, e);
+      notifyWriteFailed(key);
       // Revert optimistic update — re-read actual server state
       try {
         const snap = await firebaseGet(ref(db, key));
@@ -545,6 +546,15 @@ function writeUserWeeklyTasks(childId: string, mutator: (tasks: StoredWeeklyTask
   );
 }
 
+/** Meldet der UI, dass ein Cloud-Schreibvorgang abgelehnt wurde. */
+function notifyWriteFailed(key: string) {
+  try {
+    window.dispatchEvent(new CustomEvent('db_write_failed', { detail: { key } }));
+  } catch {
+    /* ignorieren – Hinweis ist nur Komfort */
+  }
+}
+
 function addPending(key: string) {
   pendingWrites.set(key, (pendingWrites.get(key) || 0) + 1);
 }
@@ -587,6 +597,7 @@ function updateCollection<T>(key: string, mutator: (currentData: T[]) => T[]): v
     })
     .catch(async (e) => {
       console.error(`❌ Write failed for ${key}:`, e);
+      notifyWriteFailed(key);
       // Revert optimistic update — re-read actual server state
       try {
         const snap = await firebaseGet(ref(db, key));

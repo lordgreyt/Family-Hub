@@ -7,6 +7,7 @@ import { BottomBarSlotContext } from './PageBottomBar';
 import { NotificationManager } from '../NotificationManager';
 import { UpdateNotification } from '../UpdateNotification';
 import { RequestPopup } from '../RequestPopup';
+import { SaveErrorBanner } from '../SaveErrorBanner';
 import { mockDb } from '../../services/mockDb';
 
 export const MainLayout = () => {
@@ -92,6 +93,7 @@ export const MainLayout = () => {
       <NotificationManager />
       <UpdateNotification />
       <RequestPopup />
+      <SaveErrorBanner />
     </>
   );
 };
