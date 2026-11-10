@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
-import { ref, set as firebaseSet, update as firebaseUpdate, increment, onValue, get as firebaseGet } from 'firebase/database';
+import { ref, set as firebaseSet, update as firebaseUpdate, increment, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
+import { planWeeklyStarBookings, localDateKey, lastWeeklyStarBoundary, WEEKLY_STAR_MAX } from './weeklyStars';
+import type { WeeklyStarTask } from './weeklyStars';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
@@ -84,6 +86,20 @@ export interface ScoreEntry {
   childId: string;
   score: number;
 }
+
+// --- Wochen-Sterne -------------------------------------------------------
+// Logik liegt in ./weeklyStars (ohne Firebase, dadurch testbar).
+export {
+  WEEKLY_STAR_WEEKDAY,
+  WEEKLY_STAR_HOUR,
+  WEEKLY_STAR_MAX,
+  localDateKey,
+  lastWeeklyStarBoundary,
+  nextWeeklyStarBoundary,
+  weeklyStarRewardId,
+  planWeeklyStarBookings,
+} from './weeklyStars';
+export type { WeeklyStarTask } from './weeklyStars';
 
 export interface ExpenseItem {
   id: string;
@@ -282,6 +298,7 @@ export const DB_KEYS = {
   MEAL_TEMPLATES: 'family_hub_meal_templates',
   MEAL_PLAN: 'family_hub_meal_plan',
   REWARDS: 'family_hub_rewards',
+  WEEKLY_STARS: 'family_hub_weekly_stars',
   LEADERBOARD: 'family_hub_leaderboard',
   EXPENSES: 'family_hub_expenses',
   EXPENSE_BUDGETS: 'family_hub_expense_budgets',
@@ -490,6 +507,22 @@ function set<T>(key: string, data: T): void {
 // overwriting optimistic local updates. Ref-counted to handle concurrent writes
 // to the same key (e.g., toggleTask transaction + getTasks migration set()).
 const pendingWrites = new Map<string, number>();
+
+// Firebase liefert Listen je nach Belegung als Array oder als Objekt mit Index-Keys.
+function toList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value.filter(Boolean) as T[];
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(key => (value as Record<string, T>)[key])
+      .filter(Boolean);
+  }
+  return [];
+}
+
+// Verhindert parallele Buchungsläufe (mehrere Tabs, schnelle Refreshes).
+let weeklyBookingInFlight = false;
+
 function addPending(key: string) {
   pendingWrites.set(key, (pendingWrites.get(key) || 0) + 1);
 }
@@ -667,6 +700,7 @@ export const initFirebase = async (force = false) => {
         ]),
         [DB_KEYS.MEAL_PLAN]: get(DB_KEYS.MEAL_PLAN, []),
         [DB_KEYS.REWARDS]: get(DB_KEYS.REWARDS, []),
+        [DB_KEYS.WEEKLY_STARS]: get(DB_KEYS.WEEKLY_STARS, []),
         [DB_KEYS.LEADERBOARD]: get(DB_KEYS.LEADERBOARD, []),
         [DB_KEYS.EXPENSES]: get(DB_KEYS.EXPENSES, []),
         [DB_KEYS.EXPENSE_BUDGETS]: get(DB_KEYS.EXPENSE_BUDGETS, []),
@@ -1050,6 +1084,83 @@ export const mockDb = {
   },
   updateRewardRequest: (updatedReq: RewardRequest) => {
     updateCollection<RewardRequest>(DB_KEYS.REWARDS, rewards => rewards.map(r => r.id === updatedReq.id ? updatedReq : r));
+  },
+
+  // --- Wochen-Sterne -----------------------------------------------------
+  getWeeklyStarTasks: (): WeeklyStarTask[] => toList<WeeklyStarTask>(get<unknown>(DB_KEYS.WEEKLY_STARS, [])),
+  addWeeklyStarTask: (task: { childId: string; title: string; stars: number; createdBy?: string }) => {
+    const title = task.title.trim();
+    if (!title) return;
+    const stars = Math.min(WEEKLY_STAR_MAX, Math.max(1, Math.round(task.stars)));
+    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list => [
+      ...list,
+      {
+        id: uuidv4(),
+        childId: task.childId,
+        title,
+        stars,
+        active: true,
+        createdAt: Date.now(),
+        ...(task.createdBy ? { createdBy: task.createdBy } : {}),
+      },
+    ]);
+  },
+  updateWeeklyStarTask: (updated: WeeklyStarTask) => {
+    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list =>
+      list.map(task => (task.id === updated.id ? updated : task))
+    );
+  },
+  deleteWeeklyStarTask: (id: string) => {
+    updateCollection<WeeklyStarTask>(DB_KEYS.WEEKLY_STARS, list => list.filter(task => task.id !== id));
+  },
+
+  /**
+   * Bucht alle aktiven Wochenaufgaben für den zuletzt erreichten Sonntag (18:00).
+   * Idempotent: pro Kind und Buchungssonntag entsteht genau eine Gutschrift,
+   * egal wie oft oder von welchem Gerät die Funktion läuft.
+   * Aufgaben, die erst nach dem Buchungstermin angelegt wurden, zählen erst
+   * beim nächsten Sonntag.
+   */
+  bookDueWeeklyStars: async (now: Date = new Date()): Promise<string[]> => {
+    if (weeklyBookingInFlight) return [];
+    const boundary = lastWeeklyStarBoundary(now);
+    const weekKey = localDateKey(boundary);
+    const tasks = mockDb.getWeeklyStarTasks();
+    if (tasks.length === 0) return [];
+
+    weeklyBookingInFlight = true;
+    const created: string[] = [];
+    try {
+      const result = await runTransaction(ref(db, DB_KEYS.REWARDS), (current: unknown) => {
+        const rewards = toList<RewardRequest>(current);
+        const additions = planWeeklyStarBookings({
+          tasks,
+          existingIds: rewards.map(reward => reward.id),
+          boundary,
+        });
+        if (additions.length === 0) return undefined; // nichts zu tun
+        created.push(...additions.map(addition => addition.id));
+        return [...rewards, ...additions];
+      });
+
+      if (!result.committed) created.length = 0;
+
+      if (created.length > 0) {
+        const snap = await firebaseGet(ref(db, DB_KEYS.REWARDS));
+        if (snap.exists()) {
+          localStorage.setItem(DB_KEYS.REWARDS, JSON.stringify(toList<RewardRequest>(snap.val())));
+          window.dispatchEvent(new Event('db_updated'));
+        }
+        console.log(`⭐ Wochen-Sterne gebucht (${weekKey}):`, created.join(', '));
+      }
+    } catch (error) {
+      console.error('Wochen-Sterne konnten nicht gebucht werden:', error);
+      created.length = 0;
+    } finally {
+      weeklyBookingInFlight = false;
+    }
+
+    return created;
   },
 
   // Leaderboard

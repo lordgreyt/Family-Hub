@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import type { RewardRequest, ScoreEntry, User } from '../services/mockDb';
+import type { RewardRequest, ScoreEntry, User, WeeklyStarTask } from '../services/mockDb';
+import { nextWeeklyStarBoundary, WEEKLY_STAR_HOUR } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Hourglass, Sparkles, PencilLine } from 'lucide-react';
+import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Hourglass, Sparkles, PencilLine, CalendarDays, Trash2, Repeat } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
 import { FlappyGame } from '../components/FlappyGame';
@@ -98,6 +99,268 @@ const Avatar = ({ user, size }: { user?: User; size: number }) => (
     {user?.avatar ? <AvatarEmoji emoji={user.avatar} size={size} /> : '👤'}
   </span>
 );
+
+const WEEKLY_COLOR = '#6D5DF0';
+
+const WEEKDAY_SHORT = (value: Date | number) => {
+  const date = new Date(value);
+  const weekday = date.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+  const dayMonth = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  return `${weekday} ${dayMonth}`;
+};
+
+const MiniSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    onClick={() => onChange(!checked)}
+    style={{
+      width: '38px', height: '22px', borderRadius: '999px', border: 'none', padding: 0, flexShrink: 0,
+      background: checked ? 'linear-gradient(135deg, #3F34C4, #6D5DF0)' : 'var(--color-border)',
+      position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+    }}
+  >
+    <span style={{
+      position: 'absolute', top: '3px', left: checked ? '19px' : '3px', width: '16px', height: '16px',
+      borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(23,20,58,0.35)', transition: 'left 0.2s',
+    }} />
+  </button>
+);
+
+const StarStepper = ({ value, onChange, label }: { value: number; onChange: (value: number) => void; label: string }) => {
+  const stepBtn: CSSProperties = {
+    width: '26px', height: '26px', borderRadius: '50%', border: 'none', cursor: 'pointer', flexShrink: 0,
+    background: 'var(--color-surface-muted)', color: 'var(--color-primary)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', flexShrink: 0 }}>
+      <button type="button" onClick={() => onChange(Math.max(1, value - 1))} aria-label={`${label}: ein Stern weniger`} style={stepBtn}>
+        <Minus size={13} />
+      </button>
+      <input
+        className="no-spin"
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max="500"
+        aria-label={`${label}: Sterne`}
+        value={value}
+        onChange={event => {
+          const next = Number(event.target.value);
+          onChange(Number.isFinite(next) ? Math.min(500, Math.max(1, Math.round(next))) : 1);
+        }}
+        style={{
+          width: '34px', flexShrink: 0, border: 'none', background: 'transparent', padding: 0,
+          textAlign: 'center', fontWeight: 800, fontSize: 'var(--font-sm)', fontFamily: 'inherit',
+          color: STAR_COLOR,
+        }}
+      />
+      <Star size={11} fill={STAR_COLOR} color={STAR_COLOR} style={{ flexShrink: 0 }} />
+      <button type="button" onClick={() => onChange(Math.min(500, value + 1))} aria-label={`${label}: ein Stern mehr`} style={{ ...stepBtn, marginLeft: '0.1rem' }}>
+        <Plus size={13} />
+      </button>
+    </div>
+  );
+};
+
+const readWeeklyTasks = () => mockDb.getWeeklyStarTasks();
+
+/** Eltern-Ansicht: Wochenaufgaben je Kind verwalten. */
+export const WeeklyStarsManager = ({ kids, editor }: { kids: User[]; editor: string }) => {
+  const [tasks, setTasks] = useState<WeeklyStarTask[]>([]);
+  const [requests, setRequests] = useState<RewardRequest[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, { title: string; stars: number | '' }>>({});
+
+  useEffect(() => {
+    const load = () => {
+      setTasks(readWeeklyTasks());
+      setRequests(mockDb.getRewardRequests());
+    };
+    load();
+    window.addEventListener('db_updated', load);
+    return () => window.removeEventListener('db_updated', load);
+  }, []);
+
+  const draftFor = (childId: string) => drafts[childId] ?? { title: '', stars: 5 };
+
+  const commit = (childId: string) => {
+    const draft = draftFor(childId);
+    const title = draft.title.trim();
+    if (!title) return;
+    mockDb.addWeeklyStarTask({ childId, title, stars: Number(draft.stars) || 1, createdBy: editor });
+    setDrafts(prev => ({ ...prev, [childId]: { title: '', stars: draftFor(childId).stars } }));
+  };
+
+  const nextBooking = nextWeeklyStarBoundary();
+
+  return (
+    <div style={card}>
+      <SectionTitle
+        icon={<CalendarDays size={19} />}
+        color={WEEKLY_COLOR}
+        right={<span style={{ ...pill(WEEKLY_COLOR), background: 'white', whiteSpace: 'nowrap' }}><Repeat size={12} /> So · {WEEKLY_STAR_HOUR}:00</span>}
+      >
+        Wochen-Sterne
+      </SectionTitle>
+
+      <p style={{ margin: '0 0 0.85rem', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', lineHeight: 1.45 }}>
+        Jeden Sonntag um {WEEKLY_STAR_HOUR}:00 Uhr werden alle aktiven Aufgaben automatisch gebucht – zusätzlich zu allen anderen Sternen.
+        Nächste Buchung: <strong style={{ color: 'var(--color-text)' }}>{WEEKDAY_SHORT(nextBooking)} um {WEEKLY_STAR_HOUR}:00 Uhr</strong>.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {kids.map(child => {
+          const childTasks = tasks.filter(task => task.childId === child.id);
+          const weekSum = childTasks.filter(task => task.active !== false).reduce((sum, task) => sum + Math.round(task.stars), 0);
+          const lastBooking = requests
+            .filter(r => r.id.startsWith('weekly-') && r.childId === child.id && r.status !== 'REJECTED')
+            .sort((a, b) => b.createdAt - a.createdAt)[0];
+          const draft = draftFor(child.id);
+
+          return (
+            <div key={child.id} style={{ background: 'var(--color-surface-hover)', borderRadius: 'var(--radius-lg)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Avatar user={child} size={30} />
+                <strong style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-base)' }}>{child.id}</strong>
+                <span style={{ ...pill(STAR_COLOR), background: 'white', whiteSpace: 'nowrap' }}>
+                  {weekSum} <Star size={12} fill={STAR_COLOR} color={STAR_COLOR} /> / Woche
+                </span>
+              </div>
+
+              {childTasks.length === 0 ? (
+                <span style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)' }}>Noch keine Wochenaufgabe.</span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {childTasks.map(task => {
+                    const isActive = task.active !== false;
+                    return (
+                      <div key={task.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', background: 'white', borderRadius: 'var(--radius-md)', padding: '0.4rem 0.5rem 0.35rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <MiniSwitch
+                            checked={isActive}
+                            label={`${task.title}: ${isActive ? 'ausschalten' : 'einschalten'}`}
+                            onChange={value => mockDb.updateWeeklyStarTask({ ...task, active: value })}
+                          />
+                          <span style={{
+                            flex: 1, minWidth: 0, fontSize: 'var(--font-sm)', fontWeight: 600, lineHeight: 1.3,
+                            opacity: isActive ? 1 : 0.45, textDecoration: isActive ? 'none' : 'line-through',
+                          }}>
+                            {task.title}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => mockDb.deleteWeeklyStarTask(task.id)}
+                            aria-label={`${task.title} löschen`}
+                            style={{ ...roundBtn('#E5484D'), width: '30px', height: '30px', background: 'transparent', border: 'none' }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                          <StarStepper
+                            value={Math.round(task.stars)}
+                            label={task.title}
+                            onChange={value => mockDb.updateWeeklyStarTask({ ...task, stars: value })}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  className="input-field"
+                  placeholder="Neue Aufgabe…"
+                  value={draft.title}
+                  onChange={e => setDrafts(prev => ({ ...prev, [child.id]: { ...draftFor(child.id), title: e.target.value } }))}
+                  onKeyDown={e => { if (e.key === 'Enter') commit(child.id); }}
+                  style={{ ...pillInput, background: 'white', padding: '0.5rem 0.8rem', fontSize: 'var(--font-sm)' }}
+                />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="500"
+                  aria-label={`Sterne für neue Aufgabe (${child.id})`}
+                  value={draft.stars}
+                  onChange={e => setDrafts(prev => ({ ...prev, [child.id]: { ...draftFor(child.id), stars: Number(e.target.value) || '' } }))}
+                  style={{
+                    width: '56px', flexShrink: 0, padding: '0.5rem 0.25rem', textAlign: 'center', fontWeight: 800,
+                    borderRadius: 'var(--radius-lg)', border: '1.5px solid transparent', background: 'white',
+                    fontFamily: 'inherit', fontSize: 'var(--font-sm)', color: STAR_COLOR,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => commit(child.id)}
+                  disabled={!draft.title.trim()}
+                  aria-label={`Aufgabe für ${child.id} hinzufügen`}
+                  style={{ ...roundBtn(WEEKLY_COLOR), width: '38px', height: '38px', opacity: draft.title.trim() ? 1 : 0.4 }}
+                >
+                  <Plus size={19} />
+                </button>
+              </div>
+
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                {lastBooking
+                  ? `Zuletzt gebucht: ${WEEKDAY_SHORT(lastBooking.createdAt)} · ${Math.abs(lastBooking.stars)} ★`
+                  : 'Noch nie gebucht.'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/** Kinder-Ansicht: eigene Wochenaufgaben mit Summe und nächstem Termin. */
+export const WeeklyStarsOverview = ({ childId }: { childId: string }) => {
+  const [tasks, setTasks] = useState<WeeklyStarTask[]>([]);
+
+  useEffect(() => {
+    const load = () => setTasks(readWeeklyTasks());
+    load();
+    window.addEventListener('db_updated', load);
+    return () => window.removeEventListener('db_updated', load);
+  }, []);
+
+  const mine = tasks.filter(task => task.childId === childId);
+  if (mine.length === 0) return null;
+
+  const activeTasks = mine.filter(task => task.active !== false);
+  const weekSum = activeTasks.reduce((sum, task) => sum + Math.round(task.stars), 0);
+
+  return (
+    <div style={card}>
+      <SectionTitle icon={<CalendarDays size={19} />} color={WEEKLY_COLOR}>Deine Wochenaufgaben</SectionTitle>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {mine.map(task => {
+          const isActive = task.active !== false;
+          return (
+            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', padding: '0.55rem 0.7rem' }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-sm)', fontWeight: 600, opacity: isActive ? 1 : 0.5, textDecoration: isActive ? 'none' : 'line-through' }}>
+                {task.title}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: 'var(--font-sm)', color: isActive ? STAR_COLOR : 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                {isActive ? `+${Math.round(task.stars)}` : 'pausiert'} {isActive && <Star size={12} fill={STAR_COLOR} color={STAR_COLOR} />}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p style={{ margin: '0.8rem 0 0', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', lineHeight: 1.45 }}>
+        Jeden Sonntag um {WEEKLY_STAR_HOUR}:00 Uhr bekommst du <strong style={{ color: STAR_COLOR }}>{weekSum} Sterne</strong> für deine Aufgaben.
+        Nächste Buchung: <strong style={{ color: 'var(--color-text)' }}>{WEEKDAY_SHORT(nextWeeklyStarBoundary())} um {WEEKLY_STAR_HOUR}:00 Uhr</strong>.
+      </p>
+    </div>
+  );
+};
 
 export const Rewards = () => {
   const { user } = useAuth();
@@ -342,6 +605,9 @@ export const Rewards = () => {
             </div>
           )}
         </div>
+
+        {/* Wochen-Sterne */}
+        <WeeklyStarsManager kids={childAccounts} editor={user.id} />
       </div>
     );
   }
@@ -454,9 +720,13 @@ export const Rewards = () => {
             <div key={req.id} style={{ ...card, border: '1.5px solid #2FB36B66', background: '#EFFAF3', animation: 'slideIn 0.3s ease-out', display: 'flex', gap: '0.7rem', alignItems: 'flex-start' }}>
               <span style={iconChip('#2FB36B')}><Check size={19} /></span>
               <div style={{ flex: 1 }}>
-                <h4 style={{ margin: 0, color: 'var(--color-success)', fontWeight: 800 }}>Genehmigt!</h4>
+                <h4 style={{ margin: 0, color: 'var(--color-success)', fontWeight: 800 }}>
+                  {req.id.startsWith('weekly-') ? 'Wochen-Sterne gebucht!' : 'Genehmigt!'}
+                </h4>
                 <p style={{ margin: '0.2rem 0 0', fontSize: 'var(--font-sm)', lineHeight: 1.4 }}>
-                  Deine Anfrage über <strong>{Math.abs(req.stars)} Sterne</strong> wurde {req.stars < 0 ? 'gutgeschrieben' : 'genehmigt und abgezogen'}. Viel Spaß!
+                  {req.id.startsWith('weekly-')
+                    ? <>Deine Wochenaufgaben sind fertig: <strong>+{Math.abs(req.stars)} Sterne</strong> auf deinem Konto.</>
+                    : <>Deine Anfrage über <strong>{Math.abs(req.stars)} Sterne</strong> wurde {req.stars < 0 ? 'gutgeschrieben' : 'genehmigt und abgezogen'}. Viel Spaß!</>}
                 </p>
               </div>
               <button onClick={() => acknowledgeApproval(req)} aria-label="Schließen" style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer', display: 'flex' }}>
@@ -492,6 +762,9 @@ export const Rewards = () => {
           </span>
         )}
       </div>
+
+      {/* Wochenaufgaben (nur lesen) */}
+      <WeeklyStarsOverview childId={user.id} />
 
       {/* Podium (Ranking) */}
       {rankings.length > 0 && (

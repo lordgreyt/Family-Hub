@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test:security": "node --test tests/*.test.cjs",
     "test:vocabulary": "node --experimental-strip-types --test tests/vocabularyVariants.test.mjs tests/vocabularySpeech.test.mjs",
+    "test:weekly": "node --experimental-strip-types --test tests/weeklyStars.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

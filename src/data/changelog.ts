@@ -5,9 +5,21 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = '1.5.1';
+export const APP_VERSION = '1.5.2';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.2',
+    date: '2026-11-10',
+    title: 'Wochen-Sterne',
+    changes: [
+      'Neue Wochenaufgaben je Kind: Aufgabe eintragen, Sternezahl festlegen, mit dem Schalter ein- und ausschalten',
+      'Jeden Sonntag um 18:00 Uhr werden alle aktiven Aufgaben automatisch als Sterne gebucht – zusätzlich zu allen anderen Sternen',
+      'Kinder sehen ihre Wochenaufgaben samt Summe und dem nächsten Buchungstermin',
+      'Gebuchte Wochenaufgaben erscheinen als eine Sammelbuchung in der Sterne-Historie und lösen eine Gutschrift-Meldung aus',
+      'Verpasste Buchungen werden beim nächsten Öffnen der App nachgeholt – pro Woche und Kind genau einmal',
+    ],
+  },
   {
     version: '1.5.1',
     date: '2026-11-09',

@@ -7,6 +7,7 @@ import { BottomBarSlotContext } from './PageBottomBar';
 import { NotificationManager } from '../NotificationManager';
 import { UpdateNotification } from '../UpdateNotification';
 import { RequestPopup } from '../RequestPopup';
+import { mockDb } from '../../services/mockDb';
 
 export const MainLayout = () => {
   const { user, loading } = useAuth();
@@ -30,6 +31,28 @@ export const MainLayout = () => {
       }
     }
   }, [user, loading, location.pathname, navigate]);
+
+  // Wochen-Sterne: fällige Buchungen (Sonntag ab 18:00) nachholen.
+  // Idempotent – die Buchung selbst läuft als Firebase-Transaktion.
+  useEffect(() => {
+    let stopped = false;
+    const run = () => {
+      if (stopped) return;
+      mockDb.bookDueWeeklyStars().catch(error => console.warn('Wochen-Sterne:', error));
+    };
+    const startTimer = window.setTimeout(run, 5000); // erst wenn der Cloud-Sync steht
+    const intervalTimer = window.setInterval(run, 10 * 60 * 1000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stopped = true;
+      window.clearTimeout(startTimer);
+      window.clearInterval(intervalTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   if (loading) {
     return (
