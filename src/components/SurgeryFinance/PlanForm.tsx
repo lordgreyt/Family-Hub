@@ -29,7 +29,7 @@ const createDraft = (initial: SurgeryFinancePlan | null): PlanDraft => ({
   sources: initial?.sources.map(source => ({ ...source, amount: euroInput(source.amountCents) })) || [
     { id: 'nebenkosten', label: 'Nebenkostenkonto', kind: 'repayable', amount: '' },
     { id: 'bonus', label: 'Bonuszahlung für die Rechnung', kind: 'contribution', amount: '', availableOn: '' },
-    { id: 'sparbuch', label: 'Sparbuch', kind: 'contribution', amount: '' },
+    { id: 'sparbuch', label: 'Sparbuch', kind: 'repayable', amount: '' },
     { id: 'bank', label: 'Bankkredit', kind: 'repayable', amount: '' },
   ],
   futureBonuses: initial?.futureBonuses.map(bonus => ({ ...bonus, amount: euroInput(bonus.amountCents) })) || [

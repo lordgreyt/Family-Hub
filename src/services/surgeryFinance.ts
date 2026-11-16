@@ -1,7 +1,7 @@
 import { auth } from './firebase';
 
 export type SurgeryFinanceSourceKind = 'repayable' | 'contribution';
-export type SurgeryFinanceTarget = 'nebenkosten' | 'bank';
+export type SurgeryFinanceTarget = 'nebenkosten' | 'bank' | 'sparbuch';
 
 export interface SurgeryFinanceSource {
   id: string;

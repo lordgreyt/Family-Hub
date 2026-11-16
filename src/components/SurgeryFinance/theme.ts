@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { SurgeryFinanceTarget } from '../../services/surgeryFinance';
 
 export const HERO_GRADIENT = 'linear-gradient(135deg, #3F34C4 0%, #6D5DF0 55%, #F2A9BE 130%)';
 export const GREEN = '#4FC3A1';
@@ -18,6 +19,18 @@ const SOURCE_COLORS: Record<string, string> = {
   sparbuch: BLUE,
 };
 export const sourceColor = (id: string) => SOURCE_COLORS[id] || LILAC;
+
+// Rückzahlungsziele in fester Reihenfolge – ergänzt sich automatisch, wenn eine Quelle
+// als „repayable“ markiert ist (siehe SURGERY_TARGET_META).
+export const SURGERY_TARGETS: Array<{ id: SurgeryFinanceTarget; label: string; kind: 'repayable' }> = [
+  { id: 'nebenkosten', label: 'Nebenkostenkonto', kind: 'repayable' },
+  { id: 'bank', label: 'Bankkredit', kind: 'repayable' },
+  { id: 'sparbuch', label: 'Sparbuch', kind: 'repayable' },
+];
+
+/** Ziel-Liste eines Plans: alle Standardziele, die im Plan als rückzahlbar geführt werden. */
+export const repayableTargets = (sources: Array<{ id: string; kind: string }>) =>
+  SURGERY_TARGETS.filter(target => sources.some(source => source.id === target.id && source.kind === 'repayable'));
 
 export const iconChip = (color: string, size = 38): CSSProperties => ({
   width: `${size}px`,

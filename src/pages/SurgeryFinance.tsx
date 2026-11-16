@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Banknote, CalendarClock, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Gift, HeartPulse, Home,
-  Landmark, LockKeyhole, Plus, Receipt, Settings2, Trash2, X,
+  Landmark, LockKeyhole, PiggyBank, Plus, Receipt, Settings2, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PlanForm } from '../components/SurgeryFinance/PlanForm';
 import {
   BLUE, CARD, GREEN, GREEN_TEXT, HERO_GRADIENT, ORANGE, PINK, PINK_TEXT, PRIMARY,
-  dateLabel, dateShort, fieldLabel, fmtEUR, fmtEURShort, iconChip, monthLabel, parseEuroCents, sectionTitle, shiftMonth, sourceColor,
+  dateLabel, dateShort, fieldLabel, fmtEUR, fmtEURShort, iconChip, monthLabel, parseEuroCents, repayableTargets, sectionTitle, shiftMonth, sourceColor,
 } from '../components/SurgeryFinance/theme';
 import { loadSurgeryFinance, saveSurgeryFinance } from '../services/surgeryFinance';
 import type { SurgeryFinancePlan, SurgeryFinanceRepayment, SurgeryFinanceTarget } from '../services/surgeryFinance';
@@ -21,7 +21,7 @@ const todayIso = () => {
 const currentMonth = () => todayIso().slice(0, 7);
 const shortMonth = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
 
-const TARGET_ICON = { nebenkosten: Home, bank: Landmark } as const;
+const TARGET_ICON = { nebenkosten: Home, bank: Landmark, sparbuch: PiggyBank } as const;
 
 const heroGlassBtn = {
   width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', color: 'white',
@@ -69,17 +69,25 @@ export const SurgeryFinance = () => {
   const sourceById = useMemo(() => new Map((plan?.sources || []).map(source => [source.id, source])), [plan]);
   const repayments = plan?.repayments ?? EMPTY_REPAYMENTS;
   const confirmations = plan?.confirmations || [];
-  const paidByTarget = useMemo(() => repayments.reduce((result, entry) => {
-    result[entry.target] += entry.amountCents;
+  // Rückzahlungsziele ergeben sich aus dem Plan: jede Quelle mit kind='repayable'
+  // zählt als Schuld (früher waren Nebenkosten + Bankkredit hart verdrahtet).
+  const targets = useMemo(() => repayableTargets(plan?.sources || []), [plan]);
+  const paidByTarget = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const target of targets) result[target.id] = 0;
+    for (const entry of repayments) result[entry.target] = (result[entry.target] || 0) + entry.amountCents;
     return result;
-  }, { nebenkosten: 0, bank: 0 }), [repayments]);
-  const balances = {
-    nebenkosten: Math.max(0, (sourceById.get('nebenkosten')?.amountCents || 0) - paidByTarget.nebenkosten),
-    bank: Math.max(0, (sourceById.get('bank')?.amountCents || 0) - paidByTarget.bank),
-  };
-  const totalDebt = (sourceById.get('nebenkosten')?.amountCents || 0) + (sourceById.get('bank')?.amountCents || 0);
-  const totalOutstanding = balances.nebenkosten + balances.bank;
-  const totalPaid = paidByTarget.nebenkosten + paidByTarget.bank;
+  }, [repayments, targets]);
+  const balances = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const target of targets) {
+      result[target.id] = Math.max(0, (sourceById.get(target.id)?.amountCents || 0) - (paidByTarget[target.id] || 0));
+    }
+    return result;
+  }, [targets, sourceById, paidByTarget]);
+  const totalDebt = targets.reduce((sum, target) => sum + (sourceById.get(target.id)?.amountCents || 0), 0);
+  const totalOutstanding = targets.reduce((sum, target) => sum + (balances[target.id] || 0), 0);
+  const totalPaid = targets.reduce((sum, target) => sum + (paidByTarget[target.id] || 0), 0);
   const paidPercent = totalDebt > 0 ? Math.min(100, (totalPaid / totalDebt) * 100) : 0;
   const allSources = plan?.sources.reduce((sum, source) => sum + source.amountCents, 0) || 0;
   const fundingDifference = plan ? allSources - plan.surgeryCostCents : 0;
@@ -126,7 +134,8 @@ export const SurgeryFinance = () => {
 
   const openSheet = () => {
     setError('');
-    if (balances[target] <= 0 && balances[target === 'bank' ? 'nebenkosten' : 'bank'] > 0) setTarget(target === 'bank' ? 'nebenkosten' : 'bank');
+    const alternatives = targets.filter(item => item.id !== target && (balances[item.id] || 0) > 0);
+    if ((balances[target] || 0) <= 0 && alternatives.length > 0) setTarget(alternatives[0].id);
     setShowSheet(true);
   };
 
@@ -142,8 +151,8 @@ export const SurgeryFinance = () => {
       setError('Das Buchungsdatum muss im ausgewählten Monat liegen.');
       return;
     }
-    if (amountCents > balances[target]) {
-      setError(`Die offene Summe für dieses Rückzahlungsziel beträgt nur ${fmtEUR(balances[target])}.`);
+    if (amountCents > (balances[target] || 0)) {
+      setError(`Die offene Summe für dieses Rückzahlungsziel beträgt nur ${fmtEUR(balances[target] || 0)}.`);
       return;
     }
     const entry: SurgeryFinanceRepayment = {
@@ -247,7 +256,7 @@ export const SurgeryFinance = () => {
   const monthRest = Math.max(0, monthTarget - selectedPaid);
   const historyMax = Math.max(plan.monthlyTargetCents, ...history.map(item => item.paid), 1);
 
-  const quickAmount = Math.min(monthRest, balances[target]);
+  const quickAmount = Math.min(monthRest, balances[target] || 0);
 
   const glassChip = {
     display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.7rem', borderRadius: '999px',
@@ -319,13 +328,14 @@ export const SurgeryFinance = () => {
 
       {/* Rückzahlungsziele */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
-        {(['nebenkosten', 'bank'] as const).map(id => {
+        {targets.map(({ id: targetId }) => {
+          const id = targetId;
           const source = sourceById.get(id);
           if (!source) return null;
           const Icon = TARGET_ICON[id];
           const color = sourceColor(id);
-          const paid = paidByTarget[id];
-          const balance = balances[id];
+          const paid = paidByTarget[id] || 0;
+          const balance = balances[id] || 0;
           const percent = source.amountCents > 0 ? (paid / source.amountCents) * 100 : 0;
           return (
             <div key={id} style={{ ...CARD, padding: '1rem', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
