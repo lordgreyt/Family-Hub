@@ -69,6 +69,24 @@ async function throwApiError(response: Response) {
   throw new Error(body.error || 'Der Finanzplan konnte nicht geladen werden.');
 }
 
+// Diese Standardquellen sind Schulden und werden zurückgezahlt. Ältere Pläne
+// speicherten das Sparbuch noch als Eigenmittel – beim Laden korrigieren wir das
+// einmalig und schreiben den Plan zurück, damit die Anzeige nicht am Altstand hängt.
+const REPAYABLE_SOURCE_IDS = new Set(['nebenkosten', 'bank', 'sparbuch']);
+
+export const normalizePlan = (plan: SurgeryFinancePlan): { plan: SurgeryFinancePlan; changed: boolean } => {
+  let changed = false;
+  const sources = plan.sources.map(source => {
+    if (REPAYABLE_SOURCE_IDS.has(source.id) && source.kind !== 'repayable') {
+      changed = true;
+      return { ...source, kind: 'repayable' as const };
+    }
+    return source;
+  });
+  if (!changed) return { plan, changed };
+  return { plan: { ...plan, sources, updatedAt: Date.now() }, changed };
+};
+
 export async function loadSurgeryFinance(): Promise<SurgeryFinancePlan | null> {
   const response = await fetch('/api/private/surgery-finance', {
     headers: await authHeaders(),
@@ -76,7 +94,18 @@ export async function loadSurgeryFinance(): Promise<SurgeryFinancePlan | null> {
   });
   if (!response.ok) await throwApiError(response);
   const body = (await response.json()) as { data?: SurgeryFinancePlan | null };
-  return body.data || null;
+  if (!body.data) return null;
+  const { plan, changed } = normalizePlan(body.data);
+  if (changed) {
+    // Migration best effort: schlägt das Schreiben fehl, zeigt die App den
+    // korrigierten Stand trotzdem an (nächster Speichervorgang zieht nach).
+    try {
+      await saveSurgeryFinance(plan);
+    } catch {
+      /* absichtlich still */
+    }
+  }
+  return plan;
 }
 
 export async function saveSurgeryFinance(plan: SurgeryFinancePlan): Promise<void> {
