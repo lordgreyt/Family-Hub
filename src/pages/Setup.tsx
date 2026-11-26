@@ -743,7 +743,7 @@ export const Setup = () => {
 
       {/* KI-Sprachausgabe (OpenAI TTS) — nur für Erwachsene sichtbar */}
       {!user?.isChild && (
-        <Section icon={Volume2} color={BLUE} title="KI-Sprachausgabe (OpenAI)" subtitle="Studio-Stimmen fürs Vokabeltraining · nur für Erwachsene">
+        <Section icon={Volume2} color={BLUE} title="KI-Sprachausgabe (OpenAI)" subtitle="Studio-Stimmen fürs Vokabeltraining · einmal hier hinterlegen, alle Familienmitglieder können vorlesen lassen">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {ttsStatus?.configured && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.85rem', borderRadius: 'var(--radius-lg)', background: '#E3F6EF' }}>

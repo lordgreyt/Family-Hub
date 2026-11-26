@@ -162,10 +162,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Adult-only status check
+    // 1. Status check
+    //    - adults get the full admin view (voice/accent/key hint)
+    //    - children and other members get a shared "is TTS available" flag only,
+    //      so the key the admin saved once is usable by everyone in the family.
     if (req.method === 'GET') {
-      await verifyAdultUser(req);
+      let isAdult = true;
+      try {
+        await verifyAdultUser(req);
+      } catch (err) {
+        if (!(err instanceof PublicError) || err.status !== 403) throw err;
+        await verifyFamilyMember(req);
+        isAdult = false;
+      }
       const stored = await readStoredTtsConfig();
+      if (!isAdult) {
+        return res.status(200).json({
+          configured: Boolean(stored && stored.apiKey),
+          voice: 'coral',
+          accent: 'en-GB',
+          keyHint: '',
+          source: stored && stored.apiKey ? 'database' : 'none',
+        });
+      }
       if (!stored) {
         return res.status(200).json({
           configured: false,

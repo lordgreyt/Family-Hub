@@ -2,10 +2,12 @@ import { getDatabase } from 'firebase-admin/database';
 import homeAssistant from '../../server/homeAssistant.cjs';
 import { decryptPrivateData, encryptPrivateData } from '../../server/privateFinanceCrypto.cjs';
 
-const { PublicError, sendError, setApiHeaders, verifyAdultUser } = homeAssistant;
+const { PublicError, sendError, setApiHeaders, verifyAdultUser, verifyFamilyMember } = homeAssistant;
 
 // Kept outside mockDb.DB_KEYS so clients subscribed to RTDB root never see it.
-// Only authenticated adult users (verifyAdultUser) may read status, save a key, or run OCR.
+// Only adults (verifyAdultUser) may save or remove the key. Reading the status and
+// running OCR is open to every Family Hub member, so one key configured by an adult
+// works for the whole family.
 const STORAGE_PATH = 'family_hub_private_vocab_ai_v1';
 const MAX_BODY_BYTES = 12_000_000; // up to 4 compressed textbook photos
 const VALID_PROVIDERS = new Set(['deepseek', 'gemini', 'openai']);
@@ -41,6 +43,13 @@ function requestBody(req) {
   } catch (err) {
     if (err instanceof PublicError) throw err;
     throw new PublicError(400, 'Ungültiges JSON-Format.', 'invalid_json');
+  }
+}
+
+function requireBearer(req) {
+  const header = String(req.headers?.authorization || '');
+  if (!/^Bearer\s+\S+/i.test(header)) {
+    throw new PublicError(401, 'Bitte erneut anmelden.', 'missing_auth');
   }
 }
 
@@ -179,11 +188,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    await verifyAdultUser(req);
+    // Every request must be authenticated. Adults see the full key hint; children only
+    // learn whether the shared key exists, so one key configured by an adult works for all.
+    requireBearer(req);
 
     // 1. Read status (masked, never exposes raw API key to clients)
     if (req.method === 'GET') {
+      let isAdult = true;
+      try {
+        await verifyAdultUser(req);
+      } catch (err) {
+        if (!(err instanceof PublicError) || err.status !== 403) throw err;
+        await verifyFamilyMember(req);
+        isAdult = false;
+      }
       const stored = await readStoredConfig();
+      if (!isAdult) {
+        return res.status(200).json({
+          configured: Boolean(stored),
+          provider: stored ? stored.provider : 'deepseek',
+          model: stored ? stored.model || DEFAULT_MODELS[stored.provider] : DEFAULT_MODELS.deepseek,
+          keyHint: '',
+          source: stored ? 'database' : 'none',
+        });
+      }
       if (stored) {
         return res.status(200).json({
           configured: true,
@@ -214,6 +242,7 @@ export default async function handler(req, res) {
 
     // 2. Save or clear encrypted API key (adults only)
     if (req.method === 'PUT') {
+      await verifyAdultUser(req);
       const body = requestBody(req);
       const provider = VALID_PROVIDERS.has(body.provider) ? body.provider : 'deepseek';
       const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
@@ -252,6 +281,10 @@ export default async function handler(req, res) {
     }
 
     // 3. Run Vision OCR server-side (avoids CORS & keeps key off the wire)
+    //    Allowed for every Family Hub member; the API key always comes from the
+    //    server-side store or env — never from the client body.
+    await verifyFamilyMember(req);
+
     const body = requestBody(req);
     const photos = Array.isArray(body.photos) ? body.photos : [];
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
@@ -276,17 +309,11 @@ export default async function handler(req, res) {
 
     const stored = await readStoredConfig();
     const envCfg = envFallbackConfig();
-    const fallbackInlineKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-    const requestedProvider = VALID_PROVIDERS.has(body.provider) ? body.provider : undefined;
 
-    const resolved = stored
-      || envCfg
-      || (fallbackInlineKey
-        ? { provider: requestedProvider || 'deepseek', apiKey: fallbackInlineKey, model: undefined }
-        : null);
+    const resolved = stored || envCfg;
 
     if (!resolved || !resolved.apiKey) {
-      throw new PublicError(400, 'Kein KI API-Key hinterlegt. Bitte trage deinen Key unter Setup → KI-Vokabelscanner ein.', 'missing_api_key');
+      throw new PublicError(400, 'Kein KI API-Key hinterlegt. Ein Erwachsener kann ihn unter Setup → KI-Vokabelscanner eintragen – danach gilt er für alle Familienmitglieder.', 'missing_api_key');
     }
 
     const provider = resolved.provider;

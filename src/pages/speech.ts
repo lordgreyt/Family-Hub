@@ -133,6 +133,12 @@ function localTtsStatus(): TtsStatus {
   };
 }
 
+/**
+ * Loads the shared TTS status.
+ * The key is stored once by an adult; every family member (children included) gets
+ * `configured: true` from the server and can therefore play the audio.
+ * The API never exposes the raw key or the admin-side voice settings to children.
+ */
 export async function loadTtsStatus(): Promise<TtsStatus> {
   const headers = await getFirebaseAuthHeaders();
   if (headers) {
@@ -144,9 +150,12 @@ export async function loadTtsStatus(): Promise<TtsStatus> {
       });
       if (response.ok) {
         const data = (await response.json()) as TtsStatus;
-        if (data.voice && VALID_VOICES.has(data.voice)) setTtsVoice(data.voice);
-        if (data.accent === 'en-GB' || data.accent === 'en-US') setEnglishAccent(data.accent);
-        if (data.configured) return data;
+        // Children receive placeholder voice/accent — only adopt real values.
+        if (data.keyHint && data.voice && VALID_VOICES.has(data.voice)) setTtsVoice(data.voice);
+        if (data.keyHint && (data.accent === 'en-GB' || data.accent === 'en-US')) setEnglishAccent(data.accent);
+        if (data.configured) {
+          return { ...data, voice: getTtsVoice(), accent: getEnglishAccent() };
+        }
         const local = localTtsStatus();
         return local.configured ? local : data;
       }

@@ -201,7 +201,7 @@ export const VocabCameraScanner: React.FC<VocabCameraScannerProps> = ({
 
   const handleAnalyze = async () => {
     if (!aiStatus?.configured) {
-      setError('Bitte hinterlege zuerst deinen DeepSeek (oder Gemini/OpenAI) API-Key unter Setup → KI-Vokabelscanner.');
+      setError('Es ist noch kein KI-Key hinterlegt. Ein Erwachsener kann ihn unter Setup → KI-Vokabelscanner eintragen – danach gilt er für alle.');
       return;
     }
     if (photos.length === 0) {
@@ -468,7 +468,7 @@ export const VocabCameraScanner: React.FC<VocabCameraScannerProps> = ({
                   KI API-Key noch nicht hinterlegt
                 </div>
                 <div style={{ fontSize: '12px', color: '#5D5880', lineHeight: 1.4, marginTop: '2px' }}>
-                  Hinterlege deinen DeepSeek-Key sicher unter <strong>Setup → KI-Vokabelscanner</strong> (für Kinder gesperrt).
+                  Ein Erwachsener hinterlegt den DeepSeek-Key einmalig unter <strong>Setup → KI-Vokabelscanner</strong>. Danach können alle Familienmitglieder den Scanner nutzen.
                 </div>
               </div>
               <button

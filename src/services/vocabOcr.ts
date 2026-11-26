@@ -134,7 +134,8 @@ function localStatusFallback(): VocabAiStatus {
 
 /**
  * Loads the current OCR AI key status.
- * Prefers the adult-only encrypted backend (/api/vocabulary/ocr) and falls back to localStorage in Vite dev.
+ * Adults get the full status incl. key hint from the encrypted backend (/api/vocabulary/ocr);
+ * children only learn whether the shared key exists. Falls back to localStorage in Vite dev.
  */
 export async function loadVocabAiStatus(): Promise<VocabAiStatus> {
   const headers = await getAdultAuthHeaders();
@@ -483,7 +484,8 @@ export async function extractVocabularyFromPhotos(
   const prompt = buildOcrPrompt(hints);
   const localCfg = getVocabAiConfig();
 
-  // 1. Prefer server-side adult-only proxy (/api/vocabulary/ocr) — avoids CORS & uses encrypted key
+  // 1. Prefer the server-side proxy (/api/vocabulary/ocr): the shared key that an adult
+  //    saved once lives there, so children never need (or see) an API key of their own.
   const headers = await getAdultAuthHeaders();
   if (headers) {
     let backendMissing = false;
@@ -529,7 +531,7 @@ export async function extractVocabularyFromPhotos(
   // 2. Local Vite dev fallback (uses Vite /api/deepseek proxy for DeepSeek so CORS never blocks)
   const apiKey = localCfg.apiKey.trim();
   if (!apiKey) {
-    throw new Error('Kein KI API-Key hinterlegt. Bitte trage deinen Key unter Setup → KI-Vokabelscanner ein.');
+    throw new Error('Kein KI API-Key hinterlegt. Ein Erwachsener kann ihn unter Setup → KI-Vokabelscanner eintragen – danach gilt er für alle Familienmitglieder.');
   }
 
   const provider = detectProviderFromKey(apiKey) || localCfg.provider;

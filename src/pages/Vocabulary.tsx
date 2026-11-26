@@ -577,7 +577,8 @@ export const Vocabulary = () => {
   useEffect(() => {
     if (!voicePanelOpen) return;
     setVoiceTestError('');
-    if (!user || user.isChild) return;
+    if (!user) return;
+    // Children get the shared status too (configured by an adult once, usable by everyone).
     loadTtsStatus().then(status => {
       setTtsStatus(status);
       setStudioVoice(status.voice);
@@ -1229,23 +1230,27 @@ export const Vocabulary = () => {
             </button>
           </div>
 
-          {!user?.isChild && ttsStatus && !ttsStatus.configured && (
+          {ttsStatus && !ttsStatus.configured && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', padding: '0.7rem 0.85rem', borderRadius: '14px', background: '#F4F1FF', border: '1px solid #C7B6F7', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#17143A', flex: '1 1 180px' }}>
-                Noch kein OpenAI Sprach-Key hinterlegt.
+                {user?.isChild
+                  ? 'Noch keine Vorlese-Stimme freigeschaltet – ein Erwachsener kann sie in den Einstellungen hinterlegen.'
+                  : 'Noch kein OpenAI Sprach-Key hinterlegt.'}
               </span>
-              <button
-                type="button"
-                onClick={() => { setVoicePanelOpen(false); navigate('/setup'); }}
-                style={{
-                  height: '34px', padding: '0 0.85rem', borderRadius: '999px', border: 'none',
-                  background: 'linear-gradient(135deg, #3F34C4, #6D5DF0)', color: '#FFFFFF',
-                  fontSize: '12px', fontWeight: 800, fontFamily: 'inherit',
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer',
-                }}
-              >
-                <Settings size={13} /> In Setup eintragen
-              </button>
+              {!user?.isChild && (
+                <button
+                  type="button"
+                  onClick={() => { setVoicePanelOpen(false); navigate('/setup'); }}
+                  style={{
+                    height: '34px', padding: '0 0.85rem', borderRadius: '999px', border: 'none',
+                    background: 'linear-gradient(135deg, #3F34C4, #6D5DF0)', color: '#FFFFFF',
+                    fontSize: '12px', fontWeight: 800, fontFamily: 'inherit',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer',
+                  }}
+                >
+                  <Settings size={13} /> In Setup eintragen
+                </button>
+              )}
             </div>
           )}
 
