@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Landmark, History, Settings,
   Plus, Trash2, X, Delete, ArrowRight, Calendar, FileText, ChevronRight,
-  TrendingDown, TrendingUp, PieChart as PieChartIcon, AlertTriangle, Undo2
+  TrendingDown, TrendingUp, PieChart as PieChartIcon, Undo2
 } from 'lucide-react';
 import { mockDb } from '../services/mockDb';
 import type { Depot, DepotTransaction, ExpenseItem } from '../services/mockDb';
@@ -85,8 +85,6 @@ export const N26 = () => {
     const txSum = depotTxs.reduce((sum, t) => sum + t.amount, 0);
     return (depot?.startBalance || 0) + txSum;
   };
-
-  const n26Settings = mockDb.getN26Settings();
 
   const depotsById = useMemo(() => {
     const map: Record<string, Depot> = {};
@@ -181,8 +179,6 @@ export const N26 = () => {
       {showBookingForm && (
         <BookingForm 
           depots={depots} 
-          autoBookingEnabled={n26Settings.autoBookingEnabled}
-          autoBookingDay={n26Settings.bookingDay}
           onClose={() => setShowBookingForm(false)} 
           onSave={(data) => {
             if (Array.isArray(data)) {
@@ -1160,7 +1156,7 @@ const SettingsView = ({ transactions, onRevertLastMonthly }: { transactions: Dep
 
 // --- Sub-Components ---
 
-const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingDay }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void, autoBookingEnabled?: boolean, autoBookingDay?: number }) => {
+const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void }) => {
   const [type, setType] = useState<'deposit' | 'withdrawal' | 'transfer'>('deposit');
   const [amount, setAmount] = useState('0');
   const [selectedDepotId, setSelectedDepotId] = useState(depots[0]?.id || '');
@@ -1168,7 +1164,6 @@ const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingD
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [step, setStep] = useState(1); // 1: Type/Amount/Note, 2: Depot selection
-  const [pendingAutoConfirm, setPendingAutoConfirm] = useState(false);
 
   const handleKeyPress = (key: string) => {
     setAmount(prev => {
@@ -1187,11 +1182,6 @@ const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingD
     const val = parseFloat(amount.replace(',', '.'));
     if (isNaN(val) || val === 0) return;
 
-    // Bei aktiver Auto-Buchung erst nach ausdrücklicher Bestätigung buchen
-    if (autoBookingEnabled) {
-      setPendingAutoConfirm(true);
-      return;
-    }
     commitBooking(val);
   };
 
@@ -1242,21 +1232,6 @@ const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingD
           <h3 style={{ margin: 0, fontSize: 'var(--font-base)', fontWeight: 700 }}>BUCHUNG ERSTELLEN</h3>
           <button onClick={onClose} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><X size={24} /></button>
         </div>
-
-        {autoBookingEnabled && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
-            padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)',
-            backgroundColor: 'rgba(255, 159, 45, 0.12)', border: '1px solid rgba(255, 159, 45, 0.45)',
-            fontSize: '11px', fontWeight: 600, lineHeight: 1.35, color: 'var(--color-text)',
-          }}>
-            <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '1px', color: 'var(--color-orange)' }} />
-            <span>
-              Auto-Buchung ist aktiv (Tag {autoBookingDay} im Monat). Diese manuelle Buchung kommt zusätzlich dazu
-              und wird erst nach deiner Bestätigung gespeichert.
-            </span>
-          </div>
-        )}
 
         {step === 1 ? (
           <>
@@ -1396,22 +1371,6 @@ const BookingForm = ({ depots, onClose, onSave, autoBookingEnabled, autoBookingD
           </div>
         )}
       </div>
-        {pendingAutoConfirm && (
-          <ConfirmDialog
-            title="Auto-Buchung ist aktiv"
-            message={[
-              `Am ${autoBookingDay}. des Monats werden die Sparraten automatisch gebucht.`,
-              `${type === 'withdrawal' ? '−' : ''}${amount} € · ${depots.find(d => d.id === (type === 'transfer' ? targetDepotId : selectedDepotId))?.name || 'Depot'}`,
-              'Diese manuelle Buchung kommt zusätzlich dazu.',
-            ]}
-            confirmLabel="Trotzdem buchen"
-            onCancel={() => setPendingAutoConfirm(false)}
-            onConfirm={() => {
-              setPendingAutoConfirm(false);
-              commitBooking(parseFloat(amount.replace(',', '.')));
-            }}
-          />
-        )}
 
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
