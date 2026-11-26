@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { X, LogOut, Info } from 'lucide-react';
 import { AvatarEmoji } from '../AvatarEmoji';
+import { HubIcon, navIconKey } from '../HubIcon';
 import { getNavItems } from '../../utils/navigation';
 import { APP_VERSION, getRecentChangelog } from '../../data/changelog';
 import type { ChangelogEntry } from '../../data/changelog';
@@ -95,7 +96,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           {groups.map(group => (
             <div key={group.label} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
               <div className="drawer-group-label">{group.label}</div>
-              {group.items.map(({ to, icon: Icon, label }) => (
+              {group.items.map(({ to, label }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -103,7 +104,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                   onClick={onClose}
                   className={({ isActive }) => `drawer-link${isActive ? ' drawer-link--on' : ''}`}
                 >
-                  <Icon size={20} />
+                  <HubIcon name={navIconKey(to)} size={28} />
                   <span>{label}</span>
                 </NavLink>
               ))}

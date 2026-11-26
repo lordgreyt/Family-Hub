@@ -7,14 +7,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { mockDb } from '../../services/mockDb';
+import { ExpenseCategoryIcon } from '../HubIcon';
 
 interface ExpenseFormProps {
   type: 'INCOME' | 'EXPENSE';
   currentMonth: string;
   onClose: () => void;
 }
-
-const TILE_COLORS = ['#6D5DF0', '#F27A9B', '#F5A06B', '#4FC3A1', '#4B8DFF', '#A68BF0'];
 
 export const CATEGORIES = [
   'Essen gehen', 'Geschenke', 'Gesundheit', 'Handwerk', 'Haus', 'Hund', 
@@ -253,37 +252,31 @@ export const ExpenseForm = ({ type, currentMonth, onClose }: ExpenseFormProps) =
               overflowY: 'auto',
               padding: '0.1rem'
             }}>
-              {CATEGORIES.map((cat, i) => {
-                const Icon = CATEGORY_ICONS[cat];
-                const color = TILE_COLORS[i % TILE_COLORS.length];
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => handleSave(cat)}
-                    style={{
-                      height: '84px',
-                      backgroundColor: 'var(--color-surface-hover)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-lg)',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.4rem',
-                      cursor: 'pointer',
-                      color: 'var(--color-text)'
-                    }}
-                  >
-                    <span style={{ width: '36px', height: '36px', borderRadius: '50%', background: color + '26', color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {Icon && <Icon size={19} />}
-                    </span>
-                    <span style={{ textAlign: 'center' }}>{cat}</span>
-                  </button>
-                );
-              })}
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleSave(cat)}
+                  style={{
+                    height: '86px',
+                    backgroundColor: 'var(--color-surface-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-lg)',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                    cursor: 'pointer',
+                    color: 'var(--color-text)'
+                  }}
+                >
+                  <ExpenseCategoryIcon category={cat} size={40} />
+                  <span style={{ textAlign: 'center' }}>{cat}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}

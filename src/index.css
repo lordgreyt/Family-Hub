@@ -85,7 +85,7 @@
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', 'Nunito Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Figtree', 'Plus Jakarta Sans', 'Nunito Sans', 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--color-background);
   color: var(--color-text);
   font-size: var(--font-base);

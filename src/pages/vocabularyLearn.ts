@@ -91,9 +91,31 @@ export function answerVariants(value: string): string[] {
     });
 }
 
-/** Hauptvariante: wird vorgelesen und als Antwortoption angezeigt. */
+/** Hauptvariante: wird als kompakte Antwortoption / Tipp-Hilfe genutzt. */
 export function primaryVariant(value: string) {
   return answerVariants(value)[0] || value.trim();
+}
+
+/**
+ * Vollständiger Vorlesetext für alle hinterlegten Bedeutungen einer Vokabel.
+ * Wandelt Trenner wie „;“, „|“ oder Wort-Schrägstriche („versuchen / probieren“)
+ * in Kommas um, damit OpenAI TTS alle Varianten mit natürlicher Pause vorliest,
+ * während Ausdrücke wie „km/h“ erhalten bleiben.
+ */
+export function speechText(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed
+    .split(/\s*[;|]\s*/)
+    .flatMap(part => {
+      const chunks = part.split(SLASH_SPLIT).map(chunk => chunk.trim()).filter(Boolean);
+      const letters = (text: string) => text.replace(/[^A-Za-zÄÖÜäöüß]/g, '').length;
+      return chunks.length > 1 && chunks.length <= 4 && chunks.every(chunk => letters(chunk) >= 3)
+        ? chunks
+        : [part.trim()];
+    })
+    .filter(Boolean)
+    .join(', ');
 }
 
 /** Richtig ist die Antwort, wenn sie zu irgendeiner hinterlegten Variante passt. */
@@ -176,4 +198,61 @@ export function pickLearnMode(options: { streak: number; lastMode?: LearnMode; c
   if (mode === 'choice') return 'type';
   if (mode === 'type') return canChoose ? 'choice' : 'type';
   return 'type';
+}
+
+/**
+ * Erzeugt eine gestufte Tipp-Hilfe beim Schreiben:
+ * - Stufe 1: Anfangsbuchstabe + Wortlänge (z. B. "suitcase" → "s _ _ _ _ _ _ _")
+ * - Stufe 2: Erste 2–3 Buchstaben + Endbuchstabe (z. B. "suitcase" → "s u _ _ _ _ _ e")
+ */
+export function buildTypingHint(expected: string, level: 1 | 2): string {
+  const target = primaryVariant(expected);
+  if (!target) return '';
+  return target
+    .split(/\s+/)
+    .map(word => {
+      const chars = Array.from(word);
+      if (chars.length <= 2) return level === 1 ? `${chars[0]} _` : word;
+      const revealStart = level === 1 ? 1 : Math.min(chars.length - 1, chars.length >= 7 ? 3 : 2);
+      const revealEnd = level === 2 && chars.length >= 4;
+      return chars
+        .map((ch, idx) => {
+          if (!/[A-Za-zÄÖÜäöüß0-9]/.test(ch)) return ch;
+          if (idx < revealStart) return ch;
+          if (revealEnd && idx === chars.length - 1) return ch;
+          return '_';
+        })
+        .join(' ');
+    })
+    .join('   ');
+}
+
+export type MasteryState = 'new' | 'learning' | 'mastered';
+
+export function entryMastery(progress?: { correctCount?: number; wrongCount?: number; streak?: number }): MasteryState {
+  if (!progress || ((progress.correctCount || 0) === 0 && (progress.wrongCount || 0) === 0)) {
+    return 'new';
+  }
+  if ((progress.streak || 0) >= 2) return 'mastered';
+  return 'learning';
+}
+
+export function isHardEntry(progress?: { wrongCount?: number; streak?: number }): boolean {
+  return Boolean(progress && (progress.wrongCount || 0) > 0 && (progress.streak || 0) < 2);
+}
+
+/** Ganze Kalendertage bis zu einem optionalen Klassenarbeits-Datum (YYYY-MM-DD). */
+export function daysUntilExam(examDate?: string, today: Date = new Date()): number | null {
+  if (!examDate || !/^\d{4}-\d{2}-\d{2}$/.test(examDate.trim())) return null;
+  const [y, m, d] = examDate.trim().split('-').map(Number);
+  const target = new Date(y, m - 1, d, 12, 0, 0, 0);
+  if (Number.isNaN(target.getTime())) return null;
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0);
+  return Math.round((target.getTime() - start.getTime()) / 86_400_000);
+}
+
+export function dailyExamTarget(remainingWords: number, daysLeft: number | null): number | null {
+  if (daysLeft === null || daysLeft < 0 || remainingWords <= 0) return null;
+  if (daysLeft === 0) return remainingWords;
+  return Math.max(1, Math.ceil(remainingWords / daysLeft));
 }

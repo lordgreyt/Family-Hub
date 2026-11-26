@@ -257,6 +257,8 @@ export interface VocabularySet {
   updatedAt?: number;
   createdBy: string;
   source?: string;
+  /** Optionales Klassenarbeits- / Test-Datum (YYYY-MM-DD) für Countdown & Tagesziel. */
+  examDate?: string;
   progressByUser?: Record<string, Record<string, VocabularyProgress>>;
 }
 

@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Plus, Minus, Check, X, Tag, ChevronDown, CalendarPlus, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, Check, X, ChevronDown, CalendarPlus, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { ExpenseItem } from '../services/mockDb';
-import { ExpenseForm, CATEGORY_ICONS } from '../components/Expenses/ExpenseForm';
+import { ExpenseForm } from '../components/Expenses/ExpenseForm';
 import { CategoryChanges } from '../components/Expenses/CategoryChanges';
 import { PageBottomBar } from '../components/Layout/PageBottomBar';
+import { ExpenseCategoryIcon, HubIcon } from '../components/HubIcon';
 
 const LONG_PRESS_MS = 600;
 
@@ -316,12 +317,10 @@ export const Expenses = () => {
   const cardTitle: React.CSSProperties = { margin: 0, fontSize: 'var(--font-sm)', fontWeight: 800, color: 'var(--color-text)' };
   const cardSub: React.CSSProperties = { margin: '0.15rem 0 0 0', fontSize: 'var(--font-xs)', color: 'var(--color-text-muted)', fontWeight: 500 };
   const pill = (color: string): React.CSSProperties => ({ flex: 'none', padding: '0.3rem 0.7rem', borderRadius: '999px', background: 'var(--color-surface-muted)', color, fontSize: 'var(--font-xs)', fontWeight: 800 });
-  const iconChip = (color: string): React.CSSProperties => ({ width: '38px', height: '38px', borderRadius: '50%', flex: 'none', background: color + '26', color, display: 'flex', alignItems: 'center', justifyContent: 'center' });
 
   const categoryColor = (name: string) => categoryList.find(c => c.name === name)?.color || CHART_REST_COLOR;
 
-  const renderItemRow = (item: ExpenseItem, color: string, withDate = false) => {
-    const Icon = CATEGORY_ICONS[item.category] || Tag;
+  const renderItemRow = (item: ExpenseItem, withDate = false) => {
     const sub = [withDate ? new Date(item.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '', item.description || ''].filter(Boolean).join(' · ');
     return (
       <div
@@ -329,7 +328,7 @@ export const Expenses = () => {
         {...pressHandlers(() => setItemToDelete(item))}
         style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', userSelect: 'none' }}
       >
-        <span style={iconChip(color)}><Icon size={18} /></span>
+        <ExpenseCategoryIcon category={item.category} size={38} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700, color: 'var(--color-text)' }}>{item.category}</div>
           {sub && (
@@ -462,7 +461,10 @@ export const Expenses = () => {
       {/* Erfolgsmeldung */}
       {successMessage && (
         <div style={{ ...CARD, padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', animation: 'fadeIn 0.3s ease' }}>
-          <span style={{ width: '36px', height: '36px', flex: 'none', borderRadius: '50%', background: 'var(--color-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>{successMessage.emoji}</span>
+          <HubIcon
+            name={successMessage.emoji === '⚠️' ? 'alert' : successMessage.emoji === '💰' ? 'depot_sparen' : 'flame'}
+            size={38}
+          />
           <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-text)', flex: 1 }}>{successMessage.text}</span>
         </div>
       )}
@@ -542,14 +544,13 @@ export const Expenses = () => {
                 {categoryList.map(d => {
                   const isExpanded = expandedCategory === d.name;
                   const categoryItems = monthExpenses.filter(e => e.category === d.name).sort((a, b) => b.date.localeCompare(a.date));
-                  const Icon = CATEGORY_ICONS[d.name] || Tag;
                   return (
                     <div key={d.name}>
                       <div
                         onClick={() => { setExpandedCategory(isExpanded ? null : d.name); setActiveCategory(isExpanded ? null : d.name); }}
                         style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', cursor: 'pointer' }}
                       >
-                        <span style={iconChip(d.color)}><Icon size={18} /></span>
+                        <ExpenseCategoryIcon category={d.name} size={38} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
                             <span style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>{d.name}</span>
@@ -566,7 +567,7 @@ export const Expenses = () => {
                       </div>
                       {isExpanded && (
                         <div style={{ margin: '0.25rem 0 0.5rem', padding: '0.75rem', background: 'var(--color-surface-hover)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '0.65rem', animation: 'fadeIn 0.2s ease' }}>
-                          {categoryItems.map(item => renderItemRow(item, d.color, true))}
+                          {categoryItems.map(item => renderItemRow(item, true))}
                         </div>
                       )}
                     </div>
@@ -669,7 +670,7 @@ export const Expenses = () => {
                       {dayOut > 0 && <span style={{ fontSize: 'var(--font-xs)', fontWeight: 700, color: 'var(--color-text-tertiary)' }}>−{fmt0(dayOut)}</span>}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {items.map(item => renderItemRow(item, item.type === 'INCOME' ? '#43C773' : categoryColor(item.category)))}
+                      {items.map(item => renderItemRow(item))}
                     </div>
                   </div>
                 );

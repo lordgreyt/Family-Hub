@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Refrigerator, Plus, Search, ShoppingCart, ScanBarcode, Trash2, TriangleAlert, Clock } from 'lucide-react';
+import { Plus, Search, ShoppingCart, ScanBarcode, Trash2, TriangleAlert, Clock } from 'lucide-react';
+import { HubIcon } from '../components/HubIcon';
 import { mockDb } from '../services/mockDb';
 import type { PantryItem, ShoppingList, UnknownBarcode } from '../services/mockDb';
 import { useAuth } from '../context/AuthContext';
@@ -191,8 +192,8 @@ export const Pantry = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Refrigerator size={24} /> Vorrat
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+          <HubIcon name="pantry" size={32} /> Vorrat
         </h1>
         <button
           onClick={() => setPicking(true)} className="btn btn-primary"

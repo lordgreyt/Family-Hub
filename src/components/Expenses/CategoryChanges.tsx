@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus, Sparkles, Tag } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus, Sparkles } from 'lucide-react';
 import type { ExpenseItem } from '../../services/mockDb';
-import { CATEGORY_ICONS } from './ExpenseForm';
+import { ExpenseCategoryIcon } from '../HubIcon';
 
 type Baseline = 'AVG' | 'PREV';
 type Status = 'up' | 'down' | 'new' | 'gone' | 'flat';
@@ -221,7 +221,6 @@ export const CategoryChanges = ({ expenses, currentMonth, card, categoryColor }:
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                 {list.map(c => {
-                  const Icon = CATEGORY_ICONS[c.category] || Tag;
                   const color = categoryColor(c.category);
                   const tone = toneOf(c);
                   const isOpen = openCat === c.category;
@@ -238,7 +237,7 @@ export const CategoryChanges = ({ expenses, currentMonth, card, categoryColor }:
                         onClick={() => setOpenCat(isOpen ? null : c.category)}
                         style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', padding: '0.55rem 0.4rem', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--color-text)', textAlign: 'left' }}
                       >
-                        <span style={chip(color)}><Icon size={18} /></span>
+                        <ExpenseCategoryIcon category={c.category} size={38} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
                             <span style={{ fontSize: 'var(--font-sm)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>

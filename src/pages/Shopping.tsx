@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ShoppingCart, Plus, Check, ChevronDown, ChevronRight, Pencil, Trash2, Refrigerator } from 'lucide-react';
+import { Plus, Check, ChevronDown, ChevronRight, Pencil, Trash2, Refrigerator } from 'lucide-react';
+import { HubIcon } from '../components/HubIcon';
 import { mockDb } from '../services/mockDb';
 import type { ShoppingItem, ShoppingList, PantryItem } from '../services/mockDb';
 import { useAuth } from '../context/AuthContext';
@@ -209,8 +210,8 @@ export const Shopping = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ShoppingCart size={24} /> Einkaufsliste
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+          <HubIcon name="shopping" size={32} /> Einkaufsliste
         </h1>
         {active && (
           <button onClick={() => openListModal(active)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', padding: '0.45rem 0.7rem' }}>

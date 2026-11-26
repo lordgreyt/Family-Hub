@@ -5,7 +5,8 @@ import { mockDb } from '../services/mockDb';
 import type { RewardRequest, ScoreEntry, User, WeeklyStarTask } from '../services/mockDb';
 import { nextWeeklyStarBoundary, WEEKLY_STAR_HOUR } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
-import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Hourglass, Sparkles, PencilLine, CalendarDays, Trash2, Repeat } from 'lucide-react';
+import { HubIcon } from '../components/HubIcon';
+import { Star, Clock, Send, ShieldAlert, History, Gamepad2, Play, Trophy, Check, X, Plus, Minus, Medal, Sparkles, PencilLine, Trash2, Repeat } from 'lucide-react';
 import { SnakeGame } from '../components/SnakeGame';
 import { MemoryGame } from '../components/MemoryGame';
 import { FlappyGame } from '../components/FlappyGame';
@@ -81,9 +82,9 @@ const pillInput: CSSProperties = {
   fontWeight: 700,
 };
 
-const SectionTitle = ({ icon, color, children, right }: { icon: ReactNode; color: string; children: ReactNode; right?: ReactNode }) => (
+const SectionTitle = ({ icon, color, graphic, children, right }: { icon?: ReactNode; color?: string; graphic?: ReactNode; children: ReactNode; right?: ReactNode }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.9rem' }}>
-    <span style={iconChip(color)}>{icon}</span>
+    {graphic ?? <span style={iconChip(color || 'var(--color-primary)')}>{icon}</span>}
     <h3 style={{ margin: 0, flex: 1, fontSize: 'var(--font-lg)', fontWeight: 800 }}>{children}</h3>
     {right}
   </div>
@@ -199,8 +200,7 @@ export const WeeklyStarsManager = ({ kids, editor }: { kids: User[]; editor: str
   return (
     <div style={card}>
       <SectionTitle
-        icon={<CalendarDays size={19} />}
-        color={WEEKLY_COLOR}
+        graphic={<HubIcon name="weekly_stars" size={38} />}
         right={<span style={{ ...pill(WEEKLY_COLOR), background: 'white', whiteSpace: 'nowrap' }}><Repeat size={12} /> So · {WEEKLY_STAR_HOUR}:00</span>}
       >
         Wochen-Sterne
@@ -341,7 +341,7 @@ export const WeeklyStarsOverview = ({ childId }: { childId: string }) => {
 
   return (
     <div style={card}>
-      <SectionTitle icon={<CalendarDays size={19} />} color={WEEKLY_COLOR}>Deine Wochenaufgaben</SectionTitle>
+      <SectionTitle graphic={<HubIcon name="weekly_stars" size={38} />}>Deine Wochenaufgaben</SectionTitle>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         {mine.map(task => {
           const isActive = task.active !== false;
@@ -438,7 +438,7 @@ export const Rewards = () => {
         {/* Offene Anfragen */}
         {pendingRequests.length > 0 && (
           <div style={{ ...card, border: '1.5px solid ' + STAR_COLOR + '66', background: '#FFF8EE' }}>
-            <SectionTitle icon={<Hourglass size={19} />} color={STAR_COLOR}>Offene Anfragen</SectionTitle>
+            <SectionTitle graphic={<HubIcon name="stars" size={38} />}>Offene Anfragen</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {pendingRequests.map(req => {
                 const reqUser = users.find(u => u.id === req.childId);
@@ -467,7 +467,7 @@ export const Rewards = () => {
 
         {/* Punktestände aller Kinder */}
         <div style={card}>
-          <SectionTitle icon={<Star size={19} fill={STAR_COLOR} />} color={STAR_COLOR}>Sternen-Übersicht</SectionTitle>
+          <SectionTitle graphic={<HubIcon name="stars" size={38} />}>Sternen-Übersicht</SectionTitle>
           {childAccounts.length === 0 ? (
             <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Keine Kinder-Accounts angelegt.</p>
           ) : (
@@ -917,7 +917,7 @@ export const Rewards = () => {
 
       {/* History */}
       <div style={card}>
-        <SectionTitle icon={<History size={19} />} color="#4FC3A1">Sterne-Historie</SectionTitle>
+        <SectionTitle graphic={<HubIcon name="history" size={38} />}>Sterne-Historie</SectionTitle>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
           <div>

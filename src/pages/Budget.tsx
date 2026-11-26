@@ -3,10 +3,11 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
 import type { BudgetItem, Depot } from '../services/mockDb';
-import { Calculator, Plus, Pencil, Trash2, X, Check, TrendingUp, TrendingDown, PiggyBank, Wallet } from 'lucide-react';
+import { Calculator, Plus, Pencil, Trash2, X, Check, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
 import {
   HERO_GRADIENT, GREEN, GREEN_TEXT, PINK, PINK_TEXT, PRIMARY, iconChip, CARD, sectionTitle, fieldLabel,
 } from '../components/SurgeryFinance/theme';
+import { HubIcon } from '../components/HubIcon';
 
 const fmt = (value: number) =>
   `${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -189,7 +190,7 @@ export const Budget = () => {
       {/* Einnahmen */}
       <div style={CARD}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.6rem' }}>
-          <span style={iconChip(GREEN, 38)}><Wallet size={18} /></span>
+          <HubIcon name="depot_sparen" size={38} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={sectionTitle}>Einnahmen</h3>
             <div style={{ fontSize: 'var(--font-xs)', fontWeight: 700, color: GREEN_TEXT }}>{fmt(totalIncome)}</div>
@@ -204,7 +205,7 @@ export const Budget = () => {
       {/* Ausgaben */}
       <div style={CARD}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.6rem' }}>
-          <span style={iconChip(PINK, 38)}><TrendingDown size={18} /></span>
+          <HubIcon name="expenses" size={38} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={sectionTitle}>Ausgaben</h3>
             <div style={{ fontSize: 'var(--font-xs)', fontWeight: 700, color: PINK_TEXT }}>{fmt(totalExpense)}</div>
@@ -213,7 +214,7 @@ export const Budget = () => {
         </div>
         {fixedDepotAmount > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.7rem 0', borderTop: '1px solid var(--color-border)' }}>
-            <span style={iconChip(PRIMARY, 36)}><PiggyBank size={17} /></span>
+            <HubIcon name="n26" size={36} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700, color: 'var(--color-text)' }}>N26 Sparplan</div>
               <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>

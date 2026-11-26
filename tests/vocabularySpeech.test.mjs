@@ -1,127 +1,101 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Minimaler Ersatz für die Web-Speech-API, bevor das Modul geladen wird.
-class FakeUtterance {
-  constructor(text) {
-    this.text = text;
-    this.lang = '';
-    this.rate = 1;
-    this.voice = null;
-    this.onend = null;
+const played = [];
+const fetchCalls = [];
+const storage = new Map();
+
+class FakeAudio {
+  constructor(src) {
+    this.src = src;
+    this.playbackRate = 1;
+    this.preservesPitch = true;
+    this.currentTime = 0;
+    this.paused = false;
+    this.onended = null;
     this.onerror = null;
+  }
+  play() {
+    played.push(this);
+    return Promise.resolve();
+  }
+  pause() {
+    this.paused = true;
   }
 }
 
-const state = { spoken: [], speaking: false, pending: false, paused: false, cancels: 0, current: null };
-
-const synth = {
-  get speaking() { return state.speaking; },
-  get pending() { return state.pending; },
-  get paused() { return state.paused; },
-  getVoices: () => [
-    { lang: 'de-DE', name: 'de' },
-    { lang: 'en-US', name: 'en' },
-  ],
-  speak(utterance) {
-    state.spoken.push(utterance);
-    state.speaking = true;
-    state.current = utterance;
-  },
-  cancel() {
-    state.cancels += 1;
-    const previous = state.current;
-    state.speaking = false;
-    state.pending = false;
-    state.current = null;
-    if (previous?.onerror) previous.onerror({ error: 'interrupted' });
-  },
-  resume() { state.paused = false; },
-  pause() { state.paused = true; },
+globalThis.window = {};
+globalThis.Audio = FakeAudio;
+globalThis.localStorage = {
+  getItem: key => (storage.has(key) ? storage.get(key) : null),
+  setItem: (key, val) => storage.set(key, String(val)),
+  removeItem: key => storage.delete(key),
+};
+globalThis.URL.createObjectURL = blob => `blob:test-${played.length}-${blob.size}`;
+globalThis.fetch = async (url, init) => {
+  fetchCalls.push({ url, init });
+  return {
+    ok: true,
+    status: 200,
+    blob: async () => new Blob(['fake-mp3'], { type: 'audio/mpeg' }),
+  };
 };
 
-globalThis.window = {
-  speechSynthesis: synth,
-  SpeechSynthesisUtterance: FakeUtterance,
-  setTimeout,
-  clearTimeout,
-};
+const {
+  SPEECH_RATE_SLOW,
+  buildSpeechCacheKey,
+  canSpeak,
+  maskTtsKey,
+  speakText,
+  stopSpeaking,
+} = await import('../src/pages/speech.ts');
 
-const { canSpeak, speakText, stopSpeaking } = await import('../src/pages/speech.ts');
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const tick = (ms = 25) => new Promise(resolve => setTimeout(resolve, ms));
 
 function reset() {
-  state.spoken.length = 0;
-  state.speaking = false;
-  state.pending = false;
-  state.paused = false;
-  state.cancels = 0;
-  state.current = null;
+  played.length = 0;
+  fetchCalls.length = 0;
+  storage.clear();
+  storage.set('family_hub_vocab_tts_key', 'sk-test-openai-key-1234567890');
+  stopSpeaking();
 }
 
-test('kann sprechen und setzt Sprache + Stimme', () => {
+test('canSpeak erkennt Audio-Unterstützung und Cache-Keys trennen Sprache/Stimme', () => {
   reset();
   assert.equal(canSpeak(), true);
-  assert.equal(speakText('versuchen', 'Deutsch'), true);
-  assert.equal(state.spoken.length, 1);
-  assert.equal(state.spoken[0].lang, 'de-DE');
-  assert.equal(state.spoken[0].voice?.name, 'de');
-  assert.equal(state.spoken[0].text, 'versuchen');
-  stopSpeaking();
+  assert.equal(maskTtsKey('sk-1234567890abcd'), 'sk-1…abcd');
+  const ukKey = buildSpeechCacheKey('Schedule', 'Englisch', 'coral', 'en-GB');
+  const usKey = buildSpeechCacheKey('schedule', 'Englisch', 'coral', 'en-US');
+  assert.notEqual(ukKey, usKey);
+  assert.equal(ukKey, buildSpeechCacheKey('  schedule ', 'Englisch', 'coral', 'en-GB'));
 });
 
-test('Nochmal hören startet die Ausgabe wirklich neu', async () => {
+test('speakText lädt MP3 über OpenAI-Proxy, cached es und spielt Langsam-Modus ohne Extra-Request', async () => {
   reset();
-  speakText('versuchen', 'Deutsch');
-  assert.equal(state.spoken.length, 1);
-  // Zweiter Klick während der laufenden Ausgabe
-  speakText('versuchen', 'Deutsch');
-  assert.equal(state.cancels, 1);
-  assert.equal(state.spoken.length, 1, 'speak() darf nicht im selben Tick folgen');
-  await sleep(260);
-  assert.equal(state.spoken.length, 2, 'nach der kurzen Pause muss neu gesprochen werden');
-  assert.equal(state.spoken[1].text, 'versuchen');
+  let ended = 0;
+  assert.equal(speakText('suitcase', 'Englisch', undefined, { onEnd: () => { ended += 1; } }), true);
+  await tick();
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, '/api/openai/v1/audio/speech');
+  assert.equal(played.length, 1);
+  assert.equal(played[0].playbackRate, 1);
+  played[0].onended();
+  assert.equal(ended, 1);
+
+  // Zweiter Aufruf im Langsam-Modus nutzt Memory-Cache (kein neuer API-Request!)
+  assert.equal(speakText('suitcase', 'Englisch', undefined, { rate: SPEECH_RATE_SLOW }), true);
+  await tick();
+  assert.equal(fetchCalls.length, 1, 'gecachtes Wort darf keinen zweiten API-Aufruf auslösen');
+  assert.equal(played.length, 2);
+  assert.equal(played[1].playbackRate, SPEECH_RATE_SLOW);
   stopSpeaking();
+  assert.equal(played[1].paused, true);
 });
 
-test('interrupted durch eigenes cancel() gilt nicht als Fehler', async () => {
-  reset();
-  let errors = 0;
-  speakText('probieren', 'Deutsch', () => { errors += 1; });
-  speakText('probieren', 'Deutsch', () => { errors += 1; });
-  await sleep(260);
-  assert.equal(errors, 0);
-  stopSpeaking();
-  await sleep(50);
-  assert.equal(errors, 0);
-});
-
-test('echter Fehler wird einmal wiederholt und dann gemeldet', async () => {
-  reset();
-  let errors = 0;
-  speakText('test', 'Deutsch', () => { errors += 1; });
-  state.spoken[0].onerror({ error: 'synthesis-failed' });
-  assert.equal(errors, 0, 'erst nach dem Retry melden');
-  await sleep(400);
-  assert.equal(state.spoken.length, 2, 'zweiter Versuch');
-  state.spoken[1].onerror({ error: 'synthesis-failed' });
-  await sleep(400);
-  assert.equal(errors, 1);
-  stopSpeaking();
-});
-
-test('pausierten Zustand beim Neustart wieder aufheben', async () => {
-  reset();
-  state.speaking = true;
-  state.paused = true;
-  speakText('ruhig', 'Deutsch');
-  assert.equal(state.paused, false);
-  stopSpeaking();
-});
-
-test('leerer Text löst keine Ausgabe aus', () => {
+test('leerer Text löst keinen Request aus', async () => {
   reset();
   assert.equal(speakText('   ', 'Deutsch'), false);
-  assert.equal(state.spoken.length, 0);
+  await tick();
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(played.length, 0);
 });

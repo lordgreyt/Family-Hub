@@ -3,8 +3,26 @@ import { createPortal } from 'react-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Settings, Eye, KeyRound, Star, Check, X } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Settings, Eye, KeyRound, Star, Check, X, Pencil, Sparkles, Shield, Volume2 } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
+import { ProfileSheet } from '../components/ProfileSheet';
+import { extractInitials, STUDIO_GRADIENTS } from '../data/avatars';
+import {
+  DEFAULT_MODELS,
+  PROVIDER_LABELS,
+  detectProviderFromKey,
+  loadVocabAiStatus,
+  saveVocabAiKeySecurely,
+} from '../services/vocabOcr';
+import type { VocabAiProvider, VocabAiStatus } from '../services/vocabOcr';
+import {
+  OPENAI_VOICES,
+  getLastTtsError,
+  loadTtsStatus,
+  saveTtsConfigSecurely,
+  speakText,
+} from './speech';
+import type { EnglishAccent, OpenAiVoice, TtsStatus } from './speech';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -65,6 +83,39 @@ export const Setup = () => {
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [showProfileSheet, setShowProfileSheet] = useState(false);
+
+  // KI Vokabelscanner API-Key (nur für Erwachsene sichtbar & nutzbar)
+  const [vocabAiProvider, setVocabAiProvider] = useState<VocabAiProvider>('deepseek');
+  const [vocabAiKey, setVocabAiKey] = useState('');
+  const [vocabAiStatus, setVocabAiStatus] = useState<VocabAiStatus | null>(null);
+  const [isSavingVocabAi, setIsSavingVocabAi] = useState(false);
+  const [vocabAiFeedback, setVocabAiFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
+
+  // KI Sprachausgabe (OpenAI TTS — nur für Erwachsene konfigurierbar)
+  const [ttsKey, setTtsKey] = useState('');
+  const [ttsVoice, setTtsVoiceState] = useState<OpenAiVoice>('coral');
+  const [ttsAccent, setTtsAccentState] = useState<EnglishAccent>('en-GB');
+  const [ttsStatus, setTtsStatus] = useState<TtsStatus | null>(null);
+  const [isSavingTts, setIsSavingTts] = useState(false);
+  const [ttsFeedback, setTtsFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (!user || user.isChild) return;
+    let active = true;
+    loadVocabAiStatus().then(status => {
+      if (!active) return;
+      setVocabAiStatus(status);
+      setVocabAiProvider(status.provider);
+    });
+    loadTtsStatus().then(status => {
+      if (!active) return;
+      setTtsStatus(status);
+      setTtsVoiceState(status.voice);
+      setTtsAccentState(status.accent);
+    });
+    return () => { active = false; };
+  }, [user]);
 
   const [changePwOld, setChangePwOld] = useState('');
   const [changePwNew, setChangePwNew] = useState('');
@@ -123,7 +174,8 @@ export const Setup = () => {
       
       const profileData = { 
         id: newUserId.trim(), 
-        avatar: '❓',
+        avatar: `monogram:${extractInitials(newUserId.trim())}`,
+        avatarColor: STUDIO_GRADIENTS[0].value,
         isSetupComplete: false,
         isChild: newUserIsChild,
         uid
@@ -363,18 +415,37 @@ export const Setup = () => {
           </div>
         </div>
         <div style={{ marginTop: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-          <span style={{
-            width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user?.avatarColor || '#6366f1',
-            border: '3px solid rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <AvatarEmoji emoji={user?.avatar || '❓'} size={60} />
-          </span>
-          <div style={{ minWidth: 0 }}>
+          <button
+            type="button"
+            onClick={() => setShowProfileSheet(true)}
+            aria-label="Profil bearbeiten"
+            style={{
+              width: '66px', height: '66px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user?.avatarColor || '#6D5DF0',
+              border: '3px solid rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 0, cursor: 'pointer', boxShadow: '0 8px 20px rgba(23,20,58,0.28)',
+            }}
+          >
+            <AvatarEmoji emoji={user?.avatar || 'avatar:papa'} size={66} />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-xl)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.id}</div>
             <div style={{ fontSize: 'var(--font-xs)', opacity: 0.85, fontWeight: 600, overflowWrap: 'anywhere' }}>{auth.currentUser?.email || 'Nicht mit E-Mail verknüpft'}</div>
-            <span style={{ display: 'inline-flex', marginTop: '0.4rem', padding: '0.25rem 0.7rem', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', fontSize: '11px', fontWeight: 800 }}>
-              {roleLabel}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', padding: '0.24rem 0.65rem', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', fontSize: '11px', fontWeight: 800 }}>
+                {roleLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowProfileSheet(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.24rem 0.7rem', borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.92)', color: '#3F34C4', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: '11px', fontWeight: 800,
+                }}
+              >
+                <Pencil size={11} /> Profil bearbeiten
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -533,6 +604,330 @@ export const Setup = () => {
         </form>
       </Section>
 
+      {/* KI-Vokabelscanner — nur für Erwachsene, für Kinder unsichtbar & gesperrt */}
+      {!user?.isChild && (
+        <Section icon={Sparkles} color={PRIMARY} title="KI-Vokabelscanner" subtitle="DeepSeek, Gemini oder OpenAI · nur für Erwachsene">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {vocabAiStatus?.configured && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.85rem', borderRadius: 'var(--radius-lg)', background: '#E3F6EF' }}>
+                <Shield size={17} color={GREEN_TEXT} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800, color: GREEN_TEXT }}>
+                    {PROVIDER_LABELS[vocabAiStatus.provider]} aktiv ({vocabAiStatus.model})
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: GREEN_TEXT, opacity: 0.85 }}>
+                    Key {vocabAiStatus.keyHint} · {vocabAiStatus.source === 'database' ? 'verschlüsselt gespeichert' : vocabAiStatus.source === 'env' ? 'Server-Variable' : 'lokal gespeichert'}
+                  </div>
+                </div>
+                {vocabAiStatus.source !== 'env' && (
+                  <button
+                    type="button"
+                    disabled={isSavingVocabAi}
+                    onClick={async () => {
+                      setIsSavingVocabAi(true);
+                      setVocabAiFeedback(null);
+                      try {
+                        const next = await saveVocabAiKeySecurely(vocabAiProvider, '');
+                        setVocabAiStatus(next);
+                        setVocabAiKey('');
+                        setVocabAiFeedback({ text: 'API-Key entfernt.', kind: 'success' });
+                      } catch (err: unknown) {
+                        setVocabAiFeedback({ text: err instanceof Error ? err.message : 'Fehler beim Entfernen.', kind: 'error' });
+                      } finally {
+                        setIsSavingVocabAi(false);
+                      }
+                    }}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: PINK_TEXT, fontFamily: 'inherit', fontSize: 'var(--font-xs)', fontWeight: 800 }}
+                  >
+                    Entfernen
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', padding: '4px', borderRadius: '999px', background: 'var(--color-surface-muted)' }}>
+              {([
+                { id: 'deepseek', label: 'DeepSeek' },
+                { id: 'gemini', label: 'Gemini' },
+                { id: 'openai', label: 'OpenAI' },
+              ] as const).map(opt => {
+                const active = vocabAiProvider === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setVocabAiProvider(opt.id)}
+                    style={{
+                      height: '36px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'var(--font-xs)', fontWeight: 800,
+                      background: active ? 'linear-gradient(135deg, #3F34C4, #6D5DF0)' : 'transparent', color: active ? 'white' : 'var(--color-text-muted)',
+                      boxShadow: active ? '0 4px 12px rgba(63,52,196,0.3)' : 'none',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div>
+              <label style={fieldLabel}>
+                {PROVIDER_LABELS[vocabAiProvider]} API-Key ({DEFAULT_MODELS[vocabAiProvider]})
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="password"
+                  className="input-field"
+                  value={vocabAiKey}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setVocabAiKey(val);
+                    const detected = detectProviderFromKey(val);
+                    if (detected) setVocabAiProvider(detected);
+                  }}
+                  placeholder={
+                    vocabAiStatus?.configured
+                      ? 'Neuen Key zum Ersetzen eingeben…'
+                      : vocabAiProvider === 'gemini'
+                        ? 'AIzaSy…'
+                        : 'sk-…'
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={{ flex: 1, minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                />
+                <button
+                  type="button"
+                  disabled={isSavingVocabAi || !vocabAiKey.trim()}
+                  onClick={async () => {
+                    setIsSavingVocabAi(true);
+                    setVocabAiFeedback(null);
+                    try {
+                      const next = await saveVocabAiKeySecurely(vocabAiProvider, vocabAiKey);
+                      setVocabAiStatus(next);
+                      setVocabAiProvider(next.provider);
+                      setVocabAiKey('');
+                      setVocabAiFeedback({
+                        text: next.source === 'database'
+                          ? `${PROVIDER_LABELS[next.provider]} API-Key verschlüsselt gespeichert.`
+                          : `${PROVIDER_LABELS[next.provider]} API-Key lokal gespeichert.`,
+                        kind: 'success',
+                      });
+                    } catch (err: unknown) {
+                      setVocabAiFeedback({
+                        text: err instanceof Error ? err.message : 'API-Key konnte nicht gespeichert werden.',
+                        kind: 'error',
+                      });
+                    } finally {
+                      setIsSavingVocabAi(false);
+                    }
+                  }}
+                  style={{
+                    height: '44px', padding: '0 1rem', borderRadius: '999px', border: 'none',
+                    cursor: vocabAiKey.trim() && !isSavingVocabAi ? 'pointer' : 'default',
+                    opacity: vocabAiKey.trim() && !isSavingVocabAi ? 1 : 0.5,
+                    fontFamily: 'inherit', background: '#ECE8FF', color: '#3F34C4',
+                    fontSize: 'var(--font-sm)', fontWeight: 800, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {isSavingVocabAi ? 'Speichere…' : 'Speichern'}
+                </button>
+              </div>
+              <p style={noteStyle}>
+                Wird verschlüsselt im geschützten Erwachsenen-Bereich gespeichert (im Live-Betrieb auf Vercel synchron für alle Eltern-Geräte). Kinder-Accounts haben weder Zugriff auf diese Einstellung noch auf den Kamera-Scanner.
+              </p>
+            </div>
+            {vocabAiFeedback && message(vocabAiFeedback.text, vocabAiFeedback.kind)}
+          </div>
+        </Section>
+      )}
+
+      {/* KI-Sprachausgabe (OpenAI TTS) — nur für Erwachsene sichtbar */}
+      {!user?.isChild && (
+        <Section icon={Volume2} color={BLUE} title="KI-Sprachausgabe (OpenAI)" subtitle="Studio-Stimmen fürs Vokabeltraining · nur für Erwachsene">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {ttsStatus?.configured && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.85rem', borderRadius: 'var(--radius-lg)', background: '#E3F6EF' }}>
+                <Shield size={17} color={GREEN_TEXT} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800, color: GREEN_TEXT }}>
+                    OpenAI Studio-Stimme aktiv ({OPENAI_VOICES.find(v => v.id === ttsVoice)?.label || ttsVoice})
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: GREEN_TEXT, opacity: 0.85 }}>
+                    Key {ttsStatus.keyHint} · {ttsStatus.source === 'database' ? 'verschlüsselt gespeichert' : ttsStatus.source === 'env' ? 'Server-Variable' : 'lokal gespeichert'}
+                  </div>
+                </div>
+                {ttsStatus.source !== 'env' && (
+                  <button
+                    type="button"
+                    disabled={isSavingTts}
+                    onClick={async () => {
+                      setIsSavingTts(true);
+                      setTtsFeedback(null);
+                      try {
+                        const next = await saveTtsConfigSecurely({ voice: ttsVoice, accent: ttsAccent, remove: true });
+                        setTtsStatus(next);
+                        setTtsKey('');
+                        setTtsFeedback({ text: 'OpenAI Sprach-Key entfernt.', kind: 'success' });
+                      } catch (err: unknown) {
+                        setTtsFeedback({ text: err instanceof Error ? err.message : 'Fehler beim Entfernen.', kind: 'error' });
+                      } finally {
+                        setIsSavingTts(false);
+                      }
+                    }}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: PINK_TEXT, fontFamily: 'inherit', fontSize: 'var(--font-xs)', fontWeight: 800 }}
+                  >
+                    Entfernen
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label style={fieldLabel}>OpenAI API-Key (gpt-4o-mini-tts)</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="password"
+                  className="input-field"
+                  value={ttsKey}
+                  onChange={e => setTtsKey(e.target.value)}
+                  placeholder={ttsStatus?.configured ? 'Neuen OpenAI Key zum Ersetzen eingeben…' : 'sk-…'}
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={{ flex: 1, minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                />
+                <button
+                  type="button"
+                  disabled={isSavingTts || (!ttsKey.trim() && !ttsStatus?.configured)}
+                  onClick={async () => {
+                    setIsSavingTts(true);
+                    setTtsFeedback(null);
+                    try {
+                      const next = await saveTtsConfigSecurely({
+                        apiKey: ttsKey.trim() || undefined,
+                        voice: ttsVoice,
+                        accent: ttsAccent,
+                      });
+                      setTtsStatus(next);
+                      setTtsKey('');
+                      setTtsFeedback({
+                        text: next.source === 'database'
+                          ? 'OpenAI Sprach-Key verschlüsselt gespeichert.'
+                          : 'OpenAI Sprach-Key lokal gespeichert.',
+                        kind: 'success',
+                      });
+                    } catch (err: unknown) {
+                      setTtsFeedback({
+                        text: err instanceof Error ? err.message : 'Key konnte nicht gespeichert werden.',
+                        kind: 'error',
+                      });
+                    } finally {
+                      setIsSavingTts(false);
+                    }
+                  }}
+                  style={{
+                    height: '44px', padding: '0 1rem', borderRadius: '999px', border: 'none',
+                    cursor: (ttsKey.trim() || ttsStatus?.configured) && !isSavingTts ? 'pointer' : 'default',
+                    opacity: (ttsKey.trim() || ttsStatus?.configured) && !isSavingTts ? 1 : 0.5,
+                    fontFamily: 'inherit', background: '#ECE8FF', color: '#3F34C4',
+                    fontSize: 'var(--font-sm)', fontWeight: 800, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {isSavingTts ? 'Speichere…' : 'Speichern'}
+                </button>
+              </div>
+            </div>
+
+            {/* Stimme & Englisch-Akzent */}
+            <div>
+              <label style={fieldLabel}>Standard-Stimme</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
+                {OPENAI_VOICES.map(v => {
+                  const active = ttsVoice === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        setTtsVoiceState(v.id);
+                        if (ttsStatus?.configured) {
+                          saveTtsConfigSecurely({ voice: v.id, accent: ttsAccent }).then(setTtsStatus).catch(() => {});
+                        }
+                      }}
+                      style={{
+                        padding: '0.5rem 0.4rem', borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit',
+                        border: active ? '1.5px solid #5A4BE0' : '1px solid var(--color-border)',
+                        background: active ? 'rgba(90, 75, 224, 0.1)' : 'var(--color-surface-hover)',
+                        color: active ? PRIMARY : 'var(--color-text)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
+                      }}
+                    >
+                      <span style={{ fontSize: '12.5px', fontWeight: 800 }}>{v.label}</span>
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)' }}>{v.hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', padding: '3px', borderRadius: '999px', background: 'var(--color-surface-muted)', flex: '1 1 200px' }}>
+                {([
+                  { id: 'en-GB', label: 'Britisch (UK)' },
+                  { id: 'en-US', label: 'Amerikanisch (US)' },
+                ] as const).map(opt => {
+                  const active = ttsAccent === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setTtsAccentState(opt.id);
+                        if (ttsStatus?.configured) {
+                          saveTtsConfigSecurely({ voice: ttsVoice, accent: opt.id }).then(setTtsStatus).catch(() => {});
+                        }
+                      }}
+                      style={{
+                        height: '32px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        fontSize: '11.5px', fontWeight: active ? 800 : 600,
+                        background: active ? 'var(--color-surface)' : 'transparent',
+                        color: active ? PRIMARY : 'var(--color-text-muted)',
+                        boxShadow: active ? '0 2px 6px rgba(23,20,58,0.08)' : 'none',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={!ttsStatus?.configured}
+                onClick={() => {
+                  setTtsFeedback(null);
+                  speakText('Good morning! Let us practise vocabulary together.', 'Englisch', () => {
+                    setTtsFeedback({ text: getLastTtsError() || 'Probehören fehlgeschlagen.', kind: 'error' });
+                  }, { voice: ttsVoice, accent: ttsAccent });
+                }}
+                style={{
+                  height: '38px', padding: '0 0.9rem', borderRadius: '999px', border: 'none',
+                  background: '#ECE8FF', color: PRIMARY, fontSize: '12px', fontWeight: 800,
+                  fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                  cursor: ttsStatus?.configured ? 'pointer' : 'default', opacity: ttsStatus?.configured ? 1 : 0.45,
+                }}
+              >
+                <Volume2 size={14} /> Probehören
+              </button>
+            </div>
+
+            <p style={noteStyle}>
+              Jedes vorgelesene Wort wird dauerhaft im Browser gecached (nur 1× erzeugt → Kosten unter 2 Cent pro Schuljahr). Kinder können die Studio-Stimme beim Lernen hören, haben aber keinen Zugriff auf den API-Key.
+            </p>
+            {ttsFeedback && message(ttsFeedback.text, ttsFeedback.kind)}
+          </div>
+        </Section>
+      )}
+
       {/* Backup */}
       {isAdmin && (
         <Section icon={Database} color={LILAC} title="System & Backup" subtitle="Google Drive">
@@ -672,6 +1067,8 @@ export const Setup = () => {
           )}
         </>
       ))}
+
+      <ProfileSheet isOpen={showProfileSheet} onClose={() => setShowProfileSheet(false)} />
 
       <style>{`
         @keyframes spin {

@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { mockDb } from '../services/mockDb';
 import type { TaskItem, User } from '../services/mockDb';
-import { Plus, X, Check, CheckSquare, Star, Trash2, ClipboardList } from 'lucide-react';
+import { Plus, X, Check, CheckSquare, Star, Trash2 } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
+import { HubIcon } from '../components/HubIcon';
 import { HERO_GRADIENT, GREEN, PINK_TEXT, PRIMARY, CARD, sectionTitle, fieldLabel, iconChip } from '../components/SurgeryFinance/theme';
 import { TaskRow, PRIO_COLOR, todayIso } from '../components/TaskParts';
 import type { Priority } from '../components/TaskParts';
@@ -151,9 +152,9 @@ export const Tasks = () => {
     />
   );
 
-  const sectionHeader = (icon: React.ReactNode, color: string, title: string, count: number) => (
+  const sectionHeader = (leading: React.ReactNode, color: string, title: string, count: number) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.3rem' }}>
-      <span style={iconChip(color, 38)}>{icon}</span>
+      {leading}
       <h3 style={{ ...sectionTitle, flex: 1 }}>{title}</h3>
       <span style={{ padding: '2px 10px', borderRadius: '999px', background: color + '1F', color, fontSize: 'var(--font-xs)', fontWeight: 800 }}>{count}</span>
     </div>
@@ -247,7 +248,7 @@ export const Tasks = () => {
       {/* Offen */}
       {displayedTasks.length === 0 ? (
         <div style={{ ...CARD, textAlign: 'center', padding: '2rem 1.25rem' }}>
-          <span style={{ ...iconChip(PRIMARY, 52), margin: '0 auto 0.7rem' }}><ClipboardList size={24} /></span>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.7rem' }}><HubIcon name="tasks" size={52} /></div>
           <div style={{ fontSize: 'var(--font-base)', fontWeight: 800 }}>Keine Aufgaben vorhanden</div>
           <div style={{ marginTop: '0.25rem', fontSize: 'var(--font-sm)', color: 'var(--color-text-muted)' }}>Lege die erste Aufgabe mit „Neue Aufgabe" an.</div>
         </div>
@@ -255,13 +256,13 @@ export const Tasks = () => {
         <>
           {openTasks.length > 0 && (
             <div style={CARD}>
-              {sectionHeader(<ClipboardList size={18} />, PRIMARY, 'Offen', openTasks.length)}
+              {sectionHeader(<HubIcon name="tasks" size={38} />, PRIMARY, 'Offen', openTasks.length)}
               {openTasks.map(renderRow)}
             </div>
           )}
           {doneTasks.length > 0 && (
             <div style={CARD}>
-              {sectionHeader(<Check size={18} />, GREEN, 'Erledigt', doneTasks.length)}
+              {sectionHeader(<span style={iconChip(GREEN, 38)}><Check size={18} /></span>, GREEN, 'Erledigt', doneTasks.length)}
               {doneTasks.map(renderRow)}
             </div>
           )}

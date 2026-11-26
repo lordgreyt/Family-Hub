@@ -307,6 +307,7 @@ function sendError(res, err) {
 }
 
 module.exports = {
+  PublicError,
   parseJsonBody,
   sendCoverAction,
   sendError,

@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import {
   answerVariants,
   buildChoiceOptions,
+  buildTypingHint,
+  dailyExamTarget,
+  daysUntilExam,
+  entryMastery,
   isAnswerCorrect,
+  isHardEntry,
   primaryVariant,
+  speechText,
 } from '../src/pages/vocabularyLearn.ts';
 
 test('kommagetrennte Varianten gelten beide', () => {
@@ -33,9 +39,15 @@ test('km/h bleibt eine Antwort', () => {
   assert.equal(isAnswerCorrect('km/h', 'km/h'), true);
 });
 
-test('Hauptvariante wird gesprochen', () => {
+test('Hauptvariante und vollständiger Vorlesetext', () => {
   assert.equal(primaryVariant('versuchen, probieren'), 'versuchen');
   assert.equal(primaryVariant('ruhig'), 'ruhig');
+  assert.equal(speechText('versuchen; probieren'), 'versuchen, probieren');
+  assert.equal(speechText('versuchen / probieren'), 'versuchen, probieren');
+  assert.equal(speechText('versuchen | probieren'), 'versuchen, probieren');
+  assert.equal(speechText('versuchen, probieren'), 'versuchen, probieren');
+  assert.equal(speechText('versuchen oder probieren'), 'versuchen oder probieren');
+  assert.equal(speechText('km/h'), 'km/h');
 });
 
 test('Tippfehler weiterhin toleriert, Dubletten entfernt', () => {
@@ -55,4 +67,24 @@ test('Antwortoptionen nutzen die Hauptvariante und keine gültige Dublette', () 
   assert.equal(options.filter(option => option === 'versuchen').length, 1);
   assert.equal(options.includes('probieren'), false);
   assert.equal(options.includes('versuchen'), true);
+});
+
+test('Tipp-Hilfe deckt Buchstaben stufenweise auf', () => {
+  assert.equal(buildTypingHint('suitcase', 1), 's _ _ _ _ _ _ _');
+  assert.equal(buildTypingHint('suitcase', 2), 's u i _ _ _ _ e');
+  assert.equal(buildTypingHint('versuchen, probieren', 1), 'v _ _ _ _ _ _ _ _');
+});
+
+test('Lernstand, Problemwörter und Klassenarbeits-Countdown', () => {
+  assert.equal(entryMastery(undefined), 'new');
+  assert.equal(entryMastery({ correctCount: 1, wrongCount: 1, streak: 1 }), 'learning');
+  assert.equal(entryMastery({ correctCount: 2, wrongCount: 0, streak: 2 }), 'mastered');
+  assert.equal(isHardEntry({ wrongCount: 2, streak: 0 }), true);
+  assert.equal(isHardEntry({ wrongCount: 2, streak: 2 }), false);
+
+  const refDay = new Date(2026, 10, 26, 12, 0, 0);
+  assert.equal(daysUntilExam('2026-11-26', refDay), 0);
+  assert.equal(daysUntilExam('2026-11-30', refDay), 4);
+  assert.equal(dailyExamTarget(10, 4), 3);
+  assert.equal(dailyExamTarget(0, 4), null);
 });

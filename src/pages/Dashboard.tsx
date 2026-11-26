@@ -6,11 +6,11 @@ import { mockDb } from '../services/mockDb';
 import type { TaskItem, User, RewardRequest } from '../services/mockDb';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import {
-  Star, Wallet, TrendingUp, TrendingDown, Calculator, Check, ClipboardList, GraduationCap, Gift, Euro, CreditCard, Languages,
-  Home as HomeIcon, ChevronRight, ChevronDown, History, ListChecks, Package, AlertTriangle,
+  Star, Wallet, Check, Home as HomeIcon, ChevronRight, ChevronDown,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { HERO_GRADIENT, GREEN, GREEN_TEXT, ORANGE, PINK, PINK_TEXT, PRIMARY, BLUE, CARD, sectionTitle, iconChip } from '../components/SurgeryFinance/theme';
+import { HERO_GRADIENT, GREEN_TEXT, PINK_TEXT, PRIMARY, CARD, sectionTitle } from '../components/SurgeryFinance/theme';
+import { HubIcon } from '../components/HubIcon';
+import type { HubIconName } from '../components/HubIcon';
 import { TaskRow, todayIso } from '../components/TaskParts';
 import { getRecentActivity, relativeTime } from '../utils/activity';
 import type { ActivityEvent, ActivityKind } from '../utils/activity';
@@ -27,27 +27,27 @@ const softLink = {
   background: '#ECE8FF', color: PRIMARY, fontSize: 'var(--font-xs)', fontWeight: 800, textDecoration: 'none', flexShrink: 0,
 } as const;
 
-const KIND_STYLE: Record<ActivityKind, { icon: LucideIcon; color: string }> = {
-  expense: { icon: TrendingDown, color: PINK },
-  income: { icon: TrendingUp, color: GREEN },
-  budget: { icon: Calculator, color: ORANGE },
-  task_done: { icon: Check, color: GREEN },
-  task_new: { icon: ClipboardList, color: PRIMARY },
-  grade: { icon: GraduationCap, color: BLUE },
-  stars_earned: { icon: Star, color: ORANGE },
-  stars_request: { icon: Gift, color: PINK },
-  holiday: { icon: Euro, color: BLUE },
-  depot: { icon: CreditCard, color: PRIMARY },
-  vocab: { icon: Languages, color: BLUE },
-  pantry: { icon: Package, color: GREEN },
+const KIND_ICON: Record<ActivityKind, HubIconName> = {
+  expense: 'expenses',
+  income: 'depot_sparen',
+  budget: 'budget',
+  task_done: 'tasks',
+  task_new: 'tasks',
+  grade: 'grades',
+  stars_earned: 'stars',
+  stars_request: 'depot_geschenke',
+  holiday: 'holiday',
+  depot: 'n26',
+  vocab: 'vocab',
+  pantry: 'pantry',
 };
 
 const fmtAmount = (n: number) =>
   `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
-const sectionHeader = (icon: React.ReactNode, color: string, title: string, right?: React.ReactNode) => (
+const sectionHeader = (icon: HubIconName, title: string, right?: React.ReactNode) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.3rem' }}>
-    <span style={iconChip(color, 38)}>{icon}</span>
+    <HubIcon name={icon} size={38} />
     <h3 style={{ ...sectionTitle, flex: 1 }}>{title}</h3>
     {right}
   </div>
@@ -204,7 +204,7 @@ export const Dashboard = () => {
       {/* Offene Belohnungs-Anfragen — nur für Eltern */}
       {!isChild && rewardRequests.length > 0 && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem' }}>
-          <span style={iconChip(ORANGE, 42)}><Star size={20} fill="currentColor" /></span>
+          <HubIcon name="stars" size={42} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>
               {rewardRequests.length} offene {rewardRequests.length === 1 ? 'Anfrage' : 'Anfragen'}
@@ -218,7 +218,7 @@ export const Dashboard = () => {
       {/* Vorrat: wenig übrig / läuft bald ab — nur für Eltern */}
       {!isChild && (lowStockItems.length > 0 || expiringItems.length > 0) && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem' }}>
-          <span style={iconChip(ORANGE, 42)}><AlertTriangle size={20} /></span>
+          <HubIcon name="alert" size={42} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800 }}>
               {[
@@ -239,14 +239,13 @@ export const Dashboard = () => {
 
       {/* Letzte Ereignisse */}
       <div style={CARD}>
-        {sectionHeader(<History size={18} />, GREEN_TEXT, 'Letzte Ereignisse')}
+        {sectionHeader('history', 'Letzte Ereignisse')}
         {events.length === 0 ? (
           <div style={{ padding: '1.5rem 0 0.5rem', textAlign: 'center', fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--color-text-muted)', borderTop: '1px solid var(--color-border)', marginTop: '0.5rem' }}>
             Noch keine Aktivität – sobald etwas eingetragen wird, erscheint es hier.
           </div>
         ) : (
           visibleEvents.map(ev => {
-            const { icon: Icon, color } = KIND_STYLE[ev.kind];
             const who = ev.userId ? users.find(u => u.id === ev.userId) : undefined;
             return (
               <Link
@@ -254,7 +253,7 @@ export const Dashboard = () => {
                 to={ev.link}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0', borderTop: '1px solid var(--color-border)', textDecoration: 'none', color: 'inherit' }}
               >
-                <span style={iconChip(color, 38)}><Icon size={18} {...(ev.kind === 'stars_earned' ? { fill: 'currentColor' } : {})} /></span>
+                <HubIcon name={KIND_ICON[ev.kind]} size={38} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{ev.title}</div>
                   <div style={{ marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' }}>
@@ -311,7 +310,7 @@ export const Dashboard = () => {
       {upcomingTasks.length > 0 && (
         <div style={CARD}>
           {sectionHeader(
-            <ListChecks size={18} />, PRIMARY, 'Aufgaben',
+            'tasks', 'Aufgaben',
             <span style={{ padding: '2px 10px', borderRadius: '999px', background: PRIMARY + '1F', color: PRIMARY, fontSize: 'var(--font-xs)', fontWeight: 800, whiteSpace: 'nowrap' }}>4 Wochen</span>,
           )}
 

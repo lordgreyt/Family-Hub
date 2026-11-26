@@ -10,6 +10,7 @@ import {
 import { mockDb } from '../services/mockDb';
 import type { Depot, DepotTransaction, ExpenseItem } from '../services/mockDb';
 import { PageBottomBar } from '../components/Layout/PageBottomBar';
+import { DepotIcon } from '../components/HubIcon';
 
 type Tab = 'dashboard' | 'depots' | 'historie' | 'settings';
 
@@ -178,7 +179,8 @@ export const N26 = () => {
       {/* Booking Form Overlay */}
       {showBookingForm && (
         <BookingForm 
-          depots={depots} 
+          depots={depots}
+          calculateBalance={calculateBalance}
           onClose={() => setShowBookingForm(false)} 
           onSave={(data) => {
             if (Array.isArray(data)) {
@@ -350,6 +352,7 @@ const DashboardView = ({ depots, calculateBalance, surplus, transactions, lastMa
           border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
           display: 'flex', alignItems: 'center', gap: '0.85rem',
         }}>
+          <DepotIcon name={depots.find(d => d.id === lastManualTx.depotId)?.name} size={40} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <span style={{ fontSize: '9.5px', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               LETZTE MANUELLE BUCHUNG
@@ -641,9 +644,12 @@ const DepotCard = ({ depot, balance, transactions, onDelete, onEdit }: { depot: 
           userSelect: 'none',
         }}
       >
-        {/* Top Row: Name and Balance */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>{depot.name || 'Unbekannt'}</h3>
+        {/* Top Row: Icon, Name and Balance */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: 0 }}>
+            <DepotIcon name={depot.name} size={36} />
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{depot.name || 'Unbekannt'}</h3>
+          </div>
           <span style={{ fontSize: '15px', fontWeight: 800, color: balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)', flexShrink: 0 }}>
             {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
           </span>
@@ -1156,7 +1162,7 @@ const SettingsView = ({ transactions, onRevertLastMonthly }: { transactions: Dep
 
 // --- Sub-Components ---
 
-const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: () => void, onSave: (data: any) => void }) => {
+const BookingForm = ({ depots, calculateBalance, onClose, onSave }: { depots: Depot[], calculateBalance: (d: Depot) => number, onClose: () => void, onSave: (data: any) => void }) => {
   const [type, setType] = useState<'deposit' | 'withdrawal' | 'transfer'>('deposit');
   const [amount, setAmount] = useState('0');
   const [selectedDepotId, setSelectedDepotId] = useState(depots[0]?.id || '');
@@ -1305,55 +1311,99 @@ const BookingForm = ({ depots, onClose, onSave }: { depots: Depot[], onClose: ()
               {type === 'transfer' ? (
                 <>
                   <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>VON (Quelle)</div>
-                  <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
-                    {depots.map(depot => (
-                      <button
-                        key={`source-${depot.id}`}
-                        onClick={() => setSelectedDepotId(depot.id)}
-                        style={{
-                          padding: '0.8rem 1.2rem', whiteSpace: 'nowrap', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
-                          backgroundColor: selectedDepotId === depot.id ? 'var(--color-danger)' : 'var(--color-surface)',
-                          color: selectedDepotId === depot.id ? 'white' : 'inherit', fontWeight: 600, fontSize: '12px'
-                        }}
-                      >
-                        {depot.name}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', gap: '0.45rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                    {depots.map(depot => {
+                      const isSelected = selectedDepotId === depot.id;
+                      return (
+                        <button
+                          key={`source-${depot.id}`}
+                          onClick={() => setSelectedDepotId(depot.id)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                            padding: '0.45rem 0.85rem 0.45rem 0.5rem', whiteSpace: 'nowrap', flexShrink: 0,
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? '1.5px solid var(--color-danger)' : '1px solid var(--color-border)',
+                            backgroundColor: isSelected ? 'rgba(242, 122, 155, 0.14)' : 'var(--color-surface)',
+                            color: isSelected ? 'var(--color-danger)' : 'var(--color-text)',
+                            fontWeight: 700, fontSize: '12.5px',
+                            boxShadow: isSelected ? '0 4px 12px rgba(242, 122, 155, 0.18)' : 'none',
+                          }}
+                        >
+                          <DepotIcon name={depot.name} size={28} />
+                          <span>{depot.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginTop: '0.5rem' }}>ZU (Ziel)</div>
-                  <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
-                    {depots.map(depot => (
-                      <button
-                        key={`target-${depot.id}`}
-                        onClick={() => setTargetDepotId(depot.id)}
-                        disabled={selectedDepotId === depot.id}
-                        style={{
-                          padding: '0.8rem 1.2rem', whiteSpace: 'nowrap', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
-                          backgroundColor: targetDepotId === depot.id ? 'var(--color-success)' : 'var(--color-surface)',
-                          color: targetDepotId === depot.id ? 'white' : 'inherit', fontWeight: 600, fontSize: '12px',
-                          opacity: selectedDepotId === depot.id ? 0.3 : 1
-                        }}
-                      >
-                        {depot.name}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', gap: '0.45rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                    {depots.map(depot => {
+                      const isSelected = targetDepotId === depot.id;
+                      const isDisabled = selectedDepotId === depot.id;
+                      return (
+                        <button
+                          key={`target-${depot.id}`}
+                          onClick={() => setTargetDepotId(depot.id)}
+                          disabled={isDisabled}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                            padding: '0.45rem 0.85rem 0.45rem 0.5rem', whiteSpace: 'nowrap', flexShrink: 0,
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? '1.5px solid var(--color-success)' : '1px solid var(--color-border)',
+                            backgroundColor: isSelected ? 'rgba(47, 179, 107, 0.14)' : 'var(--color-surface)',
+                            color: isSelected ? 'var(--color-success)' : 'var(--color-text)',
+                            fontWeight: 700, fontSize: '12.5px',
+                            opacity: isDisabled ? 0.35 : 1,
+                            boxShadow: isSelected ? '0 4px 12px rgba(47, 179, 107, 0.18)' : 'none',
+                          }}
+                        >
+                          <DepotIcon name={depot.name} size={28} />
+                          <span>{depot.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                  {depots.map(depot => (
-                    <button
-                      key={depot.id}
-                      onClick={() => setSelectedDepotId(depot.id)}
-                      style={{
-                        padding: '1rem 0.5rem', textAlign: 'center', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
-                        backgroundColor: selectedDepotId === depot.id ? 'var(--color-primary)' : 'var(--color-surface)',
-                        color: selectedDepotId === depot.id ? 'white' : 'inherit', fontWeight: 600, fontSize: '13px'
-                      }}
-                    >
-                      {depot.name}
-                    </button>
-                  ))}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  {depots.map(depot => {
+                    const isSelected = selectedDepotId === depot.id;
+                    const bal = calculateBalance(depot);
+                    return (
+                      <button
+                        key={depot.id}
+                        onClick={() => setSelectedDepotId(depot.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.6rem',
+                          padding: '0.6rem 0.65rem', textAlign: 'left',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)',
+                          backgroundColor: isSelected ? 'rgba(109, 93, 240, 0.12)' : 'var(--color-surface)',
+                          color: 'var(--color-text)',
+                          boxShadow: isSelected ? '0 4px 12px rgba(109, 93, 240, 0.16)' : 'var(--shadow-sm)',
+                          minWidth: 0,
+                        }}
+                      >
+                        <DepotIcon name={depot.name} size={36} />
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                          <span style={{
+                            fontWeight: 700, fontSize: '13px',
+                            color: isSelected ? 'var(--color-primary)' : 'var(--color-text)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {depot.name}
+                          </span>
+                          <span style={{
+                            fontWeight: 600, fontSize: '11px',
+                            color: bal < 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {bal.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
