@@ -21,6 +21,12 @@ import type {
   VocabGamificationSettings,
   VocabGamificationState,
 } from '../pages/vocabGamification';
+import {
+  normalizeSpellingStore,
+  spellingKindToGamificationMode,
+} from '../pages/spellingEngine';
+import type { CustomSpellingWord, SpellingStoreState } from '../pages/spellingEngine';
+import type { SpellingTaskKind } from '../pages/spellingData';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
@@ -260,6 +266,7 @@ export interface GradeChildRecord {
 export type GradeBook = Record<string, GradeChildRecord>;
 
 const VOCAB_GAMIFICATION_KEY = '__gamification';
+const SPELLING_STORE_KEY = '__spelling_v1';
 
 export interface VocabularyEntry {
   id: string;
@@ -1601,7 +1608,7 @@ export const mockDb = {
     const raw = mockDb.getVocabularyRaw();
     return Object.fromEntries(
       Object.entries(raw)
-        .filter(([id, item]) => id !== VOCAB_GAMIFICATION_KEY && Boolean(item) && typeof item === 'object')
+        .filter(([id, item]) => id !== VOCAB_GAMIFICATION_KEY && id !== SPELLING_STORE_KEY && Boolean(item) && typeof item === 'object')
         .map(([id, item]) => {
           const s = item as VocabularySet;
           return [
@@ -1626,6 +1633,9 @@ export const mockDb = {
     };
     if (raw[VOCAB_GAMIFICATION_KEY]) {
       nextStore[VOCAB_GAMIFICATION_KEY] = raw[VOCAB_GAMIFICATION_KEY];
+    }
+    if (raw[SPELLING_STORE_KEY]) {
+      nextStore[SPELLING_STORE_KEY] = raw[SPELLING_STORE_KEY];
     }
     set(DB_KEYS.VOCABULARY, nextStore);
   },
@@ -1769,9 +1779,93 @@ export const mockDb = {
       };
     }
 
-    set(DB_KEYS.VOCABULARY, {
+    const rawBefore = mockDb.getVocabularyRaw();
+    const nextStore: Record<string, unknown> = {
       [VOCAB_POOL_ID]: updatedPool,
       [VOCAB_GAMIFICATION_KEY]: nextGam,
+    };
+    if (rawBefore[SPELLING_STORE_KEY]) {
+      nextStore[SPELLING_STORE_KEY] = rawBefore[SPELLING_STORE_KEY];
+    }
+    set(DB_KEYS.VOCABULARY, nextStore);
+
+    return outcome;
+  },
+  // Deutsche Rechtschreibung (3. Klasse · Jagd nach dem Wort-Thron)
+  // Pro Kind isolierter Fortschritt unter __spelling_v1, gemeinsames Diamanten-/Level-Konto unter __gamification
+  getSpellingStore: (): SpellingStoreState => {
+    const raw = mockDb.getVocabularyRaw();
+    return normalizeSpellingStore(raw[SPELLING_STORE_KEY] as Partial<SpellingStoreState> | undefined);
+  },
+  saveSpellingCustomWords: (customWords: CustomSpellingWord[]) => {
+    const raw = mockDb.getVocabularyRaw();
+    const current = normalizeSpellingStore(raw[SPELLING_STORE_KEY] as Partial<SpellingStoreState> | undefined);
+    set(DB_KEYS.VOCABULARY, {
+      ...raw,
+      [SPELLING_STORE_KEY]: {
+        ...current,
+        customWords,
+      },
+    });
+  },
+  recordSpellingAnswer: (
+    userId: string,
+    taskId: string,
+    correct: boolean,
+    kind: SpellingTaskKind
+  ): AnswerGamificationOutcome => {
+    const raw = mockDb.getVocabularyRaw();
+    const currentSpelling = normalizeSpellingStore(raw[SPELLING_STORE_KEY] as Partial<SpellingStoreState> | undefined);
+    const previous = currentSpelling.progressByUser[userId]?.[taskId];
+    const wasHardOrNew = !previous || (previous.wrongCount > 0 && previous.streak < 2);
+    const now = Date.now();
+    const streak = correct ? (previous?.streak || 0) + 1 : 0;
+    const intervalDays = [1, 3, 7, 14][Math.min(Math.max(streak - 1, 0), 3)];
+    const gamMode = spellingKindToGamificationMode(kind);
+
+    const updatedProgress: VocabularyProgress = {
+      correctCount: (previous?.correctCount || 0) + (correct ? 1 : 0),
+      wrongCount: (previous?.wrongCount || 0) + (correct ? 0 : 1),
+      streak,
+      lastReviewedAt: now,
+      nextReviewAt: now + (correct ? intervalDays * 24 * 60 * 60 * 1000 : 10 * 60 * 1000),
+      lastMode: gamMode,
+    };
+
+    const nextSpelling: SpellingStoreState = {
+      ...currentSpelling,
+      progressByUser: {
+        ...currentSpelling.progressByUser,
+        [userId]: {
+          ...(currentSpelling.progressByUser[userId] || {}),
+          [taskId]: updatedProgress,
+        },
+      },
+    };
+
+    const currentGam = mockDb.getVocabGamification();
+    const profile: VocabChildGamification = normalizeChildProfile(userId, currentGam.profilesByUser[userId]);
+    const outcome = recordGamificationAnswer({
+      profile,
+      settings: currentGam.settings,
+      entryId: `spell_${taskId}`,
+      correct,
+      wasHardOrNew,
+      mode: gamMode,
+    });
+
+    const nextGam: VocabGamificationState = {
+      ...currentGam,
+      profilesByUser: {
+        ...currentGam.profilesByUser,
+        [userId]: outcome.profile,
+      },
+    };
+
+    set(DB_KEYS.VOCABULARY, {
+      ...raw,
+      [VOCAB_GAMIFICATION_KEY]: nextGam,
+      [SPELLING_STORE_KEY]: nextSpelling,
     });
 
     return outcome;

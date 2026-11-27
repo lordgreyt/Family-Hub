@@ -5,6 +5,7 @@ export type HubIconName =
   | 'tasks'
   | 'grades'
   | 'vocab'
+  | 'spelling'
   | 'n26'
   | 'shopping'
   | 'pantry'
@@ -80,6 +81,29 @@ function renderIconContent(name: HubIconName, id: string): React.ReactNode {
           <path d="M7.5 23.5L22.4 11.2C23.33 10.43 24.67 10.43 25.6 11.2L40.5 23.5" stroke="#3F34C4" strokeWidth="3.2" strokeLinecap="round" />
           <rect x="19.5" y="25.5" width="9" height="13.5" rx="4.5" fill={`url(#${id}b)`} />
           <circle cx="24" cy="19.5" r="2.6" fill="#FFFFFF" fillOpacity="0.85" />
+        </>
+      );
+
+    case 'spelling':
+      return (
+        <>
+          <BgSquircle id={id} c1="#F59E0B" c2="#6D5DF0" />
+          <defs>
+            <linearGradient id={`${id}spA`} x1="10" y1="10" x2="38" y2="38" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#FDE047" />
+              <stop offset="1" stopColor="#F59E0B" />
+            </linearGradient>
+            <linearGradient id={`${id}spB`} x1="12" y1="22" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#7B6CF8" />
+              <stop offset="1" stopColor="#3F34C4" />
+            </linearGradient>
+          </defs>
+          <path d="M10 21L15 12L24 18L33 12L38 21L35.5 34.5C35.2 36.2 33.7 37.5 32 37.5H16C14.3 37.5 12.8 36.2 12.5 34.5L10 21Z" fill={`url(#${id}spA)`} />
+          <rect x="13" y="27" width="22" height="10.5" rx="4" fill={`url(#${id}spB)`} />
+          <circle cx="24" cy="12" r="2.4" fill="#FEF08A" />
+          <circle cx="15" cy="12" r="2" fill="#FFFFFF" fillOpacity="0.9" />
+          <circle cx="33" cy="12" r="2" fill="#FFFFFF" fillOpacity="0.9" />
+          <path d="M19 32.5H29" stroke="#FEF08A" strokeWidth="2.4" strokeLinecap="round" />
         </>
       );
 
@@ -800,6 +824,7 @@ const NAV_PATH_MAP: Record<string, HubIconName> = {
   '/tasks': 'tasks',
   '/grades': 'grades',
   '/vokabeln': 'vocab',
+  '/rechtschreibung': 'spelling',
   '/n26': 'n26',
   '/einkaufsliste': 'shopping',
   '/vorrat': 'pantry',

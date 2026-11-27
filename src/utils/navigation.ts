@@ -1,4 +1,4 @@
-import { Home, CheckSquare, CreditCard, Wallet, Calculator, Star, Settings, SlidersHorizontal, GraduationCap, Luggage, Euro, Banknote, Languages, ShoppingCart, Refrigerator } from 'lucide-react';
+import { Home, CheckSquare, CreditCard, Wallet, Calculator, Star, Settings, SlidersHorizontal, GraduationCap, Luggage, Euro, Banknote, Languages, Crown, ShoppingCart, Refrigerator } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../services/mockDb';
 
@@ -16,6 +16,7 @@ export const getNavItems = (user: User | null, showPacklist = true, showHolidayB
     { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
     { to: '/grades', icon: GraduationCap, label: 'Noten' },
     { to: '/vokabeln', icon: Languages, label: 'Vokabeln' },
+    { to: '/rechtschreibung', icon: Crown, label: 'Rechtschreibung' },
     ...(user.id === 'Falko' ? [
       { to: '/n26', icon: CreditCard, label: 'N26' },
     ] : []),

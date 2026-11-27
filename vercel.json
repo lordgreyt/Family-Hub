@@ -3,6 +3,10 @@
     {
       "source": "/vokabeln",
       "destination": "/index.html"
+    },
+    {
+      "source": "/rechtschreibung",
+      "destination": "/index.html"
     }
   ],
   "functions": {

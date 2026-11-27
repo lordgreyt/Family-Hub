@@ -20,6 +20,7 @@ import { SmartHome } from './pages/SmartHome';
 import { SurgeryFinance } from './pages/SurgeryFinance';
 import { Grades } from './pages/Grades';
 import { Vocabulary } from './pages/Vocabulary';
+import { Spelling } from './pages/Spelling';
 import { VictronProvider } from './context/VictronContext';
 import { initBackupService } from './services/backupService';
 
@@ -52,6 +53,7 @@ function App() {
               <Route path="/smart-home" element={<SmartHome />} />
               <Route path="/grades" element={<Grades />} />
               <Route path="/vokabeln" element={<Vocabulary />} />
+              <Route path="/rechtschreibung" element={<Spelling />} />
               <Route path="/vorrat" element={<Pantry />} />
               <Route path="/einkaufsliste" element={<Shopping />} />
               <Route path="/packliste" element={<PackingList />} />
