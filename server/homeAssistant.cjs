@@ -171,10 +171,20 @@ function homeAssistantConfig() {
   };
 }
 
+function formatFetchErrorCode(err) {
+  const code = err && err.cause && err.cause.code ? String(err.cause.code) : '';
+  if (code) return code;
+  const causeMsg = err && err.cause && err.cause.message ? String(err.cause.message) : '';
+  if (causeMsg) return causeMsg.slice(0, 60);
+  if (err && err.message && err.message !== 'fetch failed') return String(err.message).slice(0, 60);
+  return '';
+}
+
 async function requestHomeAssistant(path, options = {}) {
   const { url, token } = homeAssistantConfig();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 9000);
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 11000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${url}${path}`, {
@@ -197,7 +207,7 @@ async function requestHomeAssistant(path, options = {}) {
         status: response.status,
         response: text.slice(0, 500),
       });
-      throw new PublicError(502, 'Home Assistant hat die Anfrage abgelehnt.', 'home_assistant_error');
+      throw new PublicError(502, `Home Assistant hat die Anfrage abgelehnt (HTTP ${response.status}).`, 'home_assistant_error');
     }
 
     if (!text) return null;
@@ -215,8 +225,13 @@ async function requestHomeAssistant(path, options = {}) {
     if (err && err.name === 'AbortError') {
       throw new PublicError(504, 'Home Assistant antwortet nicht rechtzeitig.', 'home_assistant_timeout');
     }
-    console.error('Home Assistant request error:', { path, err });
-    throw new PublicError(502, 'Home Assistant ist nicht erreichbar.', 'home_assistant_unreachable');
+    const detail = formatFetchErrorCode(err);
+    console.error('Home Assistant request error:', { path, detail, err });
+    throw new PublicError(
+      502,
+      detail ? `Home Assistant ist nicht erreichbar (${detail}).` : 'Home Assistant ist nicht erreichbar.',
+      'home_assistant_unreachable'
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -253,12 +268,12 @@ function normalizeCoverEntity(state, areaMap = {}) {
     entity_id: entityId,
     domain: 'cover',
     name: friendlyName,
-    area: areaMap[entityId] || null,
+    area: (state && typeof state.area === 'string' && state.area.trim()) || areaMap[entityId] || null,
     device_class: typeof attrs.device_class === 'string' ? attrs.device_class : null,
     state: COVER_STATES.has(rawState) ? rawState : 'unavailable',
     position,
     supports_position: supportsPosition,
-    is_group: Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0,
+    is_group: Boolean(attrs.is_group) || (Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0),
     updated_at: (state && (state.last_updated || state.last_changed)) || null,
   };
 }
@@ -296,7 +311,7 @@ function normalizeLightEntity(state, areaMap = {}) {
     entity_id: entityId,
     domain: 'light',
     name: friendlyName,
-    area: areaMap[entityId] || null,
+    area: (state && typeof state.area === 'string' && state.area.trim()) || areaMap[entityId] || null,
     state: LIGHT_STATES.has(rawState) ? rawState : 'unavailable',
     brightness_pct: rawState === 'on' ? brightnessPct : null,
     supports_brightness: supportsBrightness,
@@ -306,59 +321,76 @@ function normalizeLightEntity(state, areaMap = {}) {
     max_color_temp_kelvin: maxKelvin,
     supports_color: supportsColor,
     rgb_color: rawState === 'on' ? rgbColor : null,
-    is_group: Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0,
+    is_group: Boolean(attrs.is_group) || (Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0),
     updated_at: (state && (state.last_updated || state.last_changed)) || null,
   };
 }
 
-async function fetchEntityAreaMap() {
+/**
+ * Ruft gezielt nur Rollläden & Lampen inkl. HA-Raumnamen über `/api/template` ab (~5–15 KB statt mehrerer MB
+ * beim kompletten `/api/states`). Vermeidet Proxy-/Socket-Abbrüche bei großen HA-Installationen.
+ */
+async function fetchDevicesViaTemplate() {
   const template = [
-    '{% set ns = namespace(items=[]) %}',
-    '{% for s in states.cover %}{% set a = area_name(s.entity_id) %}{% if a %}{% set ns.items = ns.items + [[s.entity_id, a]] %}{% endif %}{% endfor %}',
-    '{% for s in states.light %}{% set a = area_name(s.entity_id) %}{% if a %}{% set ns.items = ns.items + [[s.entity_id, a]] %}{% endif %}{% endfor %}',
-    '{{ ns.items | to_json }}',
+    '{% set ns = namespace(covers=[], lights=[]) %}',
+    '{% for s in states.cover %}',
+    '{% set eids = s.attributes.get("entity_id") %}',
+    '{% set ns.covers = ns.covers + [{',
+    '"entity_id": s.entity_id,',
+    '"state": s.state,',
+    '"last_updated": s.last_updated.isoformat() if s.last_updated else none,',
+    '"area": area_name(s.entity_id),',
+    '"attributes": {',
+    '"friendly_name": s.attributes.get("friendly_name"),',
+    '"current_position": s.attributes.get("current_position"),',
+    '"supported_features": s.attributes.get("supported_features"),',
+    '"device_class": s.attributes.get("device_class"),',
+    '"is_group": (eids is sequence and eids is not string and (eids | length) > 0)',
+    '}}] %}',
+    '{% endfor %}',
+    '{% for s in states.light %}',
+    '{% set eids = s.attributes.get("entity_id") %}',
+    '{% set modes = s.attributes.get("supported_color_modes") %}',
+    '{% set rgb = s.attributes.get("rgb_color") %}',
+    '{% set ns.lights = ns.lights + [{',
+    '"entity_id": s.entity_id,',
+    '"state": s.state,',
+    '"last_updated": s.last_updated.isoformat() if s.last_updated else none,',
+    '"area": area_name(s.entity_id),',
+    '"attributes": {',
+    '"friendly_name": s.attributes.get("friendly_name"),',
+    '"brightness": s.attributes.get("brightness"),',
+    '"supported_color_modes": (modes | list) if modes else [],',
+    '"color_temp_kelvin": s.attributes.get("color_temp_kelvin"),',
+    '"min_color_temp_kelvin": s.attributes.get("min_color_temp_kelvin"),',
+    '"max_color_temp_kelvin": s.attributes.get("max_color_temp_kelvin"),',
+    '"rgb_color": (rgb | list) if rgb else none,',
+    '"is_group": (eids is sequence and eids is not string and (eids | length) > 0)',
+    '}}] %}',
+    '{% endfor %}',
+    '{{ {"covers": ns.covers, "lights": ns.lights} | to_json }}',
   ].join('');
 
-  try {
-    const raw = await requestHomeAssistant('/api/template', {
-      method: 'POST',
-      body: { template },
-      rawText: true,
-    });
-    if (!raw || typeof raw !== 'string') return {};
-    const parsed = JSON.parse(raw.trim());
-    if (!Array.isArray(parsed)) return {};
-    const map = {};
-    for (const pair of parsed) {
-      if (Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string' && pair[1].trim()) {
-        map[pair[0]] = pair[1].trim();
-      }
-    }
-    return map;
-  } catch {
-    // Area metadata is optional — silently degrade if HA template endpoint is unavailable.
-    return {};
+  const raw = await requestHomeAssistant('/api/template', {
+    method: 'POST',
+    body: { template },
+    rawText: true,
+    timeoutMs: 11000,
+  });
+  if (!raw || typeof raw !== 'string') return null;
+  const parsed = JSON.parse(raw.trim());
+  if (!parsed || typeof parsed !== 'object' || (!Array.isArray(parsed.covers) && !Array.isArray(parsed.lights))) {
+    return null;
   }
+  return {
+    covers: Array.isArray(parsed.covers) ? parsed.covers : [],
+    lights: Array.isArray(parsed.lights) ? parsed.lights : [],
+  };
 }
 
-async function getSmartHomeDevices() {
-  const [allStates, areaMap] = await Promise.all([
-    requestHomeAssistant('/api/states'),
-    fetchEntityAreaMap(),
-  ]);
-
-  const list = Array.isArray(allStates) ? allStates : [];
-  const covers = [];
-  const lights = [];
-
-  for (const state of list) {
-    if (!state || typeof state !== 'object' || typeof state.entity_id !== 'string') continue;
-    if (state.entity_id.startsWith('cover.')) {
-      covers.push(normalizeCoverEntity(state, areaMap));
-    } else if (state.entity_id.startsWith('light.')) {
-      lights.push(normalizeLightEntity(state, areaMap));
-    }
-  }
+function buildDevicesResponse(rawCovers, rawLights, areaMap = {}) {
+  const covers = rawCovers.map((state) => normalizeCoverEntity(state, areaMap));
+  const lights = rawLights.map((state) => normalizeLightEntity(state, areaMap));
 
   const byName = (a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' });
   covers.sort(byName);
@@ -376,6 +408,36 @@ async function getSmartHomeDevices() {
     lights,
     areas,
   };
+}
+
+async function getSmartHomeDevices() {
+  // 1. Primär: leichtgewichtiges /api/template (nur cover.* & light.* inkl. Räumen)
+  let templateErr = null;
+  try {
+    const viaTemplate = await fetchDevicesViaTemplate();
+    if (viaTemplate) {
+      return buildDevicesResponse(viaTemplate.covers, viaTemplate.lights);
+    }
+  } catch (err) {
+    templateErr = err;
+    console.warn('Home Assistant /api/template failed, falling back to /api/states:', err && err.message);
+  }
+
+  // 2. Fallback: klassisches /api/states
+  try {
+    const allStates = await requestHomeAssistant('/api/states', { timeoutMs: 12000 });
+    const list = Array.isArray(allStates) ? allStates : [];
+    const rawCovers = [];
+    const rawLights = [];
+    for (const state of list) {
+      if (!state || typeof state !== 'object' || typeof state.entity_id !== 'string') continue;
+      if (state.entity_id.startsWith('cover.')) rawCovers.push(state);
+      else if (state.entity_id.startsWith('light.')) rawLights.push(state);
+    }
+    return buildDevicesResponse(rawCovers, rawLights);
+  } catch (statesErr) {
+    throw statesErr || templateErr;
+  }
 }
 
 function validateDeviceAction(input) {

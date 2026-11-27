@@ -4,6 +4,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const {
+  getSmartHomeDevices,
   normalizeCoverEntity,
   normalizeLightEntity,
   validateDeviceAction,
@@ -153,4 +154,81 @@ test('normalizeLightEntity and normalizeCoverEntity extract attributes, areas, a
   assert.equal(cover.area, 'Küche');
   assert.equal(cover.position, 80);
   assert.equal(cover.supports_position, true);
+});
+
+test('getSmartHomeDevices prefers lightweight /api/template and falls back to /api/states', async () => {
+  const origFetch = global.fetch;
+  const origUrl = process.env.HOME_ASSISTANT_URL;
+  const origTok = process.env.HOME_ASSISTANT_TOKEN;
+  process.env.HOME_ASSISTANT_URL = 'https://ha.example.invalid';
+  process.env.HOME_ASSISTANT_TOKEN = 'test-token';
+
+  try {
+    // 1. Primary path: /api/template succeeds
+    const calls = [];
+    global.fetch = async (url) => {
+      calls.push(url);
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            covers: [
+              {
+                entity_id: 'cover.wohnzimmer',
+                state: 'open',
+                area: 'Wohnzimmer',
+                attributes: { friendly_name: 'Wohnzimmer', current_position: 100, supported_features: 15 },
+              },
+            ],
+            lights: [
+              {
+                entity_id: 'light.kueche',
+                state: 'on',
+                area: 'Küche',
+                attributes: { friendly_name: 'Küche', brightness: 255, supported_color_modes: ['brightness'] },
+              },
+            ],
+          }),
+      };
+    };
+
+    const res1 = await getSmartHomeDevices();
+    assert.deepEqual(calls, ['https://ha.example.invalid/api/template']);
+    assert.equal(res1.covers.length, 1);
+    assert.equal(res1.lights.length, 1);
+    assert.deepEqual(res1.areas, ['Küche', 'Wohnzimmer']);
+
+    // 2. Fallback path: /api/template fails -> /api/states succeeds
+    const fallbackCalls = [];
+    global.fetch = async (url) => {
+      fallbackCalls.push(url);
+      if (url.endsWith('/api/template')) {
+        return { ok: false, status: 500, text: async () => 'template error' };
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify([
+            { entity_id: 'sensor.temp', state: '21' },
+            { entity_id: 'light.flur', state: 'off', attributes: { friendly_name: 'Flur' } },
+          ]),
+      };
+    };
+
+    const res2 = await getSmartHomeDevices();
+    assert.deepEqual(fallbackCalls, [
+      'https://ha.example.invalid/api/template',
+      'https://ha.example.invalid/api/states',
+    ]);
+    assert.equal(res2.lights.length, 1);
+    assert.equal(res2.lights[0].entity_id, 'light.flur');
+  } finally {
+    global.fetch = origFetch;
+    if (origUrl === undefined) delete process.env.HOME_ASSISTANT_URL;
+    else process.env.HOME_ASSISTANT_URL = origUrl;
+    if (origTok === undefined) delete process.env.HOME_ASSISTANT_TOKEN;
+    else process.env.HOME_ASSISTANT_TOKEN = origTok;
+  }
 });
