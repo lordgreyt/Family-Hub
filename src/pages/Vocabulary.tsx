@@ -550,9 +550,11 @@ function StudyCard({
           }}
         >
           {result === 'correct' ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <CircleCheck size={19} color="#34D399" /> Richtig!
-              {acceptedAnswers.length > 1 && <span style={{ opacity: 0.88, fontWeight: 700 }}>({acceptedAnswers.join(' · ')})</span>}
+              {(acceptedAnswers.length > 1 || /[()[\]]/.test(answer)) && (
+                <span style={{ opacity: 0.9, fontWeight: 700 }}>· {acceptedAnswers.join(' · ')}</span>
+              )}
             </span>
           ) : (
             <span>

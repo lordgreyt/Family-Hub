@@ -17,9 +17,30 @@ export const MODE_HINT: Record<LearnMode, string> = {
 };
 
 const ARTICLES = /^\s*(to|the|an|a|der|die|das|den|dem|ein|eine|einen|einem|einer|le|la|les|un|une|el|los|las|il|lo)\s+/i;
+const OPTIONAL_ABBREVS = /\b(?:etw|jdn|jdm|jds|sth|sb|pl|sg)\./gi;
 
 export function stripArticles(value: string) {
   return value.trim().replace(ARTICLES, '');
+}
+
+/**
+ * Entfernt optionale Klammer-Zusätze wie „(heard)“, „(went, gone)“ oder „[out]“,
+ * damit z. B. „to hear“ bei „to hear (heard)“ als richtig gewertet wird.
+ */
+export function stripParentheticals(value: string): string {
+  return value
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Entfernt typische Schulbuch-Platzhalter wie „sth.“, „sb.“, „etw.“, „jdn.“. */
+export function stripTextbookAbbrevs(value: string): string {
+  return value
+    .replace(OPTIONAL_ABBREVS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Vergleicht Antworten tolerant: Groß-/Kleinschreibung, Umlaute/Akzente, Satzzeichen, Artikel. */
@@ -65,13 +86,54 @@ export function isAnswerClose(given: string, expected: string) {
 /**
  * Mehrere gültige Übersetzungen stehen im Feld getrennt durch , ; / | oder „oder".
  * Beispiel: „versuchen, probieren" → ['versuchen', 'probieren'].
+ * Trenner INNERHALB von Klammern wie „to go (went, gone)" trennen nicht!
  * Ein Schrägstrich trennt nur echte Wortvarianten – „km/h" bleibt eine Antwort.
  */
-const VARIANT_SPLIT = /\s*(?:[,;|]|\soder\s)\s*/i;
 const SLASH_SPLIT = /\s*\/\s*/;
 
+function splitOutsideParens(value: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let depth = 0;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === '(' || ch === '[') {
+      depth += 1;
+      current += ch;
+      continue;
+    }
+    if (ch === ')' || ch === ']') {
+      depth = Math.max(0, depth - 1);
+      current += ch;
+      continue;
+    }
+    if (depth === 0) {
+      if (ch === ',' || ch === ';' || ch === '|') {
+        parts.push(current);
+        current = '';
+        continue;
+      }
+      if (/^\s+oder\s+/i.test(value.slice(i))) {
+        const match = value.slice(i).match(/^\s+oder\s+/i);
+        if (match) {
+          parts.push(current);
+          current = '';
+          i += match[0].length - 1;
+          continue;
+        }
+      }
+    }
+    current += ch;
+  }
+  parts.push(current);
+  return parts;
+}
+
 function splitVariants(value: string): string[] {
-  return value.split(VARIANT_SPLIT).flatMap(part => {
+  return splitOutsideParens(value).flatMap(part => {
+    // Schrägstrich nur außerhalb von Klammern trennen
+    if (/[()[\]]/.test(part)) return [part];
     const chunks = part.split(SLASH_SPLIT).map(chunk => chunk.trim()).filter(Boolean);
     const letters = (text: string) => text.replace(/[^A-Za-zÄÖÜäöüß]/g, '').length;
     return chunks.length > 1 && chunks.length <= 4 && chunks.every(chunk => letters(chunk) >= 3) ? chunks : [part];
@@ -118,11 +180,33 @@ export function speechText(value: string): string {
     .join(', ');
 }
 
-/** Richtig ist die Antwort, wenn sie zu irgendeiner hinterlegten Variante passt. */
+/**
+ * Richtig ist die Antwort, wenn sie zu irgendeiner hinterlegten Variante passt –
+ * egal ob optionale Klammer-Zusätze wie „(heard)“ oder Schulbuch-Kürzel wie „sth.“ / „etw.“
+ * mitgetippt oder weggelassen wurden.
+ */
 export function isAnswerCorrect(given: string, expected: string) {
   const variants = answerVariants(expected);
   if (!variants.length) return false;
-  return variants.some(variant => isAnswerClose(given, variant));
+
+  const givenClean = stripParentheticals(given) || given;
+
+  return variants.some(variant => {
+    const candidates = new Set<string>([variant]);
+    const withoutParens = stripParentheticals(variant);
+    if (withoutParens) candidates.add(withoutParens);
+    const withoutAbbrevs = stripTextbookAbbrevs(variant);
+    if (withoutAbbrevs) candidates.add(withoutAbbrevs);
+    const core = stripTextbookAbbrevs(withoutParens);
+    if (core) candidates.add(core);
+
+    for (const candidate of candidates) {
+      if (isAnswerClose(given, candidate) || isAnswerClose(givenClean, candidate)) {
+        return true;
+      }
+    }
+    return false;
+  });
 }
 
 export function isGermanLanguage(value: string) {
@@ -228,7 +312,8 @@ export function pickRandomAdventureMode(options: {
  * - Stufe 2: Erste 2–3 Buchstaben + Endbuchstabe (z. B. "suitcase" → "s u _ _ _ _ _ e")
  */
 export function buildTypingHint(expected: string, level: 1 | 2): string {
-  const target = primaryVariant(expected);
+  const raw = primaryVariant(expected);
+  const target = stripParentheticals(raw) || raw;
   if (!target) return '';
   return target
     .split(/\s+/)

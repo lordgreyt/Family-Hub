@@ -109,3 +109,28 @@ test('pickRandomAdventureMode mischt Auswahl, Schreiben & Hören zufällig ohne 
   assert.ok(seen.has('type'));
   assert.ok(seen.has('dictation') || seen.has('audio'));
 });
+
+test('Klammer-Zusätze wie „to hear (heard)“ und „to go (went, gone)“ sind beim Eintippen optional', () => {
+  // Hauptform ohne Klammer zählt als richtig
+  assert.equal(isAnswerCorrect('to hear', 'to hear (heard)'), true);
+  assert.equal(isAnswerCorrect('hear', 'to hear (heard)'), true);
+  // Vollform mit Klammerinhalt zählt ebenfalls als richtig
+  assert.equal(isAnswerCorrect('to hear (heard)', 'to hear (heard)'), true);
+  assert.equal(isAnswerCorrect('to hear heard', 'to hear (heard)'), true);
+  // Falsches Wort bleibt falsch
+  assert.equal(isAnswerCorrect('to see', 'to hear (heard)'), false);
+
+  // Komma IN Klammern darf nicht als eigene Variante gesplittet werden
+  assert.deepEqual(answerVariants('to go (went, gone)'), ['to go (went, gone)']);
+  assert.equal(isAnswerCorrect('to go', 'to go (went, gone)'), true);
+  assert.equal(isAnswerCorrect('go', 'to go (went, gone)'), true);
+  assert.equal(isAnswerCorrect('gone', 'to go (went, gone)'), false);
+
+  // Optionale Klammern vorne/hinten & Schulbuch-Kürzel (sb./sth./etw.)
+  assert.equal(isAnswerCorrect('listen', '(to) listen (to)'), true);
+  assert.equal(isAnswerCorrect('to ask', 'to ask sb. (for sth.)'), true);
+  assert.equal(isAnswerCorrect('versuchen', 'etw. versuchen, probieren'), true);
+
+  // Tipp-Hilfe blendet den Klammer-Zusatz aus, damit nur das Hauptwort angedeutet wird
+  assert.equal(buildTypingHint('to hear (heard)', 1), 't _   h _ _ _');
+});
