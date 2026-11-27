@@ -20,12 +20,21 @@ const COVERS = [
 ];
 
 const COVER_STATES = new Set(['open', 'closed', 'opening', 'closing', 'unavailable']);
+const LIGHT_STATES = new Set(['on', 'off', 'unavailable']);
+const ALLOWED_DEVICE_ID = /^(cover|light)\.[a-z0-9_]+$/;
 const COVER_ACTIONS = {
   open: 'open_cover',
   close: 'close_cover',
   stop: 'stop_cover',
   set_position: 'set_cover_position',
 };
+const LIGHT_ACTIONS = {
+  turn_on: 'turn_on',
+  turn_off: 'turn_off',
+  toggle: 'toggle',
+};
+const COLOR_MODES_WITH_BRIGHTNESS = new Set(['brightness', 'color_temp', 'hs', 'xy', 'rgb', 'rgbw', 'rgbww', 'white']);
+const COLOR_MODES_WITH_COLOR = new Set(['hs', 'xy', 'rgb', 'rgbw', 'rgbww']);
 
 function loadLocalEnvFallback() {
   const envFile = path.join(process.cwd(), '.env.local');
@@ -193,6 +202,8 @@ async function requestHomeAssistant(path, options = {}) {
 
     if (!text) return null;
 
+    if (options.rawText) return text;
+
     try {
       return JSON.parse(text);
     } catch (err) {
@@ -212,9 +223,227 @@ async function requestHomeAssistant(path, options = {}) {
 }
 
 function normalizePosition(value) {
+  if (value === null || value === undefined || value === '') return null;
   const position = Number(value);
   if (!Number.isFinite(position)) return null;
   return Math.max(0, Math.min(100, Math.round(position)));
+}
+
+function humanizeEntityId(entityId) {
+  const slug = String(entityId || '').replace(/^(cover|light)\./, '');
+  return slug
+    .split('_')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function normalizeCoverEntity(state, areaMap = {}) {
+  const entityId = String(state && state.entity_id ? state.entity_id : '');
+  const attrs = (state && state.attributes && typeof state.attributes === 'object') ? state.attributes : {};
+  const rawState = String((state && state.state) || 'unavailable');
+  const position = normalizePosition(attrs.current_position);
+  const supportedFeatures = Number(attrs.supported_features) || 0;
+  const supportsPosition = position !== null || Boolean(supportedFeatures & 4);
+  const friendlyName = typeof attrs.friendly_name === 'string' && attrs.friendly_name.trim()
+    ? attrs.friendly_name.trim()
+    : humanizeEntityId(entityId);
+
+  return {
+    entity_id: entityId,
+    domain: 'cover',
+    name: friendlyName,
+    area: areaMap[entityId] || null,
+    device_class: typeof attrs.device_class === 'string' ? attrs.device_class : null,
+    state: COVER_STATES.has(rawState) ? rawState : 'unavailable',
+    position,
+    supports_position: supportsPosition,
+    is_group: Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0,
+    updated_at: (state && (state.last_updated || state.last_changed)) || null,
+  };
+}
+
+function normalizeLightEntity(state, areaMap = {}) {
+  const entityId = String(state && state.entity_id ? state.entity_id : '');
+  const attrs = (state && state.attributes && typeof state.attributes === 'object') ? state.attributes : {};
+  const rawState = String((state && state.state) || 'unavailable');
+  const modes = Array.isArray(attrs.supported_color_modes) ? attrs.supported_color_modes.map(String) : [];
+
+  const rawBrightness = attrs.brightness !== null && attrs.brightness !== undefined ? Number(attrs.brightness) : NaN;
+  const brightnessPct = Number.isFinite(rawBrightness)
+    ? Math.max(1, Math.min(100, Math.round((rawBrightness / 255) * 100)))
+    : null;
+
+  const supportsBrightness = brightnessPct !== null || modes.some((mode) => COLOR_MODES_WITH_BRIGHTNESS.has(mode));
+  const supportsColorTemp = modes.includes('color_temp') || Number.isFinite(Number(attrs.color_temp_kelvin));
+  const supportsColor = modes.some((mode) => COLOR_MODES_WITH_COLOR.has(mode)) || Array.isArray(attrs.rgb_color);
+
+  const colorTempKelvin = Number.isFinite(Number(attrs.color_temp_kelvin)) ? Math.round(Number(attrs.color_temp_kelvin)) : null;
+  const minKelvin = Number.isFinite(Number(attrs.min_color_temp_kelvin)) ? Math.round(Number(attrs.min_color_temp_kelvin)) : 2200;
+  const maxKelvin = Number.isFinite(Number(attrs.max_color_temp_kelvin)) ? Math.round(Number(attrs.max_color_temp_kelvin)) : 6500;
+
+  let rgbColor = null;
+  if (Array.isArray(attrs.rgb_color) && attrs.rgb_color.length === 3) {
+    const nums = attrs.rgb_color.map((n) => Math.max(0, Math.min(255, Math.round(Number(n)))));
+    if (nums.every((n) => Number.isFinite(n))) rgbColor = nums;
+  }
+
+  const friendlyName = typeof attrs.friendly_name === 'string' && attrs.friendly_name.trim()
+    ? attrs.friendly_name.trim()
+    : humanizeEntityId(entityId);
+
+  return {
+    entity_id: entityId,
+    domain: 'light',
+    name: friendlyName,
+    area: areaMap[entityId] || null,
+    state: LIGHT_STATES.has(rawState) ? rawState : 'unavailable',
+    brightness_pct: rawState === 'on' ? brightnessPct : null,
+    supports_brightness: supportsBrightness,
+    supports_color_temp: supportsColorTemp,
+    color_temp_kelvin: rawState === 'on' ? colorTempKelvin : null,
+    min_color_temp_kelvin: minKelvin,
+    max_color_temp_kelvin: maxKelvin,
+    supports_color: supportsColor,
+    rgb_color: rawState === 'on' ? rgbColor : null,
+    is_group: Array.isArray(attrs.entity_id) && attrs.entity_id.length > 0,
+    updated_at: (state && (state.last_updated || state.last_changed)) || null,
+  };
+}
+
+async function fetchEntityAreaMap() {
+  const template = [
+    '{% set ns = namespace(items=[]) %}',
+    '{% for s in states.cover %}{% set a = area_name(s.entity_id) %}{% if a %}{% set ns.items = ns.items + [[s.entity_id, a]] %}{% endif %}{% endfor %}',
+    '{% for s in states.light %}{% set a = area_name(s.entity_id) %}{% if a %}{% set ns.items = ns.items + [[s.entity_id, a]] %}{% endif %}{% endfor %}',
+    '{{ ns.items | to_json }}',
+  ].join('');
+
+  try {
+    const raw = await requestHomeAssistant('/api/template', {
+      method: 'POST',
+      body: { template },
+      rawText: true,
+    });
+    if (!raw || typeof raw !== 'string') return {};
+    const parsed = JSON.parse(raw.trim());
+    if (!Array.isArray(parsed)) return {};
+    const map = {};
+    for (const pair of parsed) {
+      if (Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string' && pair[1].trim()) {
+        map[pair[0]] = pair[1].trim();
+      }
+    }
+    return map;
+  } catch {
+    // Area metadata is optional — silently degrade if HA template endpoint is unavailable.
+    return {};
+  }
+}
+
+async function getSmartHomeDevices() {
+  const [allStates, areaMap] = await Promise.all([
+    requestHomeAssistant('/api/states'),
+    fetchEntityAreaMap(),
+  ]);
+
+  const list = Array.isArray(allStates) ? allStates : [];
+  const covers = [];
+  const lights = [];
+
+  for (const state of list) {
+    if (!state || typeof state !== 'object' || typeof state.entity_id !== 'string') continue;
+    if (state.entity_id.startsWith('cover.')) {
+      covers.push(normalizeCoverEntity(state, areaMap));
+    } else if (state.entity_id.startsWith('light.')) {
+      lights.push(normalizeLightEntity(state, areaMap));
+    }
+  }
+
+  const byName = (a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' });
+  covers.sort(byName);
+  lights.sort(byName);
+
+  const areaSet = new Set();
+  for (const item of [...covers, ...lights]) {
+    if (item.area) areaSet.add(item.area);
+  }
+  const areas = Array.from(areaSet).sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }));
+
+  return {
+    updated_at: new Date().toISOString(),
+    covers,
+    lights,
+    areas,
+  };
+}
+
+function validateDeviceAction(input) {
+  const entityId = String((input && input.entity_id) || '').trim();
+  const action = String((input && input.action) || '').trim();
+
+  if (!ALLOWED_DEVICE_ID.test(entityId)) {
+    throw new PublicError(400, 'Nur Rollläden (cover.*) und Lampen (light.*) dürfen gesteuert werden.', 'invalid_entity');
+  }
+
+  if (entityId.startsWith('cover.')) {
+    const service = COVER_ACTIONS[action];
+    if (!service) {
+      throw new PublicError(400, 'Unbekannte Rollladen-Aktion.', 'unknown_action');
+    }
+    const body = { entity_id: entityId };
+    if (action === 'set_position') {
+      const position = normalizePosition(input.position);
+      if (position === null) {
+        throw new PublicError(400, 'Position muss zwischen 0 und 100 liegen.', 'invalid_position');
+      }
+      body.position = position;
+    }
+    return { domain: 'cover', service, body };
+  }
+
+  const service = LIGHT_ACTIONS[action];
+  if (!service) {
+    throw new PublicError(400, 'Unbekannte Lampen-Aktion.', 'unknown_action');
+  }
+
+  const body = { entity_id: entityId };
+  if (action === 'turn_on') {
+    if (input.brightness_pct !== undefined && input.brightness_pct !== null) {
+      const pct = Number(input.brightness_pct);
+      if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+        throw new PublicError(400, 'Helligkeit muss zwischen 1 und 100 % liegen.', 'invalid_brightness');
+      }
+      body.brightness_pct = Math.round(pct);
+    }
+    if (input.color_temp_kelvin !== undefined && input.color_temp_kelvin !== null) {
+      const kelvin = Number(input.color_temp_kelvin);
+      if (!Number.isFinite(kelvin) || kelvin < 1500 || kelvin > 9000) {
+        throw new PublicError(400, 'Farbtemperatur muss zwischen 1500 K und 9000 K liegen.', 'invalid_color_temp');
+      }
+      body.color_temp_kelvin = Math.round(kelvin);
+    }
+    if (input.rgb_color !== undefined && input.rgb_color !== null) {
+      if (!Array.isArray(input.rgb_color) || input.rgb_color.length !== 3) {
+        throw new PublicError(400, 'RGB-Farbe muss aus 3 Werten (0–255) bestehen.', 'invalid_rgb');
+      }
+      const rgb = input.rgb_color.map((n) => Number(n));
+      if (rgb.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) {
+        throw new PublicError(400, 'RGB-Werte müssen zwischen 0 und 255 liegen.', 'invalid_rgb');
+      }
+      body.rgb_color = rgb.map((n) => Math.round(n));
+    }
+  }
+
+  return { domain: 'light', service, body };
+}
+
+async function sendDeviceAction(input) {
+  const { domain, service, body } = validateDeviceAction(input);
+  await requestHomeAssistant(`/api/services/${domain}/${service}`, {
+    method: 'POST',
+    body,
+  });
 }
 
 function normalizeCover(cover, state) {
@@ -310,8 +539,13 @@ module.exports = {
   PublicError,
   parseJsonBody,
   sendCoverAction,
+  sendDeviceAction,
   sendError,
   setApiHeaders,
   getCoverStates,
+  getSmartHomeDevices,
+  normalizeCoverEntity,
+  normalizeLightEntity,
+  validateDeviceAction,
   verifyAdultUser,
 };

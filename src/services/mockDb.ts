@@ -7,6 +7,16 @@ import type { WeeklyStarTask } from './weeklyStars';
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
 
+export interface SmartHomeSection {
+  id: string;
+  title: string;
+  entityIds: string[];
+}
+
+export interface SmartHomeLayout {
+  sections: SmartHomeSection[];
+}
+
 // Types
 export interface User {
   id: string; // The user's typed alias (e.g. "Markus")
@@ -22,6 +32,8 @@ export interface User {
   fontSize?: FontSize;
   /** Wochenaufgaben des Kindes (werden jeden Sonntagabend gebucht). */
   weeklyTasks?: WeeklyStarTask[];
+  /** Persönliche Smart-Home-Ansicht (eigene Gruppen & gepinnte Rollläden/Lampen). */
+  smartHomeLayout?: SmartHomeLayout;
 }
 
 export interface BudgetItem {
