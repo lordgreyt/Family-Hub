@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { mockDb } from '../services/mockDb';
-import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Settings, Eye, KeyRound, Star, Check, X, Pencil, Sparkles, Shield, Volume2 } from 'lucide-react';
+import { LogOut, Palette, Type, Users, Trash2, Plus, Database, Cloud, CloudOff, HardDrive, RotateCw, Settings, Eye, KeyRound, Star, Check, X, Pencil, Sparkles, Shield, Volume2, Gift } from 'lucide-react';
 import { AvatarEmoji } from '../components/AvatarEmoji';
 import { ProfileSheet } from '../components/ProfileSheet';
 import { extractInitials, STUDIO_GRADIENTS } from '../data/avatars';
@@ -23,6 +23,7 @@ import {
   speakText,
 } from './speech';
 import type { EnglishAccent, OpenAiVoice, TtsStatus } from './speech';
+import type { VocabGamificationSettings, VocabGamificationState, VocabShopReward } from './vocabGamification';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -99,6 +100,24 @@ export const Setup = () => {
   const [ttsStatus, setTtsStatus] = useState<TtsStatus | null>(null);
   const [isSavingTts, setIsSavingTts] = useState(false);
   const [ttsFeedback, setTtsFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
+
+  // Vokabel-Gamification & Diamanten-Umtauschquote (nur für Erwachsene)
+  const [vocabGamState, setVocabGamState] = useState<VocabGamificationState>(() => mockDb.getVocabGamification());
+  const [gamDraft, setGamDraft] = useState<VocabGamificationSettings>(() => mockDb.getVocabGamification().settings);
+  const [newShopEmoji, setNewShopEmoji] = useState('🎁');
+  const [newShopTitle, setNewShopTitle] = useState('');
+  const [newShopDiamonds, setNewShopDiamonds] = useState('25');
+  const [gamFeedback, setGamFeedback] = useState<string>('');
+
+  useEffect(() => {
+    const syncGam = () => {
+      const next = mockDb.getVocabGamification();
+      setVocabGamState(next);
+      setGamDraft(next.settings);
+    };
+    window.addEventListener('db_updated', syncGam);
+    return () => window.removeEventListener('db_updated', syncGam);
+  }, []);
 
   useEffect(() => {
     if (!user || user.isChild) return;
@@ -924,6 +943,254 @@ export const Setup = () => {
               Jedes vorgelesene Wort wird dauerhaft im Browser gecached (nur 1× erzeugt → Kosten unter 2 Cent pro Schuljahr). Kinder können die Studio-Stimme beim Lernen hören, haben aber keinen Zugriff auf den API-Key.
             </p>
             {ttsFeedback && message(ttsFeedback.text, ttsFeedback.kind)}
+          </div>
+        </Section>
+      )}
+
+      {/* Vokabel-Gamification & Diamanten-Umtausch (nur für Erwachsene) */}
+      {!user?.isChild && (
+        <Section icon={Gift} color={ORANGE} title="Vokabel-Diamanten & Schatztruhe" subtitle="Umtauschquote, Ziele & Anfragen">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {/* Offene Kinder-Anfragen direkt hier freigeben */}
+            {vocabGamState.exchangeRequests.filter(r => r.status === 'PENDING').length > 0 && (
+              <div
+                style={{
+                  padding: '0.8rem 0.9rem',
+                  borderRadius: '14px',
+                  background: '#FEF3C7',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.55rem',
+                }}
+              >
+                <div style={{ fontSize: '12.5px', fontWeight: 900, color: '#B45309' }}>
+                  💎 Offene Diamanten-Anfragen ({vocabGamState.exchangeRequests.filter(r => r.status === 'PENDING').length})
+                </div>
+                {vocabGamState.exchangeRequests
+                  .filter(r => r.status === 'PENDING')
+                  .map(req => (
+                    <div
+                      key={req.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap',
+                        padding: '0.55rem 0.7rem',
+                        borderRadius: '10px',
+                        background: 'var(--color-surface)',
+                      }}
+                    >
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-text)' }}>
+                        <strong>{req.userName}</strong>: {req.diamonds} 💎 → {req.rewardLabel}
+                        {req.note ? ` („${req.note}“)` : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => mockDb.resolveVocabDiamondExchange(req.id, 'APPROVED', user?.id || 'Eltern')}
+                          style={{
+                            height: '30px', padding: '0 0.7rem', borderRadius: '999px', border: 'none',
+                            background: '#10B981', color: '#FFFFFF', fontSize: '11.5px', fontWeight: 800,
+                            fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                          }}
+                        >
+                          <Check size={13} /> Einlösen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => mockDb.resolveVocabDiamondExchange(req.id, 'REJECTED', user?.id || 'Eltern')}
+                          style={{
+                            height: '30px', padding: '0 0.65rem', borderRadius: '999px', border: 'none',
+                            background: '#FDE8EF', color: PINK_TEXT, fontSize: '11.5px', fontWeight: 800,
+                            fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                          }}
+                        >
+                          <X size={13} /> Ablehnen
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Umtauschquote */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '0.6rem' }}>
+              <div>
+                <label style={fieldLabel}>Diamanten pro Tausch</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  className="input-field"
+                  value={gamDraft.exchangeDiamonds}
+                  onChange={e => setGamDraft(prev => ({ ...prev, exchangeDiamonds: Math.max(1, Number(e.target.value) || 20) }))}
+                  style={{ height: '42px', fontSize: 'var(--font-sm)', fontWeight: 800 }}
+                />
+              </div>
+              <div>
+                <label style={fieldLabel}>Gegenwert (z. B. Euro / Zeit)</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  className="input-field"
+                  value={gamDraft.exchangeLabel}
+                  onChange={e => setGamDraft(prev => ({ ...prev, exchangeLabel: e.target.value }))}
+                  placeholder="z. B. 2,00 €"
+                  style={{ height: '42px', fontSize: 'var(--font-sm)', fontWeight: 700 }}
+                />
+              </div>
+            </div>
+
+            {/* Truhen-Größe, Tagesziel & Wochenziel */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.55rem' }}>
+              <div>
+                <label style={fieldLabel}>Truhe (Wörter)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={200}
+                  className="input-field"
+                  value={gamDraft.chestSize}
+                  onChange={e => setGamDraft(prev => ({ ...prev, chestSize: Math.max(5, Number(e.target.value) || 50) }))}
+                  style={{ height: '40px', fontSize: 'var(--font-sm)', fontWeight: 800 }}
+                />
+              </div>
+              <div>
+                <label style={fieldLabel}>Tagesziel</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="input-field"
+                  value={gamDraft.dailyGoal}
+                  onChange={e => setGamDraft(prev => ({ ...prev, dailyGoal: Math.max(1, Number(e.target.value) || 30) }))}
+                  style={{ height: '40px', fontSize: 'var(--font-sm)', fontWeight: 800 }}
+                />
+              </div>
+              <div>
+                <label style={fieldLabel}>Woche (Tage)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={7}
+                  className="input-field"
+                  value={gamDraft.weeklyGoalDays}
+                  onChange={e => setGamDraft(prev => ({ ...prev, weeklyGoalDays: Math.min(7, Math.max(1, Number(e.target.value) || 7)) }))}
+                  style={{ height: '40px', fontSize: 'var(--font-sm)', fontWeight: 800 }}
+                />
+              </div>
+            </div>
+
+            {/* Wunsch-Tausch-Shop */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={fieldLabel}>Wunsch-Tausch-Shop (Karten für Kinder)</label>
+              {gamDraft.shopItems.map(item => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: '12px',
+                    background: 'var(--color-surface-hover)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{item.emoji}</span>
+                  <span style={{ flex: 1, fontSize: 'var(--font-sm)', fontWeight: 700, color: 'var(--color-text)' }}>
+                    {item.title}
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 900, color: '#0369A1' }}>{item.diamonds} 💎</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGamDraft(prev => ({
+                        ...prev,
+                        shopItems: prev.shopItems.filter(s => s.id !== item.id),
+                      }))
+                    }
+                    aria-label={`${item.title} entfernen`}
+                    style={{
+                      width: '28px', height: '28px', borderRadius: '8px', border: 'none',
+                      background: '#FDE8EF', color: PINK_TEXT, display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={newShopEmoji}
+                  onChange={e => setNewShopEmoji(e.target.value)}
+                  className="input-field"
+                  aria-label="Emoji"
+                  style={{ width: '52px', height: '38px', textAlign: 'center', fontSize: '16px', padding: '0 0.25rem' }}
+                />
+                <input
+                  type="text"
+                  maxLength={45}
+                  value={newShopTitle}
+                  onChange={e => setNewShopTitle(e.target.value)}
+                  placeholder="Neue Belohnung (z. B. 30 Min. Switch)"
+                  className="input-field"
+                  style={{ flex: '1 1 160px', height: '38px', fontSize: '13px' }}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={newShopDiamonds}
+                  onChange={e => setNewShopDiamonds(e.target.value)}
+                  className="input-field"
+                  aria-label="Diamanten"
+                  style={{ width: '74px', height: '38px', fontSize: '13px', fontWeight: 800 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newShopTitle.trim()) return;
+                    const reward: VocabShopReward = {
+                      id: `shop_${Date.now().toString(36)}`,
+                      emoji: newShopEmoji.trim() || '🎁',
+                      title: newShopTitle.trim(),
+                      diamonds: Math.max(1, Math.min(500, Number(newShopDiamonds) || 20)),
+                    };
+                    setGamDraft(prev => ({ ...prev, shopItems: [...prev.shopItems, reward] }));
+                    setNewShopTitle('');
+                  }}
+                  style={{
+                    height: '38px', padding: '0 0.85rem', borderRadius: '999px', border: 'none',
+                    background: '#ECE8FF', color: PRIMARY, fontSize: '12px', fontWeight: 800,
+                    fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                  }}
+                >
+                  <Plus size={14} /> Hinzufügen
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                mockDb.saveVocabGamificationSettings(gamDraft);
+                setGamFeedback(`Gespeichert: ${gamDraft.exchangeDiamonds} 💎 = ${gamDraft.exchangeLabel} · Truhe alle ${gamDraft.chestSize} Wörter.`);
+                window.setTimeout(() => setGamFeedback(''), 4000);
+              }}
+              style={primaryBtn}
+            >
+              <Check size={17} /> Gamification-Einstellungen speichern
+            </button>
+
+            {gamFeedback && message(gamFeedback, 'success')}
           </div>
         </Section>
       )}

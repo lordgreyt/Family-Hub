@@ -255,50 +255,31 @@ export const VocabCameraScanner: React.FC<VocabCameraScannerProps> = ({
       return;
     }
 
-    const cleanTitle = title.trim() || 'Gescannte Vokabeln';
     const cleanFrom = languageFrom.trim() || 'Englisch';
     const cleanTo = languageTo.trim() || 'Deutsch';
     const now = Date.now();
 
-    const targetExisting =
-      targetSetId !== '__new__'
-        ? existingSets.find(s => s.id === targetSetId)
-        : existingSets.find(
-            s =>
-              s.title.trim().toLocaleLowerCase() === cleanTitle.toLocaleLowerCase() &&
-              s.languageFrom.trim().toLocaleLowerCase() === cleanFrom.toLocaleLowerCase() &&
-              s.languageTo.trim().toLocaleLowerCase() === cleanTo.toLocaleLowerCase()
-          );
-
-    if (targetExisting) {
-      const merged = mergeVocabEntries(targetExisting.entries, validEntries);
-      const updatedSet: VocabularySet = {
-        ...targetExisting,
-        entries: merged.entries,
-        updatedAt: now,
-      };
-      onSaved(
-        updatedSet,
-        merged.addedCount > 0
-          ? `${merged.addedCount} neue Vokabeln zu „${updatedSet.title}“ hinzugefügt (gesamt ${merged.entries.length}).`
-          : `Alle ${validEntries.length} erkannten Vokabeln waren bereits in „${updatedSet.title}“ vorhanden.`
-      );
-    } else {
-      const merged = mergeVocabEntries([], validEntries);
-      const newSet: VocabularySet = {
-        id: createId(),
-        title: cleanTitle,
-        languageFrom: cleanFrom,
-        languageTo: cleanTo,
-        entries: merged.entries,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId,
-        source: 'Kamera-Scan',
-        progressByUser: {},
-      };
-      onSaved(newSet, `${merged.entries.length} Vokabeln in „${newSet.title}“ gespeichert.`);
-    }
+    const poolBase = existingSets[0];
+    const merged = mergeVocabEntries(poolBase?.entries || [], validEntries);
+    const updatedPool: VocabularySet = {
+      id: poolBase?.id || 'vocab_pool',
+      title: 'Vokabel-Pool',
+      languageFrom: poolBase?.languageFrom || cleanFrom,
+      languageTo: poolBase?.languageTo || cleanTo,
+      entries: merged.entries,
+      createdAt: poolBase?.createdAt || now,
+      updatedAt: now,
+      createdBy: poolBase?.createdBy || userId,
+      source: 'Kamera-Scan',
+      examDate: poolBase?.examDate,
+      progressByUser: poolBase?.progressByUser || {},
+    };
+    onSaved(
+      updatedPool,
+      merged.addedCount > 0
+        ? `${merged.addedCount} neue Vokabeln in den Vokabel-Pool übernommen (gesamt ${merged.entries.length}).`
+        : `Alle ${validEntries.length} erkannten Vokabeln waren bereits im Vokabel-Pool vorhanden.`
+    );
 
     setPhotos([]);
     onClose();
@@ -736,126 +717,71 @@ export const VocabCameraScanner: React.FC<VocabCameraScannerProps> = ({
                 </div>
               )}
 
-              {/* Target Set & Language Options */}
+              {/* Pool Info & Language Options */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                {existingSets.length > 0 && (
+                <div
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '12px',
+                    background: '#ECE8FF',
+                    color: '#3F34C4',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Alle gescannten Wörter werden automatisch in euren gemeinsamen <strong>Vokabel-Pool</strong> übernommen (Dubletten werden übersprungen).
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
-                      Ziel-Lernset
+                      Fremdsprache
                     </label>
-                    <select
-                      value={targetSetId}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setTargetSetId(val);
-                        const found = existingSets.find(s => s.id === val);
-                        if (found) {
-                          setTitle(found.title);
-                          setLanguageFrom(found.languageFrom);
-                          setLanguageTo(found.languageTo);
-                        } else {
-                          setTitle('');
-                        }
-                      }}
+                    <input
+                      type="text"
+                      list="vocab-lang-presets"
+                      value={languageFrom}
+                      onChange={e => setLanguageFrom(e.target.value)}
+                      maxLength={40}
                       className="input-field"
-                      style={{ width: '100%', height: '44px', fontSize: '13.5px', fontWeight: 700 }}
-                    >
-                      <option value="__new__">Neues Lernset anlegen (Titel automatisch erkennen)</option>
-                      {existingSets.map(set => (
-                        <option key={set.id} value={set.id}>
-                          Ergänzen: {set.title} ({set.entries.length} Vokabeln)
-                        </option>
+                      style={{ width: '100%', height: '42px', fontSize: '13.5px', fontWeight: 600 }}
+                    />
+                    <datalist id="vocab-lang-presets">
+                      {LANGUAGE_PRESETS.map(lang => (
+                        <option key={lang} value={lang} />
                       ))}
-                    </select>
+                    </datalist>
                   </div>
-                )}
-
-                {targetSetId === '__new__' && (
-                  <>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
-                        Titel (optional – sonst aus Überschrift erkannt)
-                      </label>
-                      <input
-                        type="text"
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        placeholder="z. B. Englisch – Unit 4"
-                        maxLength={120}
-                        className="input-field"
-                        style={{ width: '100%', height: '44px', fontSize: '14px', fontWeight: 600 }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
-                          Fremdsprache
-                        </label>
-                        <input
-                          type="text"
-                          list="vocab-lang-presets"
-                          value={languageFrom}
-                          onChange={e => setLanguageFrom(e.target.value)}
-                          maxLength={40}
-                          className="input-field"
-                          style={{ width: '100%', height: '42px', fontSize: '13.5px', fontWeight: 600 }}
-                        />
-                        <datalist id="vocab-lang-presets">
-                          {LANGUAGE_PRESETS.map(lang => (
-                            <option key={lang} value={lang} />
-                          ))}
-                        </datalist>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
-                          Übersetzung
-                        </label>
-                        <input
-                          type="text"
-                          value={languageTo}
-                          onChange={e => setLanguageTo(e.target.value)}
-                          maxLength={40}
-                          className="input-field"
-                          style={{ width: '100%', height: '42px', fontSize: '13.5px', fontWeight: 600 }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+                      Übersetzung
+                    </label>
+                    <input
+                      type="text"
+                      value={languageTo}
+                      onChange={e => setLanguageTo(e.target.value)}
+                      maxLength={40}
+                      className="input-field"
+                      style={{ width: '100%', height: '42px', fontSize: '13.5px', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
               </div>
             </>
           ) : (
             /* Step 2: Review & Edit Extracted Pairs */
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.55rem' }}>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="Titel des Lernsets"
-                  maxLength={120}
-                  className="input-field"
-                  style={{ width: '100%', height: '44px', fontSize: '14.5px', fontWeight: 800 }}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    value={languageFrom}
-                    onChange={e => setLanguageFrom(e.target.value)}
-                    aria-label="Ausgangssprache"
-                    className="input-field"
-                    style={{ width: '100%', height: '38px', fontSize: '13px', fontWeight: 700 }}
-                  />
-                  <input
-                    type="text"
-                    value={languageTo}
-                    onChange={e => setLanguageTo(e.target.value)}
-                    aria-label="Zielsprache"
-                    className="input-field"
-                    style={{ width: '100%', height: '38px', fontSize: '13px', fontWeight: 700 }}
-                  />
-                </div>
+              <div
+                style={{
+                  padding: '0.6rem 0.85rem',
+                  borderRadius: '12px',
+                  background: '#ECE8FF',
+                  color: '#3F34C4',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                }}
+              >
+                Ziel: <strong>Vokabel-Pool</strong> ({languageFrom} → {languageTo})
               </div>
 
               {uncertainCount > 0 && (

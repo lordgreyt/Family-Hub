@@ -330,26 +330,6 @@ export const SmartHome = () => {
             </div>
           </div>
 
-          {activeTab === 'my' && (
-            <button
-              type="button"
-              onClick={() => setEditMode(v => !v)}
-              className="glass-btn"
-              style={{
-                padding: '0 0.85rem',
-                width: 'auto',
-                gap: '0.35rem',
-                fontSize: '12px',
-                fontWeight: 800,
-                background: editMode ? '#FFFFFF' : undefined,
-                color: editMode ? '#3F34C4' : '#FFFFFF',
-              }}
-            >
-              {editMode ? <Check size={15} /> : <Pencil size={14} />}
-              {editMode ? 'Fertig' : 'Anpassen'}
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => void loadDevices(true)}
@@ -357,7 +337,7 @@ export const SmartHome = () => {
             title="Status neu laden"
             aria-label="Status neu laden"
             className="glass-btn"
-            style={{ opacity: isBusy ? 0.7 : 1 }}
+            style={{ opacity: isBusy ? 0.7 : 1, flexShrink: 0 }}
           >
             <RefreshCw className={isBusy ? 'smart-home-spin' : undefined} size={18} />
           </button>
@@ -583,8 +563,53 @@ export const SmartHome = () => {
             </div>
           ) : (
             <>
-              {/* Edit Mode Toolbar: Add new group */}
-              {editMode && (
+              {/* Action bar for Meine Ansicht: Anpassen / Fertig + Neue Gruppe */}
+              {!editMode ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPickerSectionId(layout.sections[0].id)}
+                    style={{
+                      height: '34px',
+                      padding: '0 0.85rem',
+                      borderRadius: '999px',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      fontFamily: 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={14} /> Geräte wählen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(true)}
+                    style={{
+                      height: '34px',
+                      padding: '0 0.9rem',
+                      borderRadius: '999px',
+                      border: 'none',
+                      background: '#ECE8FF',
+                      color: PRIMARY,
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      fontFamily: 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Pencil size={13} /> Ansicht anpassen
+                  </button>
+                </div>
+              ) : (
                 <div
                   style={{
                     ...CARD,
@@ -600,13 +625,40 @@ export const SmartHome = () => {
                     <span style={{ fontSize: 'var(--font-xs)', fontWeight: 800, color: PRIMARY }}>
                       Ansicht bearbeiten · Sortiere Geräte oder lege eigene Gruppen an
                     </span>
-                    {!showNewSectionInput && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      {!showNewSectionInput && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewSectionInput(true)}
+                          style={{
+                            height: '32px',
+                            padding: '0 0.8rem',
+                            borderRadius: '999px',
+                            border: `1px solid ${PRIMARY}`,
+                            background: 'var(--color-surface)',
+                            color: PRIMARY,
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            fontFamily: 'inherit',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <FolderPlus size={14} /> Neue Gruppe
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setShowNewSectionInput(true)}
+                        onClick={() => {
+                          setEditMode(false);
+                          setShowNewSectionInput(false);
+                          setRenamingSectionId(null);
+                        }}
                         style={{
                           height: '32px',
-                          padding: '0 0.8rem',
+                          padding: '0 0.9rem',
                           borderRadius: '999px',
                           border: 'none',
                           background: PRIMARY,
@@ -620,9 +672,9 @@ export const SmartHome = () => {
                           cursor: 'pointer',
                         }}
                       >
-                        <FolderPlus size={14} /> Neue Gruppe
+                        <Check size={14} /> Fertig
                       </button>
-                    )}
+                    </div>
                   </div>
 
                   {showNewSectionInput && (

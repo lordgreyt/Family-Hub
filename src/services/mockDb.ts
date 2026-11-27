@@ -3,6 +3,24 @@ import { db } from './firebase';
 import { ref, set as firebaseSet, update as firebaseUpdate, increment, onValue, get as firebaseGet, runTransaction } from 'firebase/database';
 import { planWeeklyStarBookings, localDateKey, lastWeeklyStarBoundary, WEEKLY_STAR_MAX, flattenWeeklyTasks } from './weeklyStars';
 import type { WeeklyStarTask } from './weeklyStars';
+import {
+  VOCAB_POOL_ID,
+  claimPendingChest,
+  consolidateVocabularyPool,
+  createExchangeRequest,
+  normalizeChildProfile,
+  normalizeGamificationSettings,
+  normalizeGamificationState,
+  recordGamificationAnswer,
+  resolveExchangeRequest,
+} from '../pages/vocabGamification';
+import type {
+  AnswerGamificationOutcome,
+  VocabChildGamification,
+  VocabDiamondExchangeRequest,
+  VocabGamificationSettings,
+  VocabGamificationState,
+} from '../pages/vocabGamification';
 
 export type ThemeColor = 'indigo' | 'rose' | 'emerald' | 'amber' | 'cyan' | 'violet' | 'slate' | 'teal' | 'pink' | 'blue' | 'coral' | 'lime' | 'grape' | 'ocean' | 'sunset' | 'mint' | 'crimson' | 'gold';
 export type FontSize = 'small' | 'base' | 'large';
@@ -240,6 +258,8 @@ export interface GradeChildRecord {
 }
 
 export type GradeBook = Record<string, GradeChildRecord>;
+
+const VOCAB_GAMIFICATION_KEY = '__gamification';
 
 export interface VocabularyEntry {
   id: string;
@@ -1569,34 +1589,185 @@ export const mockDb = {
     set(DB_KEYS.GRADES, { ...book, [record.childId]: normalized });
   },
 
-  // Shared vocabulary sets and per-user spaced-repetition progress
-  getVocabularyStore: (): VocabularyStore => {
-    const data = get<VocabularyStore | VocabularySet[]>(DB_KEYS.VOCABULARY, {});
+  // Shared vocabulary pool, per-user spaced-repetition progress & child gamification
+  getVocabularyRaw: (): Record<string, unknown> => {
+    const data = get<Record<string, unknown> | VocabularySet[]>(DB_KEYS.VOCABULARY, {});
     if (Array.isArray(data)) {
       return Object.fromEntries(data.filter(item => item && item.id).map(item => [item.id, item]));
     }
-    if (!data || typeof data !== 'object') return {};
-    return Object.fromEntries(Object.entries(data).filter(([, item]) => Boolean(item)).map(([id, item]) => [
-      id,
-      { ...item, id: item.id || id, entries: Array.isArray(item.entries) ? item.entries.filter(Boolean) : [] },
-    ]));
+    return data && typeof data === 'object' ? { ...data } : {};
+  },
+  getVocabularyStore: (): VocabularyStore => {
+    const raw = mockDb.getVocabularyRaw();
+    return Object.fromEntries(
+      Object.entries(raw)
+        .filter(([id, item]) => id !== VOCAB_GAMIFICATION_KEY && Boolean(item) && typeof item === 'object')
+        .map(([id, item]) => {
+          const s = item as VocabularySet;
+          return [
+            id,
+            { ...s, id: s.id || id, entries: Array.isArray(s.entries) ? s.entries.filter(Boolean) : [] },
+          ];
+        })
+    );
   },
   getVocabularySets: (): VocabularySet[] => Object.values(mockDb.getVocabularyStore())
     .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)),
+  getVocabularyPool: (): VocabularySet => consolidateVocabularyPool(mockDb.getVocabularySets()),
+  saveVocabularyPool: (pool: VocabularySet) => {
+    const raw = mockDb.getVocabularyRaw();
+    const nextStore: Record<string, unknown> = {
+      [VOCAB_POOL_ID]: {
+        ...pool,
+        id: VOCAB_POOL_ID,
+        title: 'Vokabel-Pool',
+        updatedAt: Date.now(),
+      },
+    };
+    if (raw[VOCAB_GAMIFICATION_KEY]) {
+      nextStore[VOCAB_GAMIFICATION_KEY] = raw[VOCAB_GAMIFICATION_KEY];
+    }
+    set(DB_KEYS.VOCABULARY, nextStore);
+  },
   saveVocabularySet: (vocabularySet: VocabularySet) => {
-    const store = mockDb.getVocabularyStore();
+    const raw = mockDb.getVocabularyRaw();
     set(DB_KEYS.VOCABULARY, {
-      ...store,
+      ...raw,
       [vocabularySet.id]: { ...vocabularySet, updatedAt: Date.now() },
     });
   },
   deleteVocabularySet: (id: string) => {
-    const store = mockDb.getVocabularyStore();
-    if (!store[id]) return;
-    delete store[id];
-    set(DB_KEYS.VOCABULARY, store);
+    const raw = mockDb.getVocabularyRaw();
+    if (!raw[id]) return;
+    delete raw[id];
+    set(DB_KEYS.VOCABULARY, raw);
+  },
+  getVocabGamification: (): VocabGamificationState => {
+    const raw = mockDb.getVocabularyRaw();
+    return normalizeGamificationState(raw[VOCAB_GAMIFICATION_KEY] as Partial<VocabGamificationState> | undefined);
+  },
+  saveVocabGamification: (gamification: VocabGamificationState) => {
+    const raw = mockDb.getVocabularyRaw();
+    set(DB_KEYS.VOCABULARY, {
+      ...raw,
+      [VOCAB_GAMIFICATION_KEY]: gamification,
+    });
+  },
+  saveVocabGamificationSettings: (settings: VocabGamificationSettings) => {
+    const current = mockDb.getVocabGamification();
+    mockDb.saveVocabGamification({
+      ...current,
+      settings: normalizeGamificationSettings(settings),
+    });
+  },
+  claimVocabChest: (userId: string, chestId: string) => {
+    const current = mockDb.getVocabGamification();
+    const profile = normalizeChildProfile(userId, current.profilesByUser[userId]);
+    const claimed = claimPendingChest(profile, chestId);
+    if (!claimed.chest) return claimed;
+    mockDb.saveVocabGamification({
+      ...current,
+      profilesByUser: {
+        ...current.profilesByUser,
+        [userId]: claimed.profile,
+      },
+    });
+    return claimed;
+  },
+  requestVocabDiamondExchange: (params: {
+    userId: string;
+    userName: string;
+    diamonds: number;
+    rewardLabel: string;
+    note?: string;
+  }): VocabDiamondExchangeRequest => {
+    const current = mockDb.getVocabGamification();
+    const { state, request } = createExchangeRequest({ state: current, ...params });
+    mockDb.saveVocabGamification(state);
+    return request;
+  },
+  resolveVocabDiamondExchange: (
+    requestId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    resolvedBy: string
+  ) => {
+    const current = mockDb.getVocabGamification();
+    const next = resolveExchangeRequest({ state: current, requestId, decision, resolvedBy });
+    mockDb.saveVocabGamification(next);
+  },
+  recordPoolVocabularyAnswer: (
+    userId: string,
+    entryId: string,
+    correct: boolean,
+    mode?: VocabularyLearnMode,
+    options?: { countForGamification?: boolean }
+  ): AnswerGamificationOutcome | null => {
+    const pool = mockDb.getVocabularyPool();
+    if (!pool.entries.some(entry => entry.id === entryId)) return null;
+
+    const previous = pool.progressByUser?.[userId]?.[entryId];
+    const wasHardOrNew = !previous || (previous.wrongCount > 0 && previous.streak < 2);
+    const now = Date.now();
+    const streak = correct ? (previous?.streak || 0) + 1 : 0;
+    const intervalDays = [1, 3, 7, 14][Math.min(Math.max(streak - 1, 0), 3)];
+    const progress: VocabularyProgress = {
+      correctCount: (previous?.correctCount || 0) + (correct ? 1 : 0),
+      wrongCount: (previous?.wrongCount || 0) + (correct ? 0 : 1),
+      streak,
+      lastReviewedAt: now,
+      nextReviewAt: now + (correct ? intervalDays * 24 * 60 * 60 * 1000 : 10 * 60 * 1000),
+      lastMode: mode || previous?.lastMode,
+    };
+
+    const updatedPool: VocabularySet = {
+      ...pool,
+      id: VOCAB_POOL_ID,
+      title: 'Vokabel-Pool',
+      updatedAt: now,
+      progressByUser: {
+        ...(pool.progressByUser || {}),
+        [userId]: {
+          ...(pool.progressByUser?.[userId] || {}),
+          [entryId]: progress,
+        },
+      },
+    };
+
+    const currentGam = mockDb.getVocabGamification();
+    let outcome: AnswerGamificationOutcome | null = null;
+    let nextGam = currentGam;
+
+    if (options?.countForGamification !== false) {
+      const profile: VocabChildGamification = normalizeChildProfile(userId, currentGam.profilesByUser[userId]);
+      outcome = recordGamificationAnswer({
+        profile,
+        settings: currentGam.settings,
+        entryId,
+        correct,
+        wasHardOrNew,
+        mode,
+      });
+      nextGam = {
+        ...currentGam,
+        profilesByUser: {
+          ...currentGam.profilesByUser,
+          [userId]: outcome.profile,
+        },
+      };
+    }
+
+    set(DB_KEYS.VOCABULARY, {
+      [VOCAB_POOL_ID]: updatedPool,
+      [VOCAB_GAMIFICATION_KEY]: nextGam,
+    });
+
+    return outcome;
   },
   recordVocabularyAnswer: (setId: string, userId: string, entryId: string, correct: boolean, mode?: VocabularyLearnMode) => {
+    if (setId === VOCAB_POOL_ID) {
+      mockDb.recordPoolVocabularyAnswer(userId, entryId, correct, mode);
+      return;
+    }
     const store = mockDb.getVocabularyStore();
     const vocabularySet = store[setId];
     if (!vocabularySet || !vocabularySet.entries.some(entry => entry.id === entryId)) return;
@@ -1614,7 +1785,8 @@ export const mockDb = {
       lastMode: mode || previous?.lastMode,
     };
 
-    store[setId] = {
+    const raw = mockDb.getVocabularyRaw();
+    raw[setId] = {
       ...vocabularySet,
       updatedAt: now,
       progressByUser: {
@@ -1625,7 +1797,7 @@ export const mockDb = {
         },
       },
     };
-    set(DB_KEYS.VOCABULARY, store);
+    set(DB_KEYS.VOCABULARY, raw);
   },
 };
 
