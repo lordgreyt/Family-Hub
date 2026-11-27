@@ -5,10 +5,12 @@ import {
   VOCAB_POOL_ID,
   claimPendingChest,
   consolidateVocabularyPool,
+  createDailyQuests,
   createEmptyChildProfile,
   createExchangeRequest,
   determineChestTier,
   getLevelProgress,
+  localDayKey,
   normalizeGamificationSettings,
   normalizeGamificationState,
   recordGamificationAnswer,
@@ -204,37 +206,82 @@ test('Diamanten-Umtauschanfrage sperrt doppeltes Ausgeben und Eltern-Freigabe zi
   assert.equal(state.exchangeRequests[0].status, 'APPROVED');
 });
 
-test('Tages-Quests enthalten mindestens 30 Vokabeln und eine Boss-Quest für schwere Wörter', () => {
-  const settings = DEFAULT_GAMIFICATION_SETTINGS;
-  let profile = createEmptyChildProfile('Lennart', new Date(2026, 10, 27, 12, 0, 0));
-  assert.equal(profile.dailyQuests.length, 3);
-  const volumeQuest = profile.dailyQuests.find(q => q.kind === 'answers_30');
-  const bossQuest = profile.dailyQuests.find(q => q.kind === 'hard_boss');
-  assert.ok(volumeQuest && volumeQuest.target >= 30);
-  assert.ok(bossQuest && bossQuest.target === 5);
+test('12 rotierende Tages-Missionen: immer 3 pro Tag, 60 einzigartige Kombinationen & exaktes Tracking', () => {
+  // 60 aufeinanderfolgende Tage müssen 60 verschiedene 3er-Kombinationen & alle 12 Missionstypen enthalten
+  const combos = new Set();
+  const seenKinds = new Set();
+  for (let d = 0; d < 60; d += 1) {
+    const day = new Date(2026, 10, 1 + d, 12, 0, 0);
+    const quests = createDailyQuests(localDayKey(day), 30);
+    assert.equal(quests.length, 3);
+    assert.ok(quests[0].target >= 30, 'Slot 1 muss immer mindestens 30 Vokabeln verlangen');
+    combos.add(quests.map(q => q.kind).join('|'));
+    quests.forEach(q => seenKinds.add(q.kind));
+  }
+  assert.equal(combos.size, 60, '60 Tage müssen 60 verschiedene Tages-Kombinationen liefern');
+  assert.equal(seenKinds.size, 12, 'Alle 12 Missionstypen müssen in der Rotation vorkommen');
 
-  // 5 schwere Wörter meistern -> Boss-Quest erledigt (+2 💎)
+  // Boss-Kampf, Welt-Entdecker (unique_20), Schatzjäger (chest_1) & Blitz-Serie (combo_10) live testen
+  const settings = { ...DEFAULT_GAMIFICATION_SETTINGS, chestSize: 5 };
+  let profile = {
+    ...createEmptyChildProfile('Lennart', new Date(2026, 10, 27, 12, 0, 0)),
+    dailyQuests: [
+      {
+        id: 'q_boss',
+        date: '2026-11-27',
+        kind: 'hard_boss',
+        title: 'Boss-Kampf: 5 schwere Wörter meistern',
+        subtitle: '',
+        emoji: '🐉',
+        actionHint: 'hard',
+        target: 5,
+        progress: 0,
+        rewardDiamonds: 2,
+        completed: false,
+      },
+      {
+        id: 'q_unique',
+        date: '2026-11-27',
+        kind: 'unique_20',
+        title: 'Welt-Entdecker: 20 verschiedene Wörter',
+        subtitle: '',
+        emoji: '🦉',
+        target: 5,
+        progress: 0,
+        rewardDiamonds: 2,
+        completed: false,
+      },
+      {
+        id: 'q_chest',
+        date: '2026-11-27',
+        kind: 'chest_1',
+        title: 'Schatzjäger: 1 Schatztruhe heute knacken',
+        subtitle: '',
+        emoji: '🧰',
+        target: 1,
+        progress: 0,
+        rewardDiamonds: 2,
+        completed: false,
+      },
+    ],
+  };
+
   for (let i = 0; i < 5; i += 1) {
-    const out = recordGamificationAnswer({
+    profile = recordGamificationAnswer({
       profile,
       settings,
       entryId: `hard-${i}`,
       correct: true,
       wasHardOrNew: true,
+      mode: 'type',
       now: new Date(2026, 10, 27, 12, 0, i),
-    });
-    profile = out.profile;
+    }).profile;
   }
-  assert.equal(profile.dailyQuests.find(q => q.kind === 'hard_boss')?.completed, true);
-  assert.ok(profile.diamonds >= 2);
 
-  // Blitz-Serie-Quest muss exakt 10 Richtige am Stück verlangen
-  const comboDay = new Date(2026, 10, 26, 12, 0, 0);
-  const comboProfile = createEmptyChildProfile('Lennart', comboDay);
-  const comboQuest = comboProfile.dailyQuests.find(q => q.kind === 'combo_10');
-  if (comboQuest) {
-    assert.equal(comboQuest.target, 10);
-  }
+  assert.equal(profile.dailyQuests.find(q => q.kind === 'hard_boss')?.completed, true);
+  assert.equal(profile.dailyQuests.find(q => q.kind === 'unique_20')?.completed, true);
+  assert.equal(profile.dailyQuests.find(q => q.kind === 'chest_1')?.completed, true);
+  assert.ok(profile.diamonds >= 6, 'Alle 3 Quests müssen je +2 Diamanten gutschreiben');
 });
 
 test('Wochenziel gilt standardmäßig für alle 7 Tage (Mo–So) inkl. Migration', () => {

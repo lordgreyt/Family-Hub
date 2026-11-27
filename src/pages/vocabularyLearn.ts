@@ -201,6 +201,28 @@ export function pickLearnMode(options: { streak: number; lastMode?: LearnMode; c
 }
 
 /**
+ * Zufällige Aufgabenart für den Abenteuer-Modus (nicht vom Kind manipulierbar):
+ * Mischt Auswahl, Schreiben und Hören/Diktat bunt durch und vermeidet direkte Wiederholungen.
+ */
+export function pickRandomAdventureMode(options: {
+  canChoose: boolean;
+  canSpeak: boolean;
+  canDictate: boolean;
+  previousMode?: LearnMode;
+  random?: () => number;
+}): LearnMode {
+  const { canChoose, canSpeak, canDictate, previousMode, random = Math.random } = options;
+  const pool: LearnMode[] = ['type'];
+  if (canChoose) pool.push('choice');
+  if (canSpeak) pool.push(canDictate ? 'dictation' : 'audio');
+
+  const withoutRepeat = previousMode && pool.length > 1 ? pool.filter(m => m !== previousMode) : pool;
+  const candidates = withoutRepeat.length > 0 ? withoutRepeat : pool;
+  const idx = Math.floor(Math.max(0, Math.min(0.999999, random())) * candidates.length);
+  return candidates[idx];
+}
+
+/**
  * Erzeugt eine gestufte Tipp-Hilfe beim Schreiben:
  * - Stufe 1: Anfangsbuchstabe + Wortlänge (z. B. "suitcase" → "s _ _ _ _ _ _ _")
  * - Stufe 2: Erste 2–3 Buchstaben + Endbuchstabe (z. B. "suitcase" → "s u _ _ _ _ _ e")

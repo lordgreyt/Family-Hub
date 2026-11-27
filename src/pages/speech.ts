@@ -124,12 +124,12 @@ export function maskTtsKey(key: string): string {
   return `${clean.slice(0, 4)}…${clean.slice(-4)}`;
 }
 
-async function getFirebaseAuthHeaders(): Promise<Record<string, string> | null> {
+async function getFirebaseAuthHeaders(forceRefresh = false): Promise<Record<string, string> | null> {
   try {
     const { auth } = await import('../services/firebase');
     const currentUser = auth.currentUser;
     if (!currentUser) return null;
-    const token = await currentUser.getIdToken();
+    const token = await currentUser.getIdToken(forceRefresh);
     return { Authorization: `Bearer ${token}` };
   } catch {
     return null;
@@ -398,7 +398,7 @@ async function fetchFromNetworkWithRetry(
     const headers = await getFirebaseAuthHeaders();
     if (headers) {
       try {
-        const response = await fetch('/api/vocabulary/tts', {
+        let response = await fetch('/api/vocabulary/tts', {
           method: 'POST',
           headers: {
             ...headers,
@@ -407,13 +407,33 @@ async function fetchFromNetworkWithRetry(
           body: JSON.stringify({ text, language, voice, accent }),
         });
 
+        // Falls ein Firebase-Token nach PWA-Standby abgelaufen ist (401), 1× frisch erneuern
+        if (response.status === 401) {
+          const freshHeaders = await getFirebaseAuthHeaders(true);
+          if (freshHeaders) {
+            response = await fetch('/api/vocabulary/tts', {
+              method: 'POST',
+              headers: {
+                ...freshHeaders,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ text, language, voice, accent }),
+            });
+          }
+        }
+
         if (response.ok) {
           bytes = await readResponseAudioBytes(response);
         } else if (response.status === 404) {
           backendMissing = true;
         } else {
-          const body = await response.json().catch(() => ({}));
-          const err = new Error(body?.error || `Sprachausgabe-Fehler (HTTP ${response.status}).`) as Error & {
+          const rawText = await response.text().catch(() => '');
+          let parsedErr = '';
+          try {
+            const parsed = JSON.parse(rawText);
+            if (parsed && typeof parsed.error === 'string') parsedErr = parsed.error;
+          } catch { /* non-JSON error page (e.g. Vercel protection) */ }
+          const err = new Error(parsedErr || `Sprachausgabe-Fehler (HTTP ${response.status}).`) as Error & {
             retryable?: boolean;
           };
           err.retryable = response.status >= 500 || response.status === 429;

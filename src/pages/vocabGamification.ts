@@ -60,10 +60,25 @@ export interface VocabPendingChest {
   diamonds: number;
 }
 
+export type VocabDailyQuestKind =
+  | 'answers_30'
+  | 'answers_40'
+  | 'correct_30'
+  | 'hard_boss'
+  | 'hard_boss_8'
+  | 'unique_20'
+  | 'chest_1'
+  | 'combo_10'
+  | 'combo_15'
+  | 'active_12'
+  | 'type_10'
+  | 'audio_8'
+  | 'correct_20';
+
 export interface VocabDailyQuest {
   id: string;
   date: string; // YYYY-MM-DD
-  kind: 'answers_30' | 'hard_boss' | 'combo_10' | 'correct_20' | 'active_12';
+  kind: VocabDailyQuestKind;
   title: string;
   subtitle: string;
   emoji: string;
@@ -108,6 +123,7 @@ export interface VocabChildGamification {
   lastCompletedDay: string | null; // YYYY-MM-DD (letzter Tag mit erreichtem Tagesziel)
   todayDate: string | null; // YYYY-MM-DD
   todayCount: number;
+  todayUniqueCorrectIds: string[];
   claimedDayMilestones: number[]; // z. B. [3, 7]
 
   weeklyStreak: number;
@@ -440,69 +456,57 @@ export function determineChestTier(accuracy: number): { tier: ChestTier; diamond
 }
 
 export function createDailyQuests(dayKey: string, minDailyTarget = 30): VocabDailyQuest[] {
-  const dailyTarget = Math.max(30, Math.round(minDailyTarget));
-  const hash = dayKey.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const variant = hash % 3;
+  const daily30 = Math.max(30, Math.round(minDailyTarget));
+  const daily40 = Math.max(40, daily30 + 10);
+  const dayIndex = Math.max(0, Math.floor(parseDayKey(dayKey).getTime() / (24 * 60 * 60 * 1000)));
 
-  const rotatingQuest: VocabDailyQuest =
-    variant === 0
-      ? {
-          id: `${dayKey}_combo10`,
-          date: dayKey,
-          kind: 'combo_10',
-          title: 'Blitz-Serie: 10 Richtige am Stück',
-          subtitle: 'Bleib fokussiert und knacke die 10er-Combo!',
-          emoji: '⚡',
-          actionHint: 'quiz',
-          target: 10,
-          progress: 0,
-          rewardDiamonds: 2,
-          completed: false,
-        }
-      : variant === 1
-        ? {
-            id: `${dayKey}_correct`,
-            date: dayKey,
-            kind: 'correct_20',
-            title: 'Treffsicher: 20 richtige Antworten',
-            subtitle: 'Zeig, wie sicher deine Wörter sitzen!',
-            emoji: '🎯',
-            actionHint: 'quiz',
-            target: 20,
-            progress: 0,
-            rewardDiamonds: 2,
-            completed: false,
-          }
-        : {
-            id: `${dayKey}_active`,
-            date: dayKey,
-            kind: 'active_12',
-            title: 'Profi-Training: 12× Schreiben oder Hören',
-            subtitle: 'Tippe oder höre 12 Wörter richtig!',
-            emoji: '🎧',
-            actionHint: 'quiz',
-            target: 12,
-            progress: 0,
-            rewardDiamonds: 2,
-            completed: false,
-          };
-
-  return [
+  // Slot 1 (3 Fleiß-Missionen, immer >= 30 Vokabeln)
+  const slot1Pool: VocabDailyQuest[] = [
     {
-      id: `${dayKey}_volume`,
+      id: `${dayKey}_answers30`,
       date: dayKey,
       kind: 'answers_30',
-      title: `Tages-Training: ${dailyTarget} Vokabeln üben`,
+      title: `Tages-Training: ${daily30} Vokabeln üben`,
       subtitle: 'Bleib dran und fülle deine Schatztruhe!',
       emoji: '🔥',
       actionHint: 'quiz',
-      target: dailyTarget,
+      target: daily30,
       progress: 0,
       rewardDiamonds: 2,
       completed: false,
     },
     {
-      id: `${dayKey}_boss`,
+      id: `${dayKey}_answers40`,
+      date: dayKey,
+      kind: 'answers_40',
+      title: `Turbo-Marathon: ${daily40} Vokabeln üben`,
+      subtitle: 'Extra-Ausdauer für Extra-Diamanten!',
+      emoji: '🚀',
+      actionHint: 'quiz',
+      target: daily40,
+      progress: 0,
+      rewardDiamonds: 3,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_correct30`,
+      date: dayKey,
+      kind: 'correct_30',
+      title: `Gold-Treffer: ${daily30} richtige Antworten`,
+      subtitle: 'Zeig, wie sicher dein Wortschatz sitzt!',
+      emoji: '🏆',
+      actionHint: 'quiz',
+      target: daily30,
+      progress: 0,
+      rewardDiamonds: 3,
+      completed: false,
+    },
+  ];
+
+  // Slot 2 (4 Boss-, Entdecker- & Truhen-Missionen)
+  const slot2Pool: VocabDailyQuest[] = [
+    {
+      id: `${dayKey}_boss5`,
       date: dayKey,
       kind: 'hard_boss',
       title: 'Boss-Kampf: 5 schwere Wörter meistern',
@@ -514,7 +518,120 @@ export function createDailyQuests(dayKey: string, minDailyTarget = 30): VocabDai
       rewardDiamonds: 2,
       completed: false,
     },
-    rotatingQuest,
+    {
+      id: `${dayKey}_unique20`,
+      date: dayKey,
+      kind: 'unique_20',
+      title: 'Welt-Entdecker: 20 verschiedene Wörter',
+      subtitle: 'Löse heute 20 unterschiedliche Vokabeln richtig!',
+      emoji: '🦉',
+      actionHint: 'quiz',
+      target: 20,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_boss8`,
+      date: dayKey,
+      kind: 'hard_boss_8',
+      title: 'Drachen-Jagd: 8 schwere Wörter besiegen',
+      subtitle: 'Der große Endgegner wartet auf dich!',
+      emoji: '🐉',
+      actionHint: 'hard',
+      target: 8,
+      progress: 0,
+      rewardDiamonds: 3,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_chest1`,
+      date: dayKey,
+      kind: 'chest_1',
+      title: 'Schatzjäger: 1 Schatztruhe heute knacken',
+      subtitle: 'Mach heute einen vollen 50er-Truhenblock voll!',
+      emoji: '🧰',
+      actionHint: 'quiz',
+      target: 1,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+  ];
+
+  // Slot 3 (5 Combo- & Skill-Missionen; lcm(3, 4, 5) = 60 verschiedene Tages-Kombinationen!)
+  const slot3Pool: VocabDailyQuest[] = [
+    {
+      id: `${dayKey}_combo10`,
+      date: dayKey,
+      kind: 'combo_10',
+      title: 'Blitz-Serie: 10 Richtige am Stück',
+      subtitle: 'Bleib fokussiert und knacke die 10er-Combo!',
+      emoji: '⚡',
+      actionHint: 'quiz',
+      target: 10,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_active12`,
+      date: dayKey,
+      kind: 'active_12',
+      title: 'Profi-Training: 12× Schreiben oder Hören',
+      subtitle: 'Tippe oder höre 12 Wörter richtig!',
+      emoji: '🎧',
+      actionHint: 'quiz',
+      target: 12,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_type10`,
+      date: dayKey,
+      kind: 'type_10',
+      title: 'Schreib-Champion: 10 Wörter selbst tippen',
+      subtitle: 'Beweise deine Rechtschreibung im Schreib-Modus!',
+      emoji: '✍️',
+      actionHint: 'quiz',
+      target: 10,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_combo15`,
+      date: dayKey,
+      kind: 'combo_15',
+      title: 'Mega-Blitz: 15 Richtige am Stück',
+      subtitle: 'Schaffst du die legendäre 15er-Serie ohne Fehler?',
+      emoji: '⚡',
+      actionHint: 'quiz',
+      target: 15,
+      progress: 0,
+      rewardDiamonds: 3,
+      completed: false,
+    },
+    {
+      id: `${dayKey}_audio8`,
+      date: dayKey,
+      kind: 'audio_8',
+      title: 'Ohren-Profi: 8 Wörter im Hör-Modus',
+      subtitle: 'Löse 8 Wörter im Hören- oder Diktat-Modus!',
+      emoji: '🔊',
+      actionHint: 'quiz',
+      target: 8,
+      progress: 0,
+      rewardDiamonds: 2,
+      completed: false,
+    },
+  ];
+
+  return [
+    slot1Pool[dayIndex % slot1Pool.length],
+    slot2Pool[dayIndex % slot2Pool.length],
+    slot3Pool[dayIndex % slot3Pool.length],
   ];
 }
 
@@ -581,6 +698,7 @@ export function createEmptyChildProfile(userId: string, now: Date = new Date()):
     lastCompletedDay: null,
     todayDate: today,
     todayCount: 0,
+    todayUniqueCorrectIds: [],
     claimedDayMilestones: [],
     weeklyStreak: 0,
     bestWeeklyStreak: 0,
@@ -673,6 +791,10 @@ export function normalizeChildProfile(
     lastCompletedDay: typeof raw.lastCompletedDay === 'string' ? raw.lastCompletedDay : null,
     todayDate: today,
     todayCount: sameDay ? Math.max(0, Number(raw.todayCount) || 0) : 0,
+    todayUniqueCorrectIds:
+      sameDay && Array.isArray(raw.todayUniqueCorrectIds)
+        ? Array.from(new Set(raw.todayUniqueCorrectIds.filter(id => typeof id === 'string')))
+        : [],
     claimedDayMilestones: Array.isArray(raw.claimedDayMilestones)
       ? raw.claimedDayMilestones.map(Number).filter(Number.isFinite)
       : [],
@@ -763,6 +885,9 @@ export function recordGamificationAnswer(params: {
     p.currentCombo += 1;
     if (p.currentCombo > p.bestCombo) p.bestCombo = p.currentCombo;
     if (params.wasHardOrNew) p.hardWordsMastered += 1;
+    if (params.entryId && !p.todayUniqueCorrectIds.includes(params.entryId)) {
+      p.todayUniqueCorrectIds = [...p.todayUniqueCorrectIds, params.entryId];
+    }
 
     const afterLevel = getLevelProgress(p.totalCorrect).level;
     if (afterLevel > prevLevel) {
@@ -792,20 +917,57 @@ export function recordGamificationAnswer(params: {
   if (p.totalCorrect >= 2500) grantBadge('words_2500');
   if (p.hardWordsMastered >= 50) grantBadge('hard_crusher');
 
-  // 2. Tages-Quests Fortschritt (30er-Fleiß, Schwer-Boss & Tages-Challenge)
+  // 2. 50er-Block für Schatztruhe (vor Quests, damit die Schatzjäger-Quest sofort beim Truhenfund auslöst)
+  const seenInBlock = p.blockWordCounts[params.entryId] || 0;
+  const countedForChest = seenInBlock < MAX_SAME_WORD_PER_BLOCK;
+  if (countedForChest) {
+    p.blockWordCounts = { ...p.blockWordCounts, [params.entryId]: seenInBlock + 1 };
+    p.blockCount += 1;
+    if (params.correct) p.blockCorrect += 1;
+
+    if (p.blockCount >= params.settings.chestSize) {
+      const accuracy = Math.round((p.blockCorrect / Math.max(1, p.blockCount)) * 100);
+      const { tier, diamonds } = determineChestTier(accuracy);
+      newChest = {
+        id: makeId('chest'),
+        createdAt: now.getTime(),
+        blockSize: p.blockCount,
+        correctCount: p.blockCorrect,
+        accuracy,
+        tier,
+        diamonds,
+      };
+      p.pendingChests = [...p.pendingChests, newChest];
+      p.blockCount = 0;
+      p.blockCorrect = 0;
+      p.blockWordCounts = {};
+    }
+  }
+
+  // 3. Tages-Quests Fortschritt (alle 12 rotierenden Missionen)
   const isActiveInputMode = params.mode === 'type' || params.mode === 'audio' || params.mode === 'dictation';
+  const isAudioMode = params.mode === 'audio' || params.mode === 'dictation';
+  const isTypeMode = params.mode === 'type' || params.mode === 'dictation';
   p.dailyQuests = (p.dailyQuests || createDailyQuests(today, params.settings.dailyGoal)).map(quest => {
     if (quest.completed) return quest;
     let nextProgress = quest.progress;
-    if (quest.kind === 'answers_30') {
+    if (quest.kind === 'answers_30' || quest.kind === 'answers_40') {
       nextProgress += 1;
-    } else if (quest.kind === 'hard_boss' && params.correct && params.wasHardOrNew) {
+    } else if ((quest.kind === 'correct_30' || quest.kind === 'correct_20') && params.correct) {
       nextProgress += 1;
-    } else if (quest.kind === 'combo_10') {
+    } else if ((quest.kind === 'hard_boss' || quest.kind === 'hard_boss_8') && params.correct && params.wasHardOrNew) {
+      nextProgress += 1;
+    } else if (quest.kind === 'unique_20') {
+      nextProgress = Math.max(nextProgress, p.todayUniqueCorrectIds.length);
+    } else if (quest.kind === 'chest_1' && newChest) {
+      nextProgress += 1;
+    } else if (quest.kind === 'combo_10' || quest.kind === 'combo_15') {
       nextProgress = Math.max(nextProgress, p.currentCombo);
-    } else if (quest.kind === 'correct_20' && params.correct) {
-      nextProgress += 1;
     } else if (quest.kind === 'active_12' && params.correct && isActiveInputMode) {
+      nextProgress += 1;
+    } else if (quest.kind === 'type_10' && params.correct && isTypeMode) {
+      nextProgress += 1;
+    } else if (quest.kind === 'audio_8' && params.correct && isAudioMode) {
       nextProgress += 1;
     }
 
@@ -831,7 +993,7 @@ export function recordGamificationAnswer(params: {
     };
   });
 
-  // 3. Tagesziel, Tages-Streak (+ Eis-Schild) & Wochen-Streak
+  // 4. Tagesziel, Tages-Streak (+ Eis-Schild) & Wochen-Streak
   p.todayCount += 1;
   if (p.todayCount >= params.settings.dailyGoal && p.lastCompletedDay !== today) {
     if (!p.lastCompletedDay) {
@@ -901,33 +1063,6 @@ export function recordGamificationAnswer(params: {
         kind: 'week',
       });
       grantBadge('week_champ');
-    }
-  }
-
-  // 4. 50er-Block für Schatztruhe (mit Fairness-Cap pro Wort im selben Block)
-  const seenInBlock = p.blockWordCounts[params.entryId] || 0;
-  const countedForChest = seenInBlock < MAX_SAME_WORD_PER_BLOCK;
-  if (countedForChest) {
-    p.blockWordCounts = { ...p.blockWordCounts, [params.entryId]: seenInBlock + 1 };
-    p.blockCount += 1;
-    if (params.correct) p.blockCorrect += 1;
-
-    if (p.blockCount >= params.settings.chestSize) {
-      const accuracy = Math.round((p.blockCorrect / Math.max(1, p.blockCount)) * 100);
-      const { tier, diamonds } = determineChestTier(accuracy);
-      newChest = {
-        id: makeId('chest'),
-        createdAt: now.getTime(),
-        blockSize: p.blockCount,
-        correctCount: p.blockCorrect,
-        accuracy,
-        tier,
-        diamonds,
-      };
-      p.pendingChests = [...p.pendingChests, newChest];
-      p.blockCount = 0;
-      p.blockCorrect = 0;
-      p.blockWordCounts = {};
     }
   }
 

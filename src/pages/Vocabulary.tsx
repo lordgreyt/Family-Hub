@@ -14,7 +14,6 @@ import {
   Grid2x2,
   Headphones,
   Keyboard,
-  Languages,
   Layers,
   Lightbulb,
   List,
@@ -44,7 +43,7 @@ import {
   isAnswerCorrect,
   isGermanLanguage,
   isHardEntry,
-  pickLearnMode,
+  pickRandomAdventureMode,
   speechText,
 } from './vocabularyLearn';
 import {
@@ -84,10 +83,14 @@ import {
 import { CARD, GREEN_TEXT, HERO_GRADIENT, PINK_TEXT, PRIMARY } from '../components/SurgeryFinance/theme';
 
 type LearnMode = VocabularyLearnMode;
-type QuizModePreference = 'smart' | 'choice' | 'type' | 'dictation';
 type VocabTab = 'learn' | 'treasury' | 'badges';
+interface AdventureQueueItem {
+  entryId: string;
+  mode: LearnMode;
+  direction: 'forward' | 'reverse';
+}
 type ActiveActivity =
-  | { kind: 'quiz'; modePref: QuizModePreference; onlyHard: boolean }
+  | { kind: 'quiz'; onlyHard: boolean }
   | { kind: 'flashcards'; onlyHard: boolean }
   | { kind: 'match'; onlyHard: boolean }
   | { kind: 'audio'; onlyHard: boolean };
@@ -665,10 +668,9 @@ export const Vocabulary = () => {
   const [activeChest, setActiveChest] = useState<VocabPendingChest | null>(null);
   const [bonusBanner, setBonusBanner] = useState<string>('');
 
-  // Active study session
+  // Active study session (im Abenteuer-Modus immer echter Zufalls-Mix ohne manuelle Moduswahl)
   const [activity, setActivity] = useState<ActiveActivity | null>(null);
-  const [direction, setDirection] = useState<'forward' | 'reverse'>('forward');
-  const [queue, setQueue] = useState<string[]>([]);
+  const [queue, setQueue] = useState<AdventureQueueItem[]>([]);
   const [requeued, setRequeued] = useState<Record<string, number>>({});
   const [sessionAnswered, setSessionAnswered] = useState(0);
   const [sessionCorrect, setSessionCorrect] = useState(0);
@@ -786,24 +788,39 @@ export const Vocabulary = () => {
     return ordered.slice(0, 25);
   };
 
-  const startQuiz = (
-    options: { modePref?: QuizModePreference; onlyHard?: boolean; nextDirection?: 'forward' | 'reverse' } = {}
-  ) => {
-    const modePref = options.modePref ?? 'smart';
+  const rollAdventureItem = (entryId: string, previousMode?: LearnMode): AdventureQueueItem => {
+    const itemDirection: 'forward' | 'reverse' = Math.random() < 0.5 ? 'forward' : 'reverse';
+    const itemAnswerLang = itemDirection === 'forward' ? pool.languageTo : pool.languageFrom;
+    const mode = pickRandomAdventureMode({
+      canChoose: pool.entries.length > 1,
+      canSpeak: canSpeak(),
+      canDictate: !isGermanLanguage(itemAnswerLang),
+      previousMode,
+    });
+    return { entryId, mode, direction: itemDirection };
+  };
+
+  const startQuiz = (options: { onlyHard?: boolean } = {}) => {
     const onlyHard = options.onlyHard ?? false;
-    const nextDirection = options.nextDirection ?? direction;
 
     const batch = pickSessionBatch(onlyHard);
     if (batch.length === 0) return;
 
+    const items: AdventureQueueItem[] = [];
+    let lastMode: LearnMode | undefined;
+    for (const entry of batch) {
+      const next = rollAdventureItem(entry.id, lastMode);
+      items.push(next);
+      lastMode = next.mode;
+    }
+
     stopSpeaking();
-    setActivity({ kind: 'quiz', modePref, onlyHard });
-    setDirection(nextDirection);
-    setQueue(batch.map(entry => entry.id));
+    setActivity({ kind: 'quiz', onlyHard });
+    setQueue(items);
     setRequeued({});
     setSessionAnswered(0);
     setSessionCorrect(0);
-    setSessionTotal(batch.length);
+    setSessionTotal(items.length);
     setSessionCombo(0);
     setBonusBanner('');
     setSessionSeq(value => value + 1);
@@ -841,39 +858,26 @@ export const Vocabulary = () => {
     }
   };
 
-  const currentEntry: VocabularyEntry | null =
-    activity?.kind === 'quiz' && queue.length
-      ? pool.entries.find(entry => entry.id === queue[0]) || null
-      : null;
+  const currentQueueItem: AdventureQueueItem | null =
+    activity?.kind === 'quiz' && queue.length ? queue[0] : null;
+  const currentEntry: VocabularyEntry | null = currentQueueItem
+    ? pool.entries.find(entry => entry.id === currentQueueItem.entryId) || null
+    : null;
 
   const sessionPercent = sessionTotal ? Math.min(100, Math.round((sessionAnswered / sessionTotal) * 100)) : 0;
-  const promptLanguage = direction === 'forward' ? pool.languageFrom : pool.languageTo;
-  const answerLanguage = direction === 'forward' ? pool.languageTo : pool.languageFrom;
-  const prompt = currentEntry ? (direction === 'forward' ? currentEntry.front : currentEntry.back) : '';
-  const answer = currentEntry ? (direction === 'forward' ? currentEntry.back : currentEntry.front) : '';
-  const currentProgress = currentEntry ? pool.progressByUser?.[actingUserId]?.[currentEntry.id] : undefined;
-
-  const learnMode: LearnMode = (() => {
-    if (!currentEntry || activity?.kind !== 'quiz') return 'choice';
-    const canChoose = pool.entries.length > 1;
-    const canDictate = !isGermanLanguage(answerLanguage);
-    if (activity.modePref === 'choice') return canChoose ? 'choice' : 'type';
-    if (activity.modePref === 'type') return 'type';
-    if (activity.modePref === 'dictation') return canDictate ? 'dictation' : 'audio';
-    return pickLearnMode({
-      streak: currentProgress?.streak || 0,
-      lastMode: currentProgress?.lastMode,
-      canChoose,
-      canDictate,
-    });
-  })();
+  const currentDirection: 'forward' | 'reverse' = currentQueueItem?.direction || 'forward';
+  const promptLanguage = currentDirection === 'forward' ? pool.languageFrom : pool.languageTo;
+  const answerLanguage = currentDirection === 'forward' ? pool.languageTo : pool.languageFrom;
+  const prompt = currentEntry ? (currentDirection === 'forward' ? currentEntry.front : currentEntry.back) : '';
+  const answer = currentEntry ? (currentDirection === 'forward' ? currentEntry.back : currentEntry.front) : '';
+  const learnMode: LearnMode = currentQueueItem?.mode || 'type';
 
   const choiceOptions =
     currentEntry && learnMode === 'choice'
       ? buildChoiceOptions(
           currentEntry,
           pool.entries,
-          direction === 'forward' ? entry => entry.back : entry => entry.front,
+          currentDirection === 'forward' ? entry => entry.back : entry => entry.front,
           `${currentEntry.id}:${sessionSeq}`
         )
       : [];
@@ -885,7 +889,8 @@ export const Vocabulary = () => {
     if (correct) setSessionCorrect(value => value + 1);
     let nextQueue = queue.slice(1);
     if (!correct && (requeued[currentEntry.id] || 0) < 1) {
-      nextQueue = [...nextQueue, currentEntry.id];
+      const tailMode = nextQueue[nextQueue.length - 1]?.mode ?? answeredMode;
+      nextQueue = [...nextQueue, rollAdventureItem(currentEntry.id, tailMode)];
       setRequeued(previous => ({ ...previous, [currentEntry.id]: (previous[currentEntry.id] || 0) + 1 }));
     }
     setQueue(nextQueue);
@@ -997,14 +1002,8 @@ export const Vocabulary = () => {
       );
     }
 
-    // Quiz Mode (Smart / Choice / Type / Dictation)
+    // Abenteuer-Modus (echter Zufalls-Mix aus Auswahl, Schreiben & Hören/Diktat — nicht manipulierbar)
     const completed = queue.length === 0;
-    const modeOptions: { id: QuizModePreference; label: string }[] = [
-      { id: 'smart', label: 'Smart' },
-      { id: 'choice', label: 'Auswahl' },
-      { id: 'type', label: 'Schreiben' },
-      { id: 'dictation', label: 'Hören' },
-    ];
 
     return (
       <section style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', maxWidth: 680, margin: '0 auto', paddingBottom: '2.2rem' }}>
@@ -1098,38 +1097,6 @@ export const Vocabulary = () => {
                 {autoSpeak ? <Volume2 size={14} /> : <VolumeX size={14} />} Auto-Ton
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={() =>
-                startQuiz({
-                  modePref: activity.modePref,
-                  onlyHard: activity.onlyHard,
-                  nextDirection: direction === 'forward' ? 'reverse' : 'forward',
-                })
-              }
-              title="Abfragerichtung wechseln"
-              style={{
-                height: '38px',
-                padding: '0 0.8rem',
-                borderRadius: '14px',
-                border: '1px solid rgba(167, 139, 250, 0.35)',
-                background: '#312E81',
-                color: '#E0E7FF',
-                fontWeight: 800,
-                fontSize: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              <Languages size={14} />
-              {direction === 'forward'
-                ? `${pool.languageFrom} → ${pool.languageTo}`
-                : `${pool.languageTo} → ${pool.languageFrom}`}
-            </button>
           </div>
         </div>
 
@@ -1198,30 +1165,11 @@ export const Vocabulary = () => {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', padding: '4px', borderRadius: '14px', background: 'rgba(15, 23, 42, 0.55)' }}>
-            {modeOptions.map(opt => {
-              const active = activity.modePref === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setActivity({ ...activity, modePref: opt.id })}
-                  style={{
-                    height: '32px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '12px',
-                    fontWeight: active ? 900 : 700,
-                    background: active ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'transparent',
-                    color: active ? '#FFFFFF' : '#94A3B8',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', fontSize: '11px', fontWeight: 800, color: '#C4B5FD' }}>
+            <span style={{ padding: '0.18rem 0.55rem', borderRadius: '999px', background: 'rgba(129, 140, 248, 0.24)', border: '1px solid rgba(165, 180, 252, 0.38)', color: '#E0E7FF' }}>
+              🎲 Zufalls-Mix
+            </span>
+            <span>Auswahl · Schreiben · Hören (beide Richtungen)</span>
           </div>
 
           <div style={{ height: 10, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', padding: '1px' }}>
@@ -1273,7 +1221,7 @@ export const Vocabulary = () => {
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.35rem', width: '100%' }}>
               <button
                 type="button"
-                onClick={() => startQuiz({ modePref: activity.modePref, onlyHard: activity.onlyHard })}
+                onClick={() => startQuiz({ onlyHard: activity.onlyHard })}
                 style={{
                   flex: '1 1 180px',
                   height: '50px',
@@ -1317,7 +1265,7 @@ export const Vocabulary = () => {
           </div>
         ) : currentEntry ? (
           <StudyCard
-            key={`${currentEntry.id}:${sessionSeq}:${activity.modePref}`}
+            key={`${currentEntry.id}:${sessionSeq}:${learnMode}:${currentDirection}`}
             mode={learnMode}
             options={choiceOptions}
             prompt={prompt}
@@ -1930,7 +1878,7 @@ export const Vocabulary = () => {
             hardWordCount={poolStats.totalHard}
             onOpenChest={chest => setActiveChest(chest)}
             onOpenTreasury={() => setActiveTab('treasury')}
-            onStartQuestAction={action => startQuiz({ modePref: 'smart', onlyHard: action === 'hard' })}
+            onStartQuestAction={action => startQuiz({ onlyHard: action === 'hard' })}
           />
 
           {poolStats.totalWords === 0 ? (
@@ -2071,7 +2019,7 @@ export const Vocabulary = () => {
               <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
-                  onClick={() => startQuiz({ modePref: 'smart', onlyHard: false })}
+                  onClick={() => startQuiz({ onlyHard: false })}
                   style={{
                     flex: '1 1 190px',
                     height: '54px',
@@ -2097,7 +2045,7 @@ export const Vocabulary = () => {
                 {poolStats.totalHard > 0 && (
                   <button
                     type="button"
-                    onClick={() => startQuiz({ modePref: 'smart', onlyHard: true })}
+                    onClick={() => startQuiz({ onlyHard: true })}
                     style={{
                       height: '54px',
                       padding: '0 1rem 0 0.6rem',

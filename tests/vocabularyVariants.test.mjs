@@ -9,6 +9,7 @@ import {
   entryMastery,
   isAnswerCorrect,
   isHardEntry,
+  pickRandomAdventureMode,
   primaryVariant,
   speechText,
 } from '../src/pages/vocabularyLearn.ts';
@@ -87,4 +88,24 @@ test('Lernstand, Problemwörter und Klassenarbeits-Countdown', () => {
   assert.equal(daysUntilExam('2026-11-30', refDay), 4);
   assert.equal(dailyExamTarget(10, 4), 3);
   assert.equal(dailyExamTarget(0, 4), null);
+});
+
+test('pickRandomAdventureMode mischt Auswahl, Schreiben & Hören zufällig ohne direkte Wiederholung', () => {
+  const seen = new Set();
+  let prev;
+  for (let i = 0; i < 30; i += 1) {
+    const mode = pickRandomAdventureMode({
+      canChoose: true,
+      canSpeak: true,
+      canDictate: i % 2 === 0,
+      previousMode: prev,
+      random: () => ((i * 37) % 100) / 100,
+    });
+    if (prev) assert.notEqual(mode, prev, 'Darf nicht direkt denselben Modus wiederholen');
+    seen.add(mode);
+    prev = mode;
+  }
+  assert.ok(seen.has('choice'));
+  assert.ok(seen.has('type'));
+  assert.ok(seen.has('dictation') || seen.has('audio'));
 });

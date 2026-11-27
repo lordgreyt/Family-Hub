@@ -585,17 +585,23 @@ export const VocabTreasureHud: React.FC<VocabTreasureHudProps> = ({
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {profile.dailyQuests.map(quest => {
             const pct = Math.min(100, Math.round((quest.progress / Math.max(1, quest.target)) * 100));
-            const isBoss = quest.kind === 'hard_boss';
+            const isBoss = quest.kind === 'hard_boss' || quest.kind === 'hard_boss_8';
             const questIconSrc =
-              quest.kind === 'answers_30'
+              quest.kind === 'answers_30' || quest.kind === 'answers_40'
                 ? '/vocab-game/flame.png'
-                : quest.kind === 'hard_boss'
-                  ? '/vocab-game/boss-dragon.png'
-                  : quest.kind === 'combo_10'
-                    ? '/vocab-game/lightning-bolt.png'
-                    : quest.kind === 'active_12'
-                      ? '/vocab-game/sound-orb.png'
-                      : '/vocab-game/swords-quest.png';
+                : quest.kind === 'correct_30'
+                  ? '/vocab-game/trophy-badge.png'
+                  : isBoss
+                    ? '/vocab-game/boss-dragon.png'
+                    : quest.kind === 'unique_20'
+                      ? '/vocab-game/hero-owl.png'
+                      : quest.kind === 'chest_1'
+                        ? '/vocab-game/chest-closed.png'
+                        : quest.kind === 'combo_10' || quest.kind === 'combo_15'
+                          ? '/vocab-game/lightning-bolt.png'
+                          : quest.kind === 'active_12' || quest.kind === 'audio_8'
+                            ? '/vocab-game/sound-orb.png'
+                            : '/vocab-game/swords-quest.png';
 
             return (
               <div

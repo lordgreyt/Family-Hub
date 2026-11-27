@@ -77,7 +77,14 @@ async function verifyFamilyMember(req) {
   }
 
   const usersSnap = await getDatabase().ref('family_hub_users').get();
-  const hubUser = asList(usersSnap.val()).find(u => u && u.uid === decoded.uid);
+  let hubUser = asList(usersSnap.val()).find(u => u && u.uid === decoded.uid);
+  if (!hubUser) {
+    // Fallback: manche Profile liegen direkt unter family_hub_profiles/<uid>
+    const profSnap = await getDatabase().ref(`family_hub_profiles/${decoded.uid}`).get();
+    if (profSnap.exists()) {
+      hubUser = profSnap.val();
+    }
+  }
   if (!hubUser) {
     throw new PublicError(403, 'Nutzer ist in Family Hub nicht freigeschaltet.', 'user_not_allowed');
   }
@@ -281,6 +288,9 @@ export default async function handler(req, res) {
       const msg = errBody?.error?.message || `HTTP ${openaiRes.status}`;
       if (openaiRes.status === 401) {
         throw new PublicError(400, 'Der OpenAI API-Key ist ungültig. Bitte prüfe ihn unter Setup.', 'invalid_api_key');
+      }
+      if (openaiRes.status === 403) {
+        throw new PublicError(403, `OpenAI hat das Sprachmodell abgelehnt (${msg}). Bitte im OpenAI-Projekt freischalten.`, 'openai_forbidden');
       }
       if (openaiRes.status === 429) {
         throw new PublicError(429, `OpenAI Limit oder Guthaben erschöpft (${msg}).`, 'rate_or_quota');
