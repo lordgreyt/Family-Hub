@@ -23,6 +23,7 @@ import {
   speakText,
 } from './speech';
 import type { EnglishAccent, OpenAiVoice, TtsStatus } from './speech';
+import { VOCAB_SHOP_ICONS } from './vocabGamification';
 import type { VocabGamificationSettings, VocabGamificationState, VocabShopReward } from './vocabGamification';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -104,9 +105,11 @@ export const Setup = () => {
   // Vokabel-Gamification & Diamanten-Umtauschquote (nur für Erwachsene)
   const [vocabGamState, setVocabGamState] = useState<VocabGamificationState>(() => mockDb.getVocabGamification());
   const [gamDraft, setGamDraft] = useState<VocabGamificationSettings>(() => mockDb.getVocabGamification().settings);
-  const [newShopEmoji, setNewShopEmoji] = useState('🎁');
+  const [newShopEmoji, setNewShopEmoji] = useState('⭐');
   const [newShopTitle, setNewShopTitle] = useState('');
-  const [newShopDiamonds, setNewShopDiamonds] = useState('25');
+  const [newShopDiamonds, setNewShopDiamonds] = useState('20');
+  const [newShopStars, setNewShopStars] = useState('0');
+  const [openIconPickerFor, setOpenIconPickerFor] = useState<string | null>(null);
   const [gamFeedback, setGamFeedback] = useState<string>('');
 
   useEffect(() => {
@@ -985,6 +988,11 @@ export const Setup = () => {
                     >
                       <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-text)' }}>
                         <strong>{req.userName}</strong>: {req.diamonds} 💎 → {req.rewardLabel}
+                        {(req.starsReward || 0) > 0 && (
+                          <span style={{ marginLeft: '0.35rem', padding: '0.08rem 0.4rem', borderRadius: '999px', background: '#FEF3C7', color: '#B45309', fontSize: '11px', fontWeight: 900 }}>
+                            +{req.starsReward} ⭐
+                          </span>
+                        )}
                         {req.note ? ` („${req.note}“)` : ''}
                       </div>
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -1084,97 +1092,341 @@ export const Setup = () => {
               </div>
             </div>
 
-            {/* Wunsch-Tausch-Shop */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={fieldLabel}>Wunsch-Tausch-Shop (Karten für Kinder)</label>
-              {gamDraft.shopItems.map(item => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.45rem 0.65rem',
-                    borderRadius: '12px',
-                    background: 'var(--color-surface-hover)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  <span style={{ fontSize: '18px' }}>{item.emoji}</span>
-                  <span style={{ flex: 1, fontSize: 'var(--font-sm)', fontWeight: 700, color: 'var(--color-text)' }}>
-                    {item.title}
-                  </span>
-                  <span style={{ fontSize: '12px', fontWeight: 900, color: '#0369A1' }}>{item.diamonds} 💎</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setGamDraft(prev => ({
-                        ...prev,
-                        shopItems: prev.shopItems.filter(s => s.id !== item.id),
-                      }))
-                    }
-                    aria-label={`${item.title} entfernen`}
+            {/* Wunsch-Tausch-Shop (vollständig editierbar: Icon, Belohnung, Kosten in 💎 & Sterne-Gutschrift ⭐) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div>
+                <label style={fieldLabel}>Wunsch-Tausch-Shop (Belohnungen, Kosten, Sterne & Icons)</label>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', marginTop: '-2px' }}>
+                  Lege fest, was Kinder für Diamanten erhalten, wie viel es kostet, welches Icon angezeigt wird und ob automatisch ⭐ Sterne aufs Sternekonto gebucht werden.
+                </div>
+              </div>
+
+              {gamDraft.shopItems.map(item => {
+                const pickerOpen = openIconPickerFor === item.id;
+                const updateItem = (patch: Partial<VocabShopReward>) => {
+                  setGamDraft(prev => ({
+                    ...prev,
+                    shopItems: prev.shopItems.map(s => (s.id === item.id ? { ...s, ...patch } : s)),
+                  }));
+                };
+
+                return (
+                  <div
+                    key={item.id}
                     style={{
-                      width: '28px', height: '28px', borderRadius: '8px', border: 'none',
-                      background: '#FDE8EF', color: PINK_TEXT, display: 'flex',
-                      alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      padding: '0.65rem 0.7rem',
+                      borderRadius: '14px',
+                      background: 'var(--color-surface-hover)',
+                      border: '1px solid var(--color-border)',
                     }}
                   >
-                    <Trash2 size={13} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenIconPickerFor(pickerOpen ? null : item.id)}
+                        title="Icon auswählen"
+                        aria-label={`Icon für ${item.title || 'Belohnung'} ändern`}
+                        style={{
+                          width: '42px',
+                          height: '40px',
+                          borderRadius: '11px',
+                          border: pickerOpen ? `2px solid ${PRIMARY}` : '1.5px solid var(--color-border)',
+                          background: pickerOpen ? '#ECE8FF' : 'var(--color-surface)',
+                          fontSize: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {item.emoji || '🎁'}
+                      </button>
+
+                      <input
+                        type="text"
+                        maxLength={45}
+                        value={item.title}
+                        onChange={e => updateItem({ title: e.target.value })}
+                        placeholder="Was man erhält (z. B. 25 Sterne, Filmabend)"
+                        aria-label="Was man erhält"
+                        className="input-field"
+                        style={{ flex: 1, minWidth: 0, height: '40px', fontSize: '13px', fontWeight: 700 }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (pickerOpen) setOpenIconPickerFor(null);
+                          setGamDraft(prev => ({
+                            ...prev,
+                            shopItems: prev.shopItems.filter(s => s.id !== item.id),
+                          }));
+                        }}
+                        aria-label={`${item.title} entfernen`}
+                        style={{
+                          width: '34px', height: '34px', borderRadius: '10px', border: 'none',
+                          background: '#FDE8EF', color: PINK_TEXT, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {pickerOpen && (
+                      <div
+                        style={{
+                          padding: '0.5rem',
+                          borderRadius: '12px',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.45rem',
+                        }}
+                      >
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.3rem' }}>
+                          {VOCAB_SHOP_ICONS.map(icon => {
+                            const selected = item.emoji === icon;
+                            return (
+                              <button
+                                key={icon}
+                                type="button"
+                                onClick={() => {
+                                  updateItem({ emoji: icon });
+                                  setOpenIconPickerFor(null);
+                                }}
+                                style={{
+                                  height: '34px',
+                                  borderRadius: '8px',
+                                  border: selected ? `2px solid ${PRIMARY}` : '1px solid var(--color-border)',
+                                  background: selected ? '#ECE8FF' : 'var(--color-surface-hover)',
+                                  fontSize: '18px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {icon}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)' }}>Eigenes Icon:</span>
+                          <input
+                            type="text"
+                            maxLength={4}
+                            value={item.emoji}
+                            onChange={e => updateItem({ emoji: e.target.value || '🎁' })}
+                            className="input-field"
+                            style={{ width: '58px', height: '30px', textAlign: 'center', fontSize: '15px', padding: '0 0.25rem' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 800, color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                          Kosten (💎 Diamanten)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={item.diamonds}
+                          onChange={e => updateItem({ diamonds: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })}
+                          className="input-field"
+                          style={{ height: '36px', fontSize: '13px', fontWeight: 800 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 800, color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                          Sterne-Gutschrift (⭐, 0 = aus)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1000}
+                          value={item.starsReward ?? 0}
+                          onChange={e => {
+                            const val = Math.max(0, Math.min(1000, Number(e.target.value) || 0));
+                            updateItem({ starsReward: val > 0 ? val : undefined });
+                          }}
+                          className="input-field"
+                          style={{ height: '36px', fontSize: '13px', fontWeight: 800 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Neue Belohnung anlegen */}
+              <div
+                style={{
+                  padding: '0.7rem',
+                  borderRadius: '14px',
+                  background: 'rgba(99, 102, 241, 0.06)',
+                  border: '1.5px dashed rgba(99, 102, 241, 0.35)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ fontSize: '11.5px', fontWeight: 900, color: PRIMARY }}>
+                  + Neue Belohnung hinzufügen
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIconPickerFor(openIconPickerFor === '__new__' ? null : '__new__')}
+                    title="Icon für neue Belohnung wählen"
+                    style={{
+                      width: '42px',
+                      height: '40px',
+                      borderRadius: '11px',
+                      border: openIconPickerFor === '__new__' ? `2px solid ${PRIMARY}` : '1.5px solid var(--color-border)',
+                      background: openIconPickerFor === '__new__' ? '#ECE8FF' : 'var(--color-surface)',
+                      fontSize: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {newShopEmoji || '🎁'}
+                  </button>
+                  <input
+                    type="text"
+                    maxLength={45}
+                    value={newShopTitle}
+                    onChange={e => setNewShopTitle(e.target.value)}
+                    placeholder="Was man erhält (z. B. 50 Sterne oder 30 Min. Switch)"
+                    className="input-field"
+                    style={{ flex: 1, minWidth: 0, height: '40px', fontSize: '13px' }}
+                  />
+                </div>
+
+                {openIconPickerFor === '__new__' && (
+                  <div
+                    style={{
+                      padding: '0.5rem',
+                      borderRadius: '12px',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '0.3rem' }}>
+                      {VOCAB_SHOP_ICONS.map(icon => {
+                        const selected = newShopEmoji === icon;
+                        return (
+                          <button
+                            key={icon}
+                            type="button"
+                            onClick={() => {
+                              setNewShopEmoji(icon);
+                              setOpenIconPickerFor(null);
+                            }}
+                            style={{
+                              height: '34px',
+                              borderRadius: '8px',
+                              border: selected ? `2px solid ${PRIMARY}` : '1px solid var(--color-border)',
+                              background: selected ? '#ECE8FF' : 'var(--color-surface-hover)',
+                              fontSize: '18px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {icon}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)' }}>Eigenes Icon:</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={newShopEmoji}
+                        onChange={e => setNewShopEmoji(e.target.value)}
+                        className="input-field"
+                        style={{ width: '58px', height: '30px', textAlign: 'center', fontSize: '15px', padding: '0 0.25rem' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.45rem', alignItems: 'end' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 800, color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                      Kosten (💎)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={newShopDiamonds}
+                      onChange={e => setNewShopDiamonds(e.target.value)}
+                      className="input-field"
+                      aria-label="Kosten in Diamanten"
+                      style={{ height: '38px', fontSize: '13px', fontWeight: 800 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 800, color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                      Sterne (⭐, opt.)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1000}
+                      value={newShopStars}
+                      onChange={e => setNewShopStars(e.target.value)}
+                      className="input-field"
+                      aria-label="Sterne-Gutschrift"
+                      style={{ height: '38px', fontSize: '13px', fontWeight: 800 }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newShopTitle.trim()) return;
+                      const stars = Math.max(0, Math.min(1000, Number(newShopStars) || 0));
+                      const reward: VocabShopReward = {
+                        id: `shop_${Date.now().toString(36)}`,
+                        emoji: newShopEmoji.trim() || '🎁',
+                        title: newShopTitle.trim(),
+                        diamonds: Math.max(1, Math.min(500, Number(newShopDiamonds) || 20)),
+                        ...(stars > 0 ? { starsReward: stars } : {}),
+                      };
+                      setGamDraft(prev => ({ ...prev, shopItems: [...prev.shopItems, reward] }));
+                      setNewShopTitle('');
+                      setNewShopStars('0');
+                      setOpenIconPickerFor(null);
+                    }}
+                    style={{
+                      height: '38px', padding: '0 0.9rem', borderRadius: '999px', border: 'none',
+                      background: '#ECE8FF', color: PRIMARY, fontSize: '12px', fontWeight: 800,
+                      fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                    }}
+                  >
+                    <Plus size={14} /> Hinzufügen
                   </button>
                 </div>
-              ))}
-
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <input
-                  type="text"
-                  maxLength={4}
-                  value={newShopEmoji}
-                  onChange={e => setNewShopEmoji(e.target.value)}
-                  className="input-field"
-                  aria-label="Emoji"
-                  style={{ width: '52px', height: '38px', textAlign: 'center', fontSize: '16px', padding: '0 0.25rem' }}
-                />
-                <input
-                  type="text"
-                  maxLength={45}
-                  value={newShopTitle}
-                  onChange={e => setNewShopTitle(e.target.value)}
-                  placeholder="Neue Belohnung (z. B. 30 Min. Switch)"
-                  className="input-field"
-                  style={{ flex: '1 1 160px', height: '38px', fontSize: '13px' }}
-                />
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={newShopDiamonds}
-                  onChange={e => setNewShopDiamonds(e.target.value)}
-                  className="input-field"
-                  aria-label="Diamanten"
-                  style={{ width: '74px', height: '38px', fontSize: '13px', fontWeight: 800 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!newShopTitle.trim()) return;
-                    const reward: VocabShopReward = {
-                      id: `shop_${Date.now().toString(36)}`,
-                      emoji: newShopEmoji.trim() || '🎁',
-                      title: newShopTitle.trim(),
-                      diamonds: Math.max(1, Math.min(500, Number(newShopDiamonds) || 20)),
-                    };
-                    setGamDraft(prev => ({ ...prev, shopItems: [...prev.shopItems, reward] }));
-                    setNewShopTitle('');
-                  }}
-                  style={{
-                    height: '38px', padding: '0 0.85rem', borderRadius: '999px', border: 'none',
-                    background: '#ECE8FF', color: PRIMARY, fontSize: '12px', fontWeight: 800,
-                    fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                  }}
-                >
-                  <Plus size={14} /> Hinzufügen
-                </button>
               </div>
             </div>
 

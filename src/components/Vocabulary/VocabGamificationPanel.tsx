@@ -763,7 +763,7 @@ interface VocabTreasuryViewProps {
   requests: VocabDiamondExchangeRequest[];
   isAdult: boolean;
   viewerName: string;
-  onRequestExchange: (params: { diamonds: number; rewardLabel: string; note?: string }) => void;
+  onRequestExchange: (params: { diamonds: number; rewardLabel: string; starsReward?: number; note?: string }) => void;
   onResolveRequest: (requestId: string, decision: 'APPROVED' | 'REJECTED') => void;
 }
 
@@ -787,13 +787,18 @@ export const VocabTreasuryView: React.FC<VocabTreasuryViewProps> = ({
   const pendingForParents = requests.filter(r => r.status === 'PENDING');
   const childRequests = requests.filter(r => r.userId === profile.userId).slice(0, 15);
 
-  const submitRequest = (diamonds: number, rewardLabel: string) => {
+  const submitRequest = (diamonds: number, rewardLabel: string, starsReward?: number) => {
     setFeedback(null);
     try {
-      onRequestExchange({ diamonds, rewardLabel, note: note.trim() || undefined });
+      onRequestExchange({ diamonds, rewardLabel, starsReward, note: note.trim() || undefined });
       setNote('');
       setMultiplier(1);
-      setFeedback({ text: `Anfrage für ${diamonds} Diamanten („${rewardLabel}“) an Mama & Papa gesendet!`, kind: 'ok' });
+      setFeedback({
+        text: starsReward
+          ? `Anfrage für ${diamonds} Diamanten („${rewardLabel}“, +${starsReward} ⭐) an Mama & Papa gesendet!`
+          : `Anfrage für ${diamonds} Diamanten („${rewardLabel}“) an Mama & Papa gesendet!`,
+        kind: 'ok',
+      });
     } catch (err) {
       setFeedback({ text: err instanceof Error ? err.message : 'Anfrage fehlgeschlagen.', kind: 'err' });
     }
@@ -835,6 +840,21 @@ export const VocabTreasuryView: React.FC<VocabTreasuryViewProps> = ({
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800, color: 'var(--color-text)' }}>
                   {req.userName}: <strong>{req.diamonds} 💎</strong> → {req.rewardLabel}
+                  {(req.starsReward || 0) > 0 && (
+                    <span
+                      style={{
+                        marginLeft: '0.4rem',
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: '999px',
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                      }}
+                    >
+                      +{req.starsReward} ⭐
+                    </span>
+                  )}
                 </div>
                 {req.note && (
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
@@ -1096,6 +1116,21 @@ export const VocabTreasuryView: React.FC<VocabTreasuryViewProps> = ({
                   <div style={{ fontSize: 'var(--font-sm)', fontWeight: 800, color: 'var(--color-text)' }}>
                     {item.title}
                   </div>
+                  {(item.starsReward || 0) > 0 && (
+                    <div
+                      style={{
+                        alignSelf: 'flex-start',
+                        padding: '0.16rem 0.55rem',
+                        borderRadius: '999px',
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        fontSize: '11.5px',
+                        fontWeight: 900,
+                      }}
+                    >
+                      +{item.starsReward} ⭐ aufs Sternekonto
+                    </div>
+                  )}
                   <div style={{ height: '7px', borderRadius: '999px', background: 'rgba(15,23,42,0.08)', overflow: 'hidden' }}>
                     <div
                       style={{
@@ -1109,7 +1144,7 @@ export const VocabTreasuryView: React.FC<VocabTreasuryViewProps> = ({
                   <button
                     type="button"
                     disabled={!affordable}
-                    onClick={() => submitRequest(item.diamonds, item.title)}
+                    onClick={() => submitRequest(item.diamonds, item.title, item.starsReward)}
                     style={{
                       marginTop: 'auto',
                       height: '36px',

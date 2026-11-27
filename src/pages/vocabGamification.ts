@@ -19,11 +19,18 @@ export type VocabBadgeId =
   | 'week_champ'
   | 'hard_crusher';
 
+export const VOCAB_SHOP_ICONS = [
+  '⭐', '💶', '🎬', '🍦', '🎮', '🍕', '🎁', '📱',
+  '🎧', '⚽', '🎨', '📖', '🧸', '🎟️', '🏖️', '💎',
+] as const;
+
 export interface VocabShopReward {
   id: string;
   title: string;
   emoji: string;
   diamonds: number;
+  /** Optional: Wie viele Family-Hub-Sterne das Kind bei Einlösung automatisch aufs Sternekonto bekommt (0 = keine). */
+  starsReward?: number;
 }
 
 export interface VocabGamificationSettings {
@@ -127,6 +134,8 @@ export interface VocabDiamondExchangeRequest {
   userName: string;
   diamonds: number;
   rewardLabel: string;
+  /** Optional: Family-Hub-Sterne, die bei Eltern-Freigabe automatisch gutgeschrieben werden. */
+  starsReward?: number;
   note?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: number;
@@ -192,6 +201,7 @@ export const DEFAULT_GAMIFICATION_SETTINGS: VocabGamificationSettings = {
   dailyGoal: 30,
   weeklyGoalDays: 7,
   shopItems: [
+    { id: 'shop_stars', title: '25 Sterne aufs Konto', emoji: '⭐', diamonds: 20, starsReward: 25 },
     { id: 'shop_pocket', title: '2,00 € Taschengeld', emoji: '💶', diamonds: 20 },
     { id: 'shop_movie', title: 'Filmabend aussuchen', emoji: '🎬', diamonds: 30 },
     { id: 'shop_icecream', title: 'Eis essen gehen', emoji: '🍦', diamonds: 45 },
@@ -518,12 +528,16 @@ export function normalizeGamificationSettings(raw?: Partial<VocabGamificationSet
   const shopItems = Array.isArray(raw?.shopItems)
     ? raw!.shopItems
         .filter(item => item && typeof item.title === 'string' && item.title.trim())
-        .map((item, idx) => ({
-          id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : `shop_${idx + 1}`,
-          title: item.title.trim(),
-          emoji: typeof item.emoji === 'string' && item.emoji.trim() ? item.emoji.trim() : '🎁',
-          diamonds: clampInt(item.diamonds, 20, 1, 500),
-        }))
+        .map((item, idx) => {
+          const stars = clampInt(item.starsReward, 0, 0, 1000);
+          return {
+            id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : `shop_${idx + 1}`,
+            title: item.title.trim(),
+            emoji: typeof item.emoji === 'string' && item.emoji.trim() ? item.emoji.trim() : '🎁',
+            diamonds: clampInt(item.diamonds, 20, 1, 500),
+            ...(stars > 0 ? { starsReward: stars } : {}),
+          };
+        })
     : DEFAULT_GAMIFICATION_SETTINGS.shopItems;
 
   const isLegacySchema = !raw?.settingsVersion || Number(raw.settingsVersion) < 2;
@@ -982,6 +996,7 @@ export function createExchangeRequest(params: {
   userName: string;
   diamonds: number;
   rewardLabel: string;
+  starsReward?: number;
   note?: string;
   now?: Date;
 }): { state: VocabGamificationState; request: VocabDiamondExchangeRequest } {
@@ -1002,12 +1017,18 @@ export function createExchangeRequest(params: {
     );
   }
 
+  const starsReward =
+    Number.isFinite(Number(params.starsReward)) && Number(params.starsReward) > 0
+      ? Math.min(1000, Math.round(Number(params.starsReward)))
+      : undefined;
+
   const request: VocabDiamondExchangeRequest = {
     id: makeId('exch'),
     userId: params.userId,
     userName: params.userName || params.userId,
     diamonds: amount,
     rewardLabel: params.rewardLabel.trim() || params.state.settings.exchangeLabel,
+    ...(starsReward ? { starsReward } : {}),
     note: params.note?.trim() || undefined,
     status: 'PENDING',
     createdAt: now.getTime(),

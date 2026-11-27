@@ -160,12 +160,25 @@ test('Diamanten-Umtauschanfrage sperrt doppeltes Ausgeben und Eltern-Freigabe zi
     userId: 'Lennart',
     userName: 'Lennart',
     diamonds: 20,
-    rewardLabel: '2,00 €',
-    note: 'Für mein Sparschwein',
+    rewardLabel: '25 Sterne aufs Konto',
+    starsReward: 25,
+    note: 'Für mein Sternekonto',
   });
   state = afterReq;
   assert.equal(state.exchangeRequests.length, 1);
   assert.equal(state.exchangeRequests[0].status, 'PENDING');
+  assert.equal(state.exchangeRequests[0].starsReward, 25);
+
+  // Shop-Item Normalisierung speichert Icon, Kosten & Sterne-Gutschrift sauber
+  const normalizedShop = normalizeGamificationSettings({
+    settingsVersion: 2,
+    shopItems: [
+      { id: 's1', title: '50 Sterne', emoji: '⭐', diamonds: 30, starsReward: 50 },
+      { id: 's2', title: 'Eis', emoji: '🍦', diamonds: 20, starsReward: 0 },
+    ],
+  });
+  assert.equal(normalizedShop.shopItems[0].starsReward, 50);
+  assert.equal(normalizedShop.shopItems[1].starsReward, undefined);
 
   // Zweite Anfrage für 20 💎 muss fehlschlagen, weil nur noch 5 frei sind!
   assert.throws(

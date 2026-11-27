@@ -2214,12 +2214,13 @@ export const Vocabulary = () => {
           requests={gamState.exchangeRequests}
           isAdult={!user?.isChild}
           viewerName={user?.id || 'Eltern'}
-          onRequestExchange={({ diamonds, rewardLabel, note }) => {
+          onRequestExchange={({ diamonds, rewardLabel, starsReward, note }) => {
             mockDb.requestVocabDiamondExchange({
               userId: viewedProfile.userId,
               userName: viewedProfile.userId,
               diamonds,
               rewardLabel,
+              starsReward,
               note,
             });
           }}

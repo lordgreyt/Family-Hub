@@ -1679,6 +1679,7 @@ export const mockDb = {
     userName: string;
     diamonds: number;
     rewardLabel: string;
+    starsReward?: number;
     note?: string;
   }): VocabDiamondExchangeRequest => {
     const current = mockDb.getVocabGamification();
@@ -1692,8 +1693,20 @@ export const mockDb = {
     resolvedBy: string
   ) => {
     const current = mockDb.getVocabGamification();
+    const target = current.exchangeRequests.find(r => r.id === requestId);
     const next = resolveExchangeRequest({ state: current, requestId, decision, resolvedBy });
     mockDb.saveVocabGamification(next);
+
+    // Falls der Wunsch-Tausch Sterne vergibt, diese automatisch aufs Sternekonto buchen!
+    if (decision === 'APPROVED' && target && target.status === 'PENDING' && (target.starsReward || 0) > 0) {
+      mockDb.addRewardRequest({
+        id: `vocab-diamond-stars-${target.id}`,
+        childId: target.userId,
+        stars: -(target.starsReward || 0),
+        status: 'APPROVED',
+        description: `Vokabel-Diamanten getauscht (${target.diamonds} 💎 → ${target.starsReward} ⭐ · ${target.rewardLabel})`,
+      });
+    }
   },
   recordPoolVocabularyAnswer: (
     userId: string,
