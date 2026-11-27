@@ -2,10 +2,13 @@
  * Studio-Sprachausgabe für Vokabeln über OpenAI TTS (`gpt-4o-mini-tts`)
  * mit dauerhaftem Browser-Cache (Cache API), sodass jede Vokabel nur einmal erzeugt wird.
  *
- * - Im Live-Betrieb (Vercel): ruft `/api/vocabulary/tts` auf (Key liegt verschlüsselt auf dem Server,
- *   Kinder können hören, aber niemals den Key sehen oder ändern).
- * - Lokal unter `vite` (ohne Vercel-Serverless): nutzt `/api/openai/v1/audio/speech` über den Vite-Dev-Proxy
- *   mit dem in Setup hinterlegten lokalen OpenAI-Key.
+ * Mobil-optimierte Wiedergabe (iOS Safari / PWA, Android Chrome, Samsung Internet):
+ * - Ein einziges, wiederverwendetes `<audio>`-Element (kein Hardware-Decoder-Überlauf,
+ *   beibehaltene User-Gesture-Entsperrung im Hör-Modus).
+ * - `data:audio/mpeg;base64,...` statt anfälliger `blob:`-URLs (vermeidet iOS AVPlayer Range-Bugs).
+ * - Automatischer Web-Audio-API-Fallback (`AudioContext.decodeAudioData`), falls `<audio>`
+ *   trotzdem einen Media-Fehler meldet.
+ * - Validierung & Selbstheilung: leere/kaputte Cache-Einträge werden verworfen und 1× frisch geladen.
  */
 
 export const SPEECH_RATE_NORMAL = 1.0;
@@ -43,16 +46,27 @@ const CACHE_NAME = 'family-hub-vocab-tts-v1';
 const LOCAL_KEY_STORAGE = 'family_hub_vocab_tts_key';
 const VOICE_STORAGE = 'family_hub_vocab_tts_voice';
 const ACCENT_STORAGE = 'family_hub_vocab_en_accent';
+// 46-Byte standardkonforme Stille-WAV zum synchronen Entsperren auf iOS/Mobile im Click-Handler
+const SILENT_WAV_DATA_URL = 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQIAAAAAAA==';
 
 const VALID_VOICES = new Set<string>(OPENAI_VOICES.map(v => v.id));
 
-let activeAudio: HTMLAudioElement | null = null;
+interface CachedAudio {
+  bytes: Uint8Array;
+  dataUrl: string;
+}
+
+let sharedAudio: HTMLAudioElement | null = null;
+let sharedAudioUnlocked = false;
+let sharedAudioContext: AudioContext | null = null;
+let activeBufferSource: AudioBufferSourceNode | null = null;
 let activeRunId = 0;
-const memoryBlobUrls = new Map<string, string>();
+const memoryAudioCache = new Map<string, CachedAudio>();
+const inflightFetches = new Map<string, Promise<{ audio: CachedAudio; fromCache: boolean }>>();
 let lastTtsErrorMessage = '';
 
 export function canSpeak(): boolean {
-  return typeof window !== 'undefined' && typeof Audio !== 'undefined';
+  return typeof window !== 'undefined' && (typeof Audio !== 'undefined' || getAudioContextClass() !== null);
 }
 
 export function getLastTtsError(): string {
@@ -237,124 +251,469 @@ function buildLocalInstructions(language: string, accent: EnglishAccent): string
   return `Pronounce this ${language} vocabulary word or phrase clearly and naturally as a native speaker for a language student. If multiple variants are separated by commas, read all of them in order with a brief pause between them. Say only the provided text.`;
 }
 
-async function fetchTtsAudioBlob(
+function getAudioContextClass(): (typeof AudioContext) | null {
+  if (typeof window === 'undefined') return null;
+  const win = window as unknown as {
+    AudioContext?: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
+  };
+  return win.AudioContext || win.webkitAudioContext || null;
+}
+
+function getAudioContext(): AudioContext | null {
+  const Ctor = getAudioContextClass();
+  if (!Ctor) return null;
+  if (!sharedAudioContext) {
+    try {
+      sharedAudioContext = new Ctor();
+    } catch {
+      return null;
+    }
+  }
+  return sharedAudioContext;
+}
+
+function getSharedAudio(): HTMLAudioElement | null {
+  if (typeof Audio === 'undefined') return null;
+  if (!sharedAudio) {
+    sharedAudio = new Audio();
+    sharedAudio.preload = 'auto';
+    if (typeof sharedAudio.setAttribute === 'function') {
+      sharedAudio.setAttribute('playsinline', 'true');
+    }
+  }
+  return sharedAudio;
+}
+
+/**
+ * Entsperrt `<audio>` und `AudioContext` synchron innerhalb eines User-Klicks,
+ * damit nachfolgende Vokabeln (nach `fetch` oder Denkpause) auf iOS Safari & Mobile nicht blockiert werden.
+ */
+export function unlockAudio(): void {
+  const ctx = getAudioContext();
+  if (ctx) {
+    try {
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!sharedAudioUnlocked) {
+    const audio = getSharedAudio();
+    if (audio) {
+      try {
+        audio.onerror = null;
+        audio.onended = null;
+        audio.src = SILENT_WAV_DATA_URL;
+        const p = audio.play();
+        sharedAudioUnlocked = true;
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            if (audio.src === SILENT_WAV_DATA_URL) {
+              try {
+                audio.pause();
+                audio.currentTime = 0;
+              } catch { /* ignore */ }
+            }
+          }).catch(() => {
+            sharedAudioUnlocked = false;
+          });
+        }
+      } catch {
+        sharedAudioUnlocked = false;
+      }
+    }
+  }
+}
+
+function bytesToDataUrl(bytes: Uint8Array): string {
+  if (typeof btoa === 'function') {
+    const CHUNK = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return `data:audio/mpeg;base64,${btoa(binary)}`;
+  }
+  const maybeBuffer = (globalThis as unknown as { Buffer?: { from: (data: Uint8Array) => { toString: (enc: string) => string } } }).Buffer;
+  if (maybeBuffer) {
+    return `data:audio/mpeg;base64,${maybeBuffer.from(bytes).toString('base64')}`;
+  }
+  throw new Error('Base64-Kodierung nicht verfügbar.');
+}
+
+function isValidAudioBytes(bytes: Uint8Array, contentType?: string | null): boolean {
+  if (!bytes || bytes.byteLength === 0) return false;
+  const ct = (contentType || '').toLowerCase();
+  if (ct && (ct.includes('text/html') || ct.includes('application/json') || ct.includes('text/plain'))) {
+    return false;
+  }
+  // Erste sichtbare Zeichen auf versehentliches HTML (`<`) oder JSON (`{`) prüfen
+  let idx = 0;
+  while (idx < bytes.length && idx < 16 && (bytes[idx] === 0x20 || bytes[idx] === 0x09 || bytes[idx] === 0x0a || bytes[idx] === 0x0d)) {
+    idx += 1;
+  }
+  if (idx < bytes.length && (bytes[idx] === 0x3c || bytes[idx] === 0x7b)) {
+    return false;
+  }
+  return true;
+}
+
+async function readResponseAudioBytes(response: Response): Promise<Uint8Array> {
+  const contentType = typeof response.headers?.get === 'function' ? response.headers.get('content-type') : '';
+  let bytes: Uint8Array;
+  if (typeof response.arrayBuffer === 'function') {
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } else {
+    const blob = await response.blob();
+    bytes = new Uint8Array(await blob.arrayBuffer());
+  }
+  if (!isValidAudioBytes(bytes, contentType)) {
+    throw new Error('Ungültige Audiodatei vom Server erhalten.');
+  }
+  return bytes;
+}
+
+async function deleteCachedEntry(cacheUrl: string): Promise<void> {
+  memoryAudioCache.delete(cacheUrl);
+  if (typeof caches !== 'undefined') {
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.delete(cacheUrl);
+    } catch { /* ignore */ }
+  }
+}
+
+async function fetchFromNetworkWithRetry(
   text: string,
   language: string,
   voice: OpenAiVoice,
   accent: EnglishAccent
-): Promise<Blob> {
-  const cacheUrl = buildSpeechCacheKey(text, language, voice, accent);
+): Promise<Uint8Array> {
+  const attemptOnce = async (): Promise<Uint8Array> => {
+    let bytes: Uint8Array | null = null;
+    let backendMissing = false;
 
-  // 1. Check persistent Cache API first
-  if (typeof caches !== 'undefined') {
-    try {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(cacheUrl);
-      if (cached && cached.ok) {
-        return await cached.blob();
-      }
-    } catch { /* cache unavailable */ }
-  }
+    const headers = await getFirebaseAuthHeaders();
+    if (headers) {
+      try {
+        const response = await fetch('/api/vocabulary/tts', {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text, language, voice, accent }),
+        });
 
-  // 2. Try production backend route (/api/vocabulary/tts)
-  let blob: Blob | null = null;
-  let backendMissing = false;
-
-  const headers = await getFirebaseAuthHeaders();
-  if (headers) {
-    try {
-      const response = await fetch('/api/vocabulary/tts', {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text, language, voice, accent }),
-      });
-
-      if (response.ok) {
-        blob = await response.blob();
-      } else if (response.status === 404) {
+        if (response.ok) {
+          bytes = await readResponseAudioBytes(response);
+        } else if (response.status === 404) {
+          backendMissing = true;
+        } else {
+          const body = await response.json().catch(() => ({}));
+          const err = new Error(body?.error || `Sprachausgabe-Fehler (HTTP ${response.status}).`) as Error & {
+            retryable?: boolean;
+          };
+          err.retryable = response.status >= 500 || response.status === 429;
+          throw err;
+        }
+      } catch (err) {
+        if (!backendMissing && err instanceof Error && err.message && !/Failed to fetch|NetworkError|Load failed/i.test(err.message)) {
+          throw err;
+        }
+        if (err instanceof Error && /Failed to fetch|NetworkError|Load failed/i.test(err.message)) {
+          // Im Live-Betrieb ohne lokalen Key nicht still als backendMissing verschlucken
+          if (!getLocalOpenAiKey()) {
+            const netErr = new Error('Netzwerkfehler beim Laden der Sprachausgabe.') as Error & { retryable?: boolean };
+            netErr.retryable = true;
+            throw netErr;
+          }
+        }
         backendMissing = true;
-      } else {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body?.error || `Sprachausgabe-Fehler (HTTP ${response.status}).`);
       }
-    } catch (err) {
-      if (!backendMissing && err instanceof Error && err.message && !/Failed to fetch/i.test(err.message)) {
-        throw err;
-      }
+    } else {
       backendMissing = true;
     }
-  } else {
-    backendMissing = true;
-  }
 
-  // 3. Local Vite dev fallback via /api/openai proxy (with local OpenAI key from Setup)
-  if (!blob && backendMissing) {
-    const localKey = getLocalOpenAiKey();
-    if (!localKey) {
-      throw new Error('Kein OpenAI API-Key für die Sprachausgabe hinterlegt (Setup → KI-Sprachausgabe).');
-    }
-    const response = await fetch('/api/openai/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localKey}`,
-      },
-      body: JSON.stringify({
-        model: TTS_MODEL,
-        voice,
-        input: text,
-        instructions: buildLocalInstructions(language, accent),
-        response_format: 'mp3',
-      }),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      const msg = errBody?.error?.message || `HTTP ${response.status}`;
-      if (response.status === 401) {
-        throw new Error('Der OpenAI API-Key ist ungültig. Bitte prüfe ihn unter Setup → KI-Sprachausgabe.');
+    if (!bytes && backendMissing) {
+      const localKey = getLocalOpenAiKey();
+      if (!localKey) {
+        throw new Error('Kein OpenAI API-Key für die Sprachausgabe hinterlegt (Setup → KI-Sprachausgabe).');
       }
-      throw new Error(`OpenAI TTS Fehler: ${msg}`);
+      const response = await fetch('/api/openai/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localKey}`,
+        },
+        body: JSON.stringify({
+          model: TTS_MODEL,
+          voice,
+          input: text,
+          instructions: buildLocalInstructions(language, accent),
+          response_format: 'mp3',
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        const msg = errBody?.error?.message || `HTTP ${response.status}`;
+        if (response.status === 401) {
+          throw new Error('Der OpenAI API-Key ist ungültig. Bitte prüfe ihn unter Setup → KI-Sprachausgabe.');
+        }
+        const err = new Error(`OpenAI TTS Fehler: ${msg}`) as Error & { retryable?: boolean };
+        err.retryable = response.status >= 500 || response.status === 429;
+        throw err;
+      }
+      bytes = await readResponseAudioBytes(response);
     }
-    blob = await response.blob();
+
+    if (!bytes) {
+      throw new Error('Audio konnte nicht geladen werden.');
+    }
+    return bytes;
+  };
+
+  try {
+    return await attemptOnce();
+  } catch (err) {
+    const retryable = Boolean(
+      err && typeof err === 'object' && 'retryable' in err && (err as { retryable?: boolean }).retryable
+    );
+    if (!retryable) throw err;
+    await new Promise(resolve => setTimeout(resolve, 350));
+    return attemptOnce();
+  }
+}
+
+async function loadTtsAudio(
+  text: string,
+  language: string,
+  voice: OpenAiVoice,
+  accent: EnglishAccent,
+  bypassCache = false
+): Promise<{ audio: CachedAudio; fromCache: boolean }> {
+  const cacheUrl = buildSpeechCacheKey(text, language, voice, accent);
+
+  if (!bypassCache) {
+    const inMemory = memoryAudioCache.get(cacheUrl);
+    if (inMemory) return { audio: inMemory, fromCache: true };
+
+    const pending = inflightFetches.get(cacheUrl);
+    if (pending) return pending;
   }
 
-  if (!blob) {
-    throw new Error('Audio konnte nicht geladen werden.');
-  }
+  const task = (async (): Promise<{ audio: CachedAudio; fromCache: boolean }> => {
+    // 1. Dauerhafte Cache API prüfen (und beschädigte Einträge sofort aussortieren)
+    if (!bypassCache && typeof caches !== 'undefined') {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(cacheUrl);
+        if (cached && cached.ok) {
+          const cachedBytes = new Uint8Array(await cached.arrayBuffer());
+          if (isValidAudioBytes(cachedBytes, 'audio/mpeg')) {
+            const entry: CachedAudio = { bytes: cachedBytes, dataUrl: bytesToDataUrl(cachedBytes) };
+            memoryAudioCache.set(cacheUrl, entry);
+            return { audio: entry, fromCache: true };
+          }
+          await cache.delete(cacheUrl);
+        }
+      } catch { /* cache unavailable */ }
+    }
 
-  // 4. Persist MP3 in Cache API for instant offline replay
-  if (typeof caches !== 'undefined') {
-    try {
-      const cache = await caches.open(CACHE_NAME);
-      await cache.put(
-        cacheUrl,
-        new Response(blob.slice(0), {
-          headers: { 'Content-Type': 'audio/mpeg' },
-        })
-      );
-    } catch { /* ignore quota errors */ }
-  }
+    // 2. Frisch vom Server/Proxy laden (mit 1× Retry bei Netzwerk-/5xx-Hänger)
+    const bytes = await fetchFromNetworkWithRetry(text, language, voice, accent);
+    const entry: CachedAudio = { bytes, dataUrl: bytesToDataUrl(bytes) };
+    memoryAudioCache.set(cacheUrl, entry);
 
-  return blob;
+    // 3. Dauerhaft in Cache API ablegen
+    if (typeof caches !== 'undefined') {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const copy = new Uint8Array(bytes.byteLength);
+        copy.set(bytes);
+        await cache.put(
+          cacheUrl,
+          new Response(copy.buffer, {
+            headers: { 'Content-Type': 'audio/mpeg' },
+          })
+        );
+      } catch { /* ignore quota errors */ }
+    }
+
+    return { audio: entry, fromCache: false };
+  })();
+
+  if (!bypassCache) {
+    inflightFetches.set(cacheUrl, task);
+  }
+  try {
+    return await task;
+  } finally {
+    if (inflightFetches.get(cacheUrl) === task) {
+      inflightFetches.delete(cacheUrl);
+    }
+  }
+}
+
+/** Lädt eine Vokabel still in den Cache vor (z. B. nächster Schritt im Hör-Modus). */
+export function prefetchSpeech(text: string, language: string, options?: Pick<SpeakOptions, 'voice' | 'accent'>): void {
+  const cleanText = text.trim();
+  if (!canSpeak() || !cleanText) return;
+  const voice = options?.voice || getTtsVoice();
+  const accent = options?.accent || getEnglishAccent();
+  void loadTtsAudio(cleanText, language, voice, accent).catch(() => { /* ignore background prefetch failures */ });
 }
 
 export function stopSpeaking(): void {
   activeRunId += 1;
-  if (activeAudio) {
+  if (sharedAudio) {
     try {
-      activeAudio.pause();
-      activeAudio.currentTime = 0;
+      sharedAudio.onended = null;
+      sharedAudio.onerror = null;
+      sharedAudio.pause();
+      sharedAudio.currentTime = 0;
     } catch { /* ignore */ }
-    activeAudio = null;
+  }
+  if (activeBufferSource) {
+    try {
+      activeBufferSource.onended = null;
+      activeBufferSource.stop();
+      activeBufferSource.disconnect();
+    } catch { /* ignore */ }
+    activeBufferSource = null;
   }
 }
 
+async function playViaWebAudio(bytes: Uint8Array, rate: number, runId: number, onEnd?: () => void): Promise<boolean> {
+  const ctx = getAudioContext();
+  if (!ctx || typeof ctx.decodeAudioData !== 'function') return false;
+  try {
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const decoded = await ctx.decodeAudioData(copy as ArrayBuffer);
+    if (runId !== activeRunId) return true;
+
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.playbackRate.value = rate;
+    source.connect(ctx.destination);
+    activeBufferSource = source;
+    source.onended = () => {
+      if (activeBufferSource === source) activeBufferSource = null;
+      if (runId === activeRunId) onEnd?.();
+    };
+    source.start(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function describeMediaError(audio: HTMLAudioElement): string {
+  const code = audio.error?.code;
+  if (code === 2) return 'Audio-Netzwerkfehler (Code 2).';
+  if (code === 3) return 'Audiodatei konnte nicht dekodiert werden (Code 3).';
+  if (code === 4) return 'Audioformat wird vom Browser abgelehnt (Code 4).';
+  return 'Audio konnte nicht abgespielt werden.';
+}
+
+function playViaSharedAudioElement(
+  audioData: CachedAudio,
+  rate: number,
+  runId: number,
+  onEnd?: () => void,
+  onLateMediaError?: (message: string) => void
+): Promise<{ ok: true } | { ok: false; reason: 'autoplay' | 'media'; message: string }> {
+  const audio = getSharedAudio();
+  if (!audio) {
+    return Promise.resolve({ ok: false, reason: 'media', message: 'Audio-Element nicht verfügbar.' });
+  }
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (result: { ok: true } | { ok: false; reason: 'autoplay' | 'media'; message: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    try {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      audio.src = audioData.dataUrl;
+      audio.currentTime = 0;
+      audio.playbackRate = rate;
+      if ('preservesPitch' in audio) {
+        (audio as HTMLAudioElement & { preservesPitch: boolean }).preservesPitch = true;
+      }
+      if (typeof audio.load === 'function') {
+        audio.load();
+      }
+    } catch {
+      finish({ ok: false, reason: 'media', message: 'Audio konnte nicht initialisiert werden.' });
+      return;
+    }
+
+    audio.onended = () => {
+      if (runId === activeRunId) onEnd?.();
+    };
+
+    audio.onerror = () => {
+      if (runId !== activeRunId) {
+        finish({ ok: true });
+        return;
+      }
+      const message = describeMediaError(audio);
+      if (!settled) {
+        finish({ ok: false, reason: 'media', message });
+      } else {
+        onLateMediaError?.(message);
+      }
+    };
+
+    const playPromise = audio.play();
+    sharedAudioUnlocked = true;
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => finish({ ok: true }))
+        .catch((err: unknown) => {
+          if (runId !== activeRunId) {
+            finish({ ok: true });
+            return;
+          }
+          const errName = err && typeof err === 'object' && 'name' in err ? String((err as { name: unknown }).name) : '';
+          if (errName === 'AbortError') {
+            finish({ ok: true });
+            return;
+          }
+          if (errName === 'NotAllowedError') {
+            finish({
+              ok: false,
+              reason: 'autoplay',
+              message: 'Autoplay wurde vom Browser blockiert – tippe auf „Vorlesen“.',
+            });
+            return;
+          }
+          finish({
+            ok: false,
+            reason: 'media',
+            message: err instanceof Error && err.message ? err.message : 'Audio konnte nicht abgespielt werden.',
+          });
+        });
+    } else {
+      finish({ ok: true });
+    }
+  });
+}
+
 /**
- * Spielt die Vokabel über OpenAI Studio-TTS ab (mit Cache API).
+ * Spielt die Vokabel über OpenAI Studio-TTS ab (mit Cache API, Einzel-Audio-Element & Web-Audio-Fallback).
  * Bei Langsam-Modus (`rate < 1`) wird die bereits gecachte Studio-MP3 sauber mit `playbackRate` verlangsamt.
  */
 export function speakText(
@@ -374,55 +733,88 @@ export function speakText(
     typeof options?.rate === 'number' && Number.isFinite(options.rate)
       ? Math.min(1.5, Math.max(0.5, options.rate))
       : SPEECH_RATE_NORMAL;
+  const cacheUrl = buildSpeechCacheKey(cleanText, language, voice, accent);
 
-  const memKey = buildSpeechCacheKey(cleanText, language, voice, accent);
-
-  const playUrl = (url: string) => {
+  const playWithRecovery = async (audioData: CachedAudio, fromCache: boolean): Promise<void> => {
     if (runId !== activeRunId) return;
-    const audio = new Audio(url);
-    audio.playbackRate = rate;
-    if ('preservesPitch' in audio) {
-      (audio as HTMLAudioElement & { preservesPitch: boolean }).preservesPitch = true;
-    }
-    activeAudio = audio;
-    audio.onended = () => {
-      if (activeAudio === audio) activeAudio = null;
-      if (runId === activeRunId) options?.onEnd?.();
-    };
-    audio.onerror = () => {
-      if (activeAudio === audio) activeAudio = null;
-      if (runId === activeRunId) {
-        lastTtsErrorMessage = 'Audio konnte nicht abgespielt werden.';
-        onError?.();
+
+    let lateRecoveryTriggered = false;
+    const handleLateError = async (message: string) => {
+      if (lateRecoveryTriggered || runId !== activeRunId) return;
+      lateRecoveryTriggered = true;
+      const webAudioOk = await playViaWebAudio(audioData.bytes, rate, runId, options?.onEnd);
+      if (webAudioOk || runId !== activeRunId) {
+        lastTtsErrorMessage = '';
+        return;
       }
+      lastTtsErrorMessage = message;
+      onError?.();
     };
-    const playPromise = audio.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(() => {
-        if (activeAudio === audio) activeAudio = null;
-        if (runId === activeRunId) {
-          lastTtsErrorMessage = 'Autoplay wurde vom Browser blockiert – tippe auf „Vorlesen“.';
-          onError?.();
-        }
-      });
+
+    const result = await playViaSharedAudioElement(audioData, rate, runId, options?.onEnd, msg => {
+      void handleLateError(msg);
+    });
+    if (result.ok || runId !== activeRunId) {
+      lastTtsErrorMessage = '';
+      return;
     }
+
+    // Automatischer Fallback auf Web Audio API (umgeht iOS Safari/WebKit `<audio>`-Aussetzer komplett)
+    if (result.reason === 'media' || result.reason === 'autoplay') {
+      const webAudioOk = await playViaWebAudio(audioData.bytes, rate, runId, options?.onEnd);
+      if (webAudioOk || runId !== activeRunId) {
+        lastTtsErrorMessage = '';
+        return;
+      }
+    }
+
+    // Selbstheilung: falls ein korrupter Cache-Eintrag vorlag, löschen und 1× frisch vom Server laden
+    if (fromCache && result.reason === 'media') {
+      await deleteCachedEntry(cacheUrl);
+      if (runId !== activeRunId) return;
+      try {
+        const fresh = await loadTtsAudio(cleanText, language, voice, accent, true);
+        if (runId !== activeRunId) return;
+        const retryResult = await playViaSharedAudioElement(fresh.audio, rate, runId, options?.onEnd);
+        if (retryResult.ok || runId !== activeRunId) {
+          lastTtsErrorMessage = '';
+          return;
+        }
+        const retryWebAudioOk = await playViaWebAudio(fresh.audio.bytes, rate, runId, options?.onEnd);
+        if (retryWebAudioOk || runId !== activeRunId) {
+          lastTtsErrorMessage = '';
+          return;
+        }
+      } catch (err) {
+        if (runId !== activeRunId) return;
+        lastTtsErrorMessage = err instanceof Error ? err.message : result.message;
+        onError?.();
+        return;
+      }
+    }
+
+    lastTtsErrorMessage = result.message;
+    onError?.();
   };
 
-  const cachedUrl = memoryBlobUrls.get(memKey);
-  if (cachedUrl) {
+  // Wenn bereits im RAM-Cache: sofort synchron im Klick-Handler starten (optimal für iOS/Mobile Autoplay)
+  const cachedInMemory = memoryAudioCache.get(cacheUrl);
+  if (cachedInMemory) {
     lastTtsErrorMessage = '';
-    playUrl(cachedUrl);
+    void playWithRecovery(cachedInMemory, true);
     return true;
   }
 
-  fetchTtsAudioBlob(cleanText, language, voice, accent)
-    .then(blob => {
-      if (runId !== activeRunId) return;
-      lastTtsErrorMessage = '';
-      const url = URL.createObjectURL(blob);
-      memoryBlobUrls.set(memKey, url);
-      playUrl(url);
-    })
+  // AudioContext ggf. schon im Klick-Handler reaktivieren
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    try {
+      void ctx.resume();
+    } catch { /* ignore */ }
+  }
+
+  loadTtsAudio(cleanText, language, voice, accent)
+    .then(({ audio, fromCache }) => playWithRecovery(audio, fromCache))
     .catch((err: unknown) => {
       if (runId !== activeRunId) return;
       lastTtsErrorMessage = err instanceof Error ? err.message : 'OpenAI Sprachausgabe fehlgeschlagen.';

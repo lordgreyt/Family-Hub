@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { VocabularyEntry, VocabularySet } from '../../services/mockDb';
 import { seededShuffle, speechText } from '../../pages/vocabularyLearn';
-import { SPEECH_RATE_NORMAL, SPEECH_RATE_SLOW, canSpeak, getLastTtsError, speakText, stopSpeaking } from '../../pages/speech';
+import { SPEECH_RATE_NORMAL, SPEECH_RATE_SLOW, canSpeak, getLastTtsError, prefetchSpeech, speakText, stopSpeaking, unlockAudio } from '../../pages/speech';
 import { HERO_GRADIENT, PRIMARY, CARD } from '../SurgeryFinance/theme';
 
 interface VocabAudioPlayerProps {
@@ -90,6 +90,13 @@ export const VocabAudioPlayer: React.FC<VocabAudioPlayerProps> = ({ set, entries
     setIndex(idx);
     setPhase('prompt');
 
+    // Antwort und nächstes Wort still vorladen, damit nach der Denkpause kein Netzwerk-Hänger entsteht
+    prefetchSpeech(aText, answerLang);
+    const upcomingItem = playlist[idx + 1] || (repeat ? playlist[0] : null);
+    if (upcomingItem && upcomingItem !== item) {
+      prefetchSpeech(speechText(direction === 'forward' ? upcomingItem.front : upcomingItem.back), promptLang);
+    }
+
     const startedPrompt = speakText(
       pText,
       promptLang,
@@ -152,6 +159,7 @@ export const VocabAudioPlayer: React.FC<VocabAudioPlayerProps> = ({ set, entries
       setTtsError('Audio-Wiedergabe wird in diesem Browser nicht unterstützt.');
       return;
     }
+    unlockAudio();
     setTtsError(null);
     clearTimers();
     const nextRun = runIdRef.current + 1;

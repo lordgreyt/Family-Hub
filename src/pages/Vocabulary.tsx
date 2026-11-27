@@ -59,6 +59,7 @@ import {
   setTtsVoice,
   speakText,
   stopSpeaking,
+  unlockAudio,
 } from './speech';
 import type { EnglishAccent, OpenAiVoice, TtsStatus } from './speech';
 import { HubIcon } from '../components/HubIcon';
@@ -162,22 +163,28 @@ function StudyCard({
   const [result, setResult] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [plays, setPlays] = useState(0);
   const [hintLevel, setHintLevel] = useState<0 | 1 | 2>(0);
-  const [ttsBroken, setTtsBroken] = useState(false);
+  const [ttsErrorMsg, setTtsErrorMsg] = useState<string | null>(null);
   const answerRef = useRef(onAnswer);
   answerRef.current = onAnswer;
 
   const listening = mode === 'audio' || mode === 'dictation';
-  const ttsAvailable = canSpeak() && !ttsBroken;
+  const ttsAvailable = canSpeak();
   const acceptedAnswers = answerVariants(answer);
   const spokenText = speechText(mode === 'dictation' ? answer : prompt);
   const spokenLanguage = mode === 'dictation' ? answerLanguage : promptLanguage;
   const foreignAnswerText = !isGermanLanguage(answerLanguage) ? speechText(answer) : '';
 
+  const handleTtsError = () => {
+    setTtsErrorMsg(getLastTtsError() || 'OpenAI Sprachausgabe aktuell nicht erreichbar – tippe auf „Vorlesen“.');
+  };
+
   const playAudio = (slow = false) => {
     if (!ttsAvailable) return;
     if (listening && plays >= 5) return;
+    unlockAudio();
+    setTtsErrorMsg(null);
     if (
-      speakText(spokenText, spokenLanguage, () => setTtsBroken(true), {
+      speakText(spokenText, spokenLanguage, handleTtsError, {
         rate: slow ? SPEECH_RATE_SLOW : SPEECH_RATE_NORMAL,
       })
     ) {
@@ -191,7 +198,7 @@ function StudyCard({
     const shouldAutoPlay = listening || (autoSpeak && !isGermanLanguage(spokenLanguage));
     if (!shouldAutoPlay) return;
     const timer = window.setTimeout(() => {
-      if (speakText(spokenText, spokenLanguage, () => setTtsBroken(true), { rate: SPEECH_RATE_NORMAL })) {
+      if (speakText(spokenText, spokenLanguage, handleTtsError, { rate: SPEECH_RATE_NORMAL })) {
         setPlays(value => value + 1);
       }
     }, 260);
@@ -336,6 +343,12 @@ function StudyCard({
               {getLastTtsError() || 'OpenAI Sprachausgabe aktuell nicht verfügbar – Wort steht oben.'}
             </span>
           )
+        )}
+
+        {ttsErrorMsg && (
+          <div style={{ fontSize: 'var(--font-xs)', fontWeight: 700, color: '#D4416E', maxWidth: '380px' }}>
+            {ttsErrorMsg}
+          </div>
         )}
       </div>
 
