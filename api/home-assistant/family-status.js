@@ -5,8 +5,8 @@
  * Liest Family-Hub-Daten direkt aus Firebase RTDB, inklusive family_hub_reminders.
  */
 
-const admin = require('firebase-admin');
-const { getDatabase } = require('firebase-admin/database');
+import admin from 'firebase-admin';
+import { getDatabase } from 'firebase-admin/database';
 
 const DATABASE_URL = 'https://familyhub-a588b-default-rtdb.europe-west1.firebasedatabase.app';
 
@@ -293,7 +293,7 @@ function normalize(raw) {
   };
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
@@ -302,7 +302,14 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const expectedToken = env('FAMILY_HUB_API_TOKEN');
+  let expectedToken;
+  try {
+    expectedToken = env('FAMILY_HUB_API_TOKEN');
+  } catch (err) {
+    console.error('family-status config error:', err.message);
+    return res.status(500).json({ error: 'Server nicht konfiguriert', code: 'not_configured' });
+  }
+
   const authHeader = String(req.headers.authorization || '');
   if (authHeader !== `Bearer ${expectedToken}`) return res.status(401).json({ error: 'Unauthorized' });
 
